@@ -1,0 +1,1132 @@
+! @#$^&* 21 0 691 0 0 0 0 0 0 0 0 0 149 *&^$#@ 
+!*! Updated on Fri Nov  5 11:35:06 2021 by Cheryl Eberhard  1 times 
+!*! Updated on Mon Oct 18 15:00:24 2021 by Eric Eberhard 1 times 
+!*! Updated on Thu Feb 18 14:13:58 2021 by Cheryl Eberhard  1 times 
+!%W% %G% %U% - SCCS
+!* Updated on 06-Jun-94 at 11:42 AM by Eric Eberhard; edit time: 0:00:27
+PROGRAM AR1TMH,8.0(13)          !!Telemarketing Header
+GLOBAL L25="N"
+GLOBAL NM="1"
+GLOBAL V''MODEL="LNKFLP"
+GLOBAL CALL'PRE'ABORT="CALL PRE'ABORT1"
+SYMBOL MCAPID="MC"                              !!Modify
+SYMBOL SCREEN="AR1TMH"                  !!MODIFY
+!! Simple Screen control module - Link or Flip from MC1LST
+!!
+!!                       V. I. C. S.
+!!                    of Camp Verde, AZ
+!!
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!             2933 W Middle Verde Rd
+!!              Camp Verde, AZ
+!!              (602) 567-3727
+!!
+!!
+!! Model program LNKFLP written by:
+!!
+!!              Kenneth J. Shook
+!!              Eric S. Eberhard
+!!
+!!              August 4, 1988
+!!
+!! COPYRIGHT(c) 1988 by VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!      CAMP VERDE, AZ  86322  (V.I.C.S.) ALL RIGHTS RESERVED WORLDWIDE
+!!      All programs written with this model belong to Vertical Integrated
+!!      Computer Systems unless otherwise licensed by V.I.C.S.
+!!
+!!
+!! Model Revision History:
+!!      [1] 12/30/88 ESE        Made compatible w/ version [15] AUTOKY.
+!!      [2] 08/25/89 ESE        Made compatible w/ version [17] AUTOKY.
+!!      [3] 10/24/89 KJS        Unmap SF.
+!!      [4] 06/18/90 KJS/BAP    Changed to set TMH'LST'NO instead of
+!!                              TMH'NO
+!!      [5] 07/17/90 KJS        Added NOAFR="N" to copyf of primary file.
+!!
+!!
+!! Program Revision History (Created by Eric Eberhard on 02/12/93):
+!!
+!![1] 10/15/93 ESE      FIX: print report.
+!![2] 10/19/93 ESE      NEW: use profile for competitor.
+!![3] 12/15/93 ESE      NEW: default territories and frequencies from
+!!                      control record.
+!!                      FIX: display when F5 on frequency and territory.
+!!                      IH: ar1tmh.s as well.
+!![4] 02/07/94 ESE      NEW: Make it work with non-customer profile.
+!![5] 02/15/94 ESE      NEW: Add marketing fields.
+!![6] 02/27/94 ESE      NEW: Mandatory Y/N enabled for competitor.
+!![7] 03/02/94 ESE      NEW: Widened message field to match TMD, etc.
+!!
+!![8] 06/06/94 ESE      NEW: Support messages in TO (not A/R).
+!!
+!![9] 12/14/94 ESE      NEW: Set territory and commission group by zip
+!!                           code table (ZTE) in TO.
+!!
+!!7.4   09/30/95 CAE    New version created
+!!
+!![10]  10/17/96 CAE    NEW: Added free freight and cutoff to screen
+!!                      FIX: Remapped SCALE to SCALEX
+!!                      IH: Need AR1TMH.S
+!!
+!![11]  12/09/96 CAE    FIX: highlighting on screen
+!!                      IH: Need AR1TMH.S
+!!
+!!8.0  02/04/97 CAE     New version created
+!!
+!![12] 02/04/97 CAE     NEW: Changes for year 2000.
+!!
+!![13] 06/27/97  CAE/ESE Use MCPACK for company keys (LPRMAC.MAC[1])
+!!
+!!The following values of PASS'WINDOW are sent:
+!!
+!!      PASS'WINDOW = 1  - Maintenance
+!!      PASS'WINDOW = 2  - LST Changed
+!!      PASS'WINDOW = 3  - Check Del
+!!      PASS'WINDOW = 4  - Delete
+!!              or
+!!      PASS'WINDOW Contains ASC(Menu choice) (e.g. subtract 48 to get
+!!                                                              INX2 value)
+!!
+
+COPY    "FORMAD"
+COPY    "CVTMAP"
+COPY    "ABSELL"
+
+\COPYF LST |MCAPID|
+\COPYF TMH AR NOAFR="N"
+COPYF "TMHFIL[AR]",=ZZZ|NM|,NOAFR
+\COPYF FFP OE
+
+MAP1 FF'PROFILE'YN,S,4
+MAP1 DONE'W,B,1
+MAP1 LNKFLP'REC
+        MAP2 WINDOW,B,1
+        MAP2 V''REC'STAT(1),B,1
+        MAP2 SELECT(1),B,1
+!!      MAP2 SF,B,1
+        MAP2 PG,B,1,1
+        MAP2 SXLN(1),B,1
+
+!!Put your own maps here
+!!      Do not put any code until MODIFY below ...
+!!
+!!
+
+\LSTLNKIN |MCAPID|
+
+IF LST'LINKED'IN = 0 THEN
+        ENTRY = "Could not get LST record."
+        CALL DO'ERR
+        GOTO ABORT
+ENDIF
+OLST'REC = LST'REC
+
+MAP1 SPASS'WINDOW,B,1
+SPASS'WINDOW = PASS'WINDOW
+
+!!MODIFY - you may do anything in here ... below is typical.
+
+\DOPASS
+
+IF PWASTR[1;1] # "Y" AND PASS'WINDOW # 2 THEN
+        ENTRY = "You do not have security to run this program!"
+        CALL DO'ERR
+        PASS'SKIP = 1
+        GOTO ABORT
+ENDIF
+
+\TMREADCTL
+\READCTL APID="GL"
+
+NUMLINS = 10000
+
+MAP1 FORCE'REC
+        MAP2 QTO,S,1
+        MAP2 TER,S,6
+
+IF PWASTR[8;1] # "Y" THEN
+        \COPYF USR SY
+        USE USR UB'RCN INTO USR'REC
+        IF USR'CTL # 0 THEN
+                ENTRY = "Invalid user!"
+                CALL DO'ERR
+                GOTO ABORT
+        ENDIF
+        IF USR'LDCODE = 1 THEN QTO = "T" ELSE QTO = "O"
+        TER = USR'REMSTR
+        IF SELECT(|NM|) # 1 THEN
+                IF (QTO = "T" AND TER # TMH'TTER AND TER # "")          OR &
+                   (QTO = "O" AND TER # TMH'OTER AND TER # "")          THEN
+                        ENTRY = "You cannot change this person - wrong territory!"
+                        CALL DO'ERR
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+ENDIF
+
+TMH'SPACE = SPACE
+TMH'LST'NO = LST'NO
+\DEFALT'TMH
+\SETKEY TMH MODE="KEY"
+CALL PRE'READ|NM|
+IF TMH'CTL # 0 THEN
+        DONE'W = 1
+ELSE
+        IF TOC'SIC'MAND = "Y" AND TMH'SIC'NO = 0 DONE'W = 1
+        IF TOC'VOL'MAND = "Y" AND TMH'VOL'NO = "" DONE'W = 1
+        IF TOC'CLST'MAND = "Y" AND TMH'CLST'NO = 0 DONE'W = 1
+        IF TOC'HOW'MAND = "Y" AND TMH'HOW'NO = "" DONE'W = 1
+        IF TOC'PRD'MAND = "Y" AND TMH'PRD'NO = "" DONE'W = 1
+        IF TOC'CAT'MAND = "Y" AND TMH'CAT'YN = "" DONE'W = 1
+        IF TOC'CHK'MAND = "Y" AND TMH'CHK'CR'YN = "" DONE'W = 1
+ENDIF
+\SETKEY TMH MODE="ALL" BAD1="TMH"
+
+CASE
+IF PASS'WINDOW = 1 THEN
+        IF TMH'CTL # 0 THEN
+                SELECT(|NM|) = 1
+        ELSE
+                SELECT(|NM|) = 3
+        ENDIF
+ELSE
+IF PASS'WINDOW = 4 THEN
+        SELECT(|NM|) = 4
+ENDCASE
+
+IF SELECT(|NM|) = 1 AND PWASTR[2;1] # "Y" THEN
+        ENTRY = "You do not have security to add!"
+        CALL DO'ERR
+        PASS'SKIP = 1
+        GOTO ABORT
+ENDIF
+
+CALL SET'UP
+
+IF PASS'WINDOW # 3 AND PASS'WINDOW # 4 THEN
+        CALL PRE'DSP'SCREEN|NM|
+        CALL PRE'DDB'SCREEN|NM|
+ENDIF
+
+CASE
+IF PASS'WINDOW = 3 THEN
+        !!MODIFY - Check for delete here - set PASS'SKIP = 1 to skip delete
+        !!
+        !!      IF SOME CONDITION THEN
+        !!              PASS'SKIP = 1
+        !!      ENDIF
+        !!
+        IF PWASTR[4;1] # "Y" THEN
+                ENTRY = "You do not have security to delete!"
+                CALL DO'ERR
+                PASS'SKIP = 1
+        ENDIF
+        CUS'KNO = LST'NO
+        RDKEY CUS
+        IF CUS'CTL = 0 THEN
+                ENTRY = "You must delete as a customer first!"
+                CALL DO'ERR
+                PASS'SKIP = 1
+        ENDIF
+ELSE
+IF PASS'WINDOW = 4 THEN
+        IF TMH'CTL = 0 THEN
+                \DELTMH
+        ENDIF
+ELSE
+        CALL PRE'GDB'SCREEN|NM|
+ENDCASE
+
+ABORT:
+        CALL PRE'ABORT|NM|
+!!
+!!MODIFY - To prevent a LST file update set PASS'FRM'PRGNAM = SPACE
+!!         You may set the LST bit here and all will be well.
+!!
+        \LSTLNKRTN |MCAPID|
+END
+
+PRE'ABORT|NM|:
+        CALL PRE'READ|NM|
+        ?TAB(24,1) ; TAB(-1,A'RED) "Cleaning up various things ... ";
+        CALL DEL'MSGNO
+        CALL FIX'DTT
+        TMH'RCN = 0
+        REL TMH
+RETURN
+
+\\DUMLBL
+
+PRE'DSP'SCREEN|NM|:
+        DSP |SCREEN|
+RETURN
+
+MAP1 DSPYR(3),B,1
+
+PRE'DDB'SCREEN|NM|:
+        DDB |SCREEN|
+        ?TAB(6,70) ; TAB(-1,A'YEL) ;
+        IF CUR'YEAR > 99 THEN
+            DSPYR(1) = CUR'YEAR - 100
+        ELSE
+            DSPYR(1) = CUR'YEAR
+        ENDIF
+        IF CUR'YEAR - 1 > 99 THEN
+            DSPYR(2) = CUR'YEAR - 101
+        ELSE
+            DSPYR(2) = CUR'YEAR - 1
+        ENDIF
+        IF CUR'YEAR - 2 > 99 THEN
+            DSPYR(3) = CUR'YEAR - 102
+        ELSE
+            DSPYR(3) = CUR'YEAR - 2
+        ENDIF
+
+        CALL DSP'HST
+        CALL PRE'DSP'MSG
+RETURN
+
+PRE'GDB'SCREEN|NM|:
+        IF PWASTR[3;1] # "Y" AND SELECT(|NM|) # 1 THEN
+                CALL ANYEXT
+        ELSE
+                DO
+                        IF TMH'TMSGNO = 0 OR QTO = "O" THEN
+                                ENTRY = "*  X"
+                                \AFR EDIT="N"
+                        ENDIF
+                        IF TMH'OMSGNO = 0 OR QTO = "T" THEN
+                                ENTRY = "*     X"
+                                \AFR EDIT="N"
+                        ENDIF
+                        IF QTO = "T" THEN
+                                \GAFR |SCREEN| AFR="XN:TMH'OTER+XN:TMH'OFRQ'NO"
+                                IF TER # "" THEN
+                                        \GAFR |SCREEN| AFR="XN:TMH'TTER"
+                                ENDIF
+                                IF TMH'TTER = "" THEN
+                                        TMH'TTER = TER
+                                ENDIF
+                        ELSE
+                        IF QTO = "O" THEN
+                                \GAFR |SCREEN| AFR="XN:TMH'TTER+XN:TMH'TFRQ'NO"
+                                IF TER # "" THEN
+                                        \GAFR |SCREEN| AFR="XN:TMH'OTER"
+                                ENDIF
+                                IF TMH'OTER = "" THEN
+                                        TMH'OTER = TER
+                                ENDIF
+                        ENDIF
+                        ENDIF
+                        GDB |SCREEN|
+                        CALL TST'FUNC
+                        IF TST'FUNC = 0 THEN
+                                CALL PRE'UPDATE|NM|
+                                IF DONE'W = 1 THEN
+                                        DONE'W = 2
+                                        INX1 = I'FUN
+                                        INX2 = FN'W
+                                ENDIF
+                        ELSE
+!!MODIFY: depending on your application you may not want do do below.
+                                IF TMH'CTL # 0 THEN
+                                        PASS'SKIP = 1   !!Delete profile as
+                                                        !!not really added.
+                                ENDIF
+                        ENDIF
+                        IF INX2 # 0 THEN
+                                WINDOW = INX2
+                                CALL DO'WINDOW
+                        ELSE
+                                WINDOW = -1
+                        ENDIF
+                LOOP UNTIL WINDOW # 0
+                REL TMH
+        ENDIF
+RETURN
+
+PRE'READ|NM|:
+        RDLOCK TMH INTO TMH'REC KEY TMH'KEY
+        ZZZ|NM|'REC = TMH'REC
+RETURN
+
+PRE'UPDATE|NM|:
+   IF PASS'SKIP = 0 THEN
+        IF TMH'CTL = 0 THEN
+                IF ZZZ|NM|'REC # TMH'REC THEN
+                        TMH'LSTDT = DATE
+                        TMH'LSTID = UB'UID
+                        UPDATE TMH FROM TMH'REC
+                        \UPDKEY TMH MODE="ALL" BAD1="TMH"
+                        ZZZ|NM|'REC = TMH'REC
+                ENDIF
+        ELSE
+                TMH'CRDT = DATE
+                TMH'CRID = UB'UID
+                TMH'LSTDT = DATE
+                TMH'LSTID = UB'UID
+                ADD TMH FROM TMH'REC KEY TMH'KEY
+                IF TMH'CTL = 0 THEN
+                        \SETKEY TMH MODE="ALL" BAD1="TMH"
+                        \ADDKEY TMH MODE="ALL" BAD1="TMH"
+                        IF TOC'TTY'NO # 0 THEN
+                                \ADD'TMD TOC'TTY'NO Y LST'NO TMDTYPE="1"
+                                \ADD'TMD TOC'TTY'NO Y LST'NO TMDTYPE="2"
+                        ENDIF
+                        IF CUS'NO = 0 THEN
+                            RDLOCK TMH INTO TMH'REC KEY TMH'KEY
+                            PRF'KNO = TOC'PRF'NO
+                            CALL ADDLPR
+                            PRF'KNO = TOC'PPRF'NO
+                            CALL ADDLPR
+                        ELSE
+                            RDLOCK TMH INTO TMH'REC KEY TMH'KEY
+                            PRF'KNO = TOC'PRF'NO
+                        ENDIF
+                ELSE
+                        ENTRY = "LNKFLP Error during add:"
+                        \KERROR TMH MODE="D"
+                        CALL DO'ERRL
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+   ENDIF
+   PRE'VDSP|NM|:
+   UPDATE'2ND'KEYS|NM|:
+RETURN
+
+MAP1 TMP'MSGNO,B,3
+MAP1 TMP'MFLAG,S,1
+
+DO'WINDOW:
+        IF WINDOW = FN'8 THEN
+                IF CUS'NO = TMH'NO THEN
+                        \WINDOW TLR="22" ACTION="DO'MSGTMP" VUEMLT="|NM|" SINX="Y"
+                        CALL TST'FUNC
+                        IF INX1 = I'ESC THEN TST'FUNC = 1
+                ELSE
+                        ENTRY = "G"
+                ENDIF
+                INX1 = I'RT
+                INX2 = 0
+                IF TST'FUNC # 0 RETURN          !!KLUDGE
+                \WINDOW VUEMLT="|NM|" TLR="8" ACTION="PROC'MSG|NM|"
+                CALL PRE'DSP'MSG
+                CALL PRE'UPDATE|NM|
+                WINDOW = 0
+        ENDIF
+        IF WINDOW # 0 THEN
+                V''REC'STAT(1) = 4
+                \AUTOKY SUB="AR1TMH" NM="1" REV="11" PRE="TMH"
+        ENDIF
+RETURN
+
+PROC'MSG|NM|:
+        ?TAB(7,80) ; TAB(-1,A'CYAN) ;
+        IF TMP'MFLAG # "A" THEN TMP'MSGNO = TMH'MSGNO ELSE TMP'MSGNO = TMH'AMSGNO
+        \MSGMAC VMSGFIL=TO'MSGFIL MSGNO="TMP'MSGNO" LENGTH="78" &
+                                                MTSCR="8" MBSCR="23" L25="N"
+        IF TMP'MFLAG # "A" THEN TMH'MSGNO = TMP'MSGNO ELSE TMH'AMSGNO = TMP'MSGNO
+        ?TAB(7,80) ; TAB(-1,A'MGN) ;
+RETURN
+
+DO'MSGTMP:
+        DSP MSGTMP
+        ENTRY = "G"
+        GDB MSGTMP
+RETURN
+
+E'TMP'MFLAG:
+        IF EDSPSW = 0 THEN
+                \TSTF
+                CASE
+                IF ENTRY = "G" THEN
+                        TMP'MFLAG = "G"
+                ELSE
+                IF ENTRY = "A" THEN
+                        TMP'MFLAG = "A"
+                ELSE
+                        ENTRY = "Enter 'G' or 'A' or F10 to abort"
+                        CALL DO'ERR
+                ENDCASE
+        ENDIF
+RETURN
+
+COPY    "FORMAT"
+COPY    "BASERR"
+
+!!MODIFY - Add your edit routines below
+
+MAP1 MSG'FLAG,S,1
+
+PRE'DSP'MSG:
+        IF TMH'MSGNO = 0 THEN MSG'FLAG = "N" ELSE MSG'FLAG = "Y"
+        CALL DSP'MSG
+        IF TMH'AMSGNO = 0 THEN MSG'FLAG = "N" ELSE MSG'FLAG = "Y"
+        CALL DSP'AMSG
+RETURN
+
+E'TYP'NO:
+        IF CUS'NO = TMH'NO THEN
+!![xx]          \LOOKUP FROM="CUS" ON="TYP" DSP="Y" DSPLEN="22"
+                \LOOKUP FROM="CUS" ON="TYP" DSP="Y" DSPLEN="10"
+        ELSE
+                CUS'SPACE = SPACE
+        ENDIF
+RETURN
+
+E'TRH'NO:
+        IF CUS'NO = TMH'NO THEN
+!![xx]          \LOOKUP FROM="CUS" ON="TRH" DSP="Y" DSPLEN="22"
+                \LOOKUP FROM="CUS" ON="TRH" DSP="Y" DSPLEN="13"
+        ELSE
+                TRH'SPACE = SPACE
+        ENDIF
+RETURN
+
+E'TFRQ'NO:
+        \TABC FROM="TMH" ON="FRQ" FLDNAM="TMH'TFRQ'NO" DSPLEN="24" DSPFLD="Y"
+RETURN
+
+E'OFRQ'NO:
+        \TABC FROM="TMH" ON="FRQ" FLDNAM="TMH'OFRQ'NO" DSPLEN="24" DSPFLD="Y"
+RETURN
+
+E'TMSGNO:
+        \TSTF
+        IF TMH'TMSGNO = 0 RETURN
+        IF TO'MSGFIL = "ARMSG" THEN
+                \FLDMSG CUS LENGTH="73" TLR="10" TLC="5" LINES="3" WINDOW="Y" &
+                        WTLR="9" MSGNO="TMH'TMSGNO" DSP="Y" WTLC="2" WLENGTH="78" &
+                        MSGFIL="ARMSG"
+        ELSE
+                \FLDMSG CUS LENGTH="73" TLR="10" TLC="5" LINES="3" WINDOW="Y" &
+                        WTLR="9" MSGNO="TMH'TMSGNO" DSP="Y" WTLC="2" WLENGTH="78" &
+                        MSGFIL="TOMSG"
+        ENDIF
+RETURN
+
+E'OMSGNO:
+        \TSTF
+        IF TMH'OMSGNO = 0 RETURN
+        IF TO'MSGFIL = "ARMSG" THEN
+                \FLDMSG CUS LENGTH="73" TLR="15" TLC="5" LINES="3" WINDOW="Y" &
+                        WTLR="9" MSGNO="TMH'OMSGNO" DSP="Y" WTLC="2" WLENGTH="78" &
+                        MSGFIL="ARMSG"
+        ELSE
+                \FLDMSG CUS LENGTH="73" TLR="15" TLC="5" LINES="3" WINDOW="Y" &
+                        WTLR="9" MSGNO="TMH'OMSGNO" DSP="Y" WTLC="2" WLENGTH="78" &
+                        MSGFIL="TOMSG"
+        ENDIF
+RETURN
+
+DEL'MSGNO:
+        IF TMH'TMSGNO # 0 THEN
+                IF TO'MSGFIL = "ARMSG" THEN
+                        DELMSG TMH'TMSGNO "ARMSG"
+                ELSE
+                        DELMSG TMH'TMSGNO "TOMSG"
+                ENDIF
+        ENDIF
+        IF TMH'OMSGNO # 0 THEN
+                IF TO'MSGFIL = "ARMSG" THEN
+                        DELMSG TMH'OMSGNO "ARMSG"
+                ELSE
+                        DELMSG TMH'OMSGNO "TOMSG"
+                ENDIF
+        ENDIF
+        TMH'OMSGNO = 0
+        TMH'TMSGNO = 0
+        CALL PRE'UPDATE|NM|
+RETURN
+
+MAP1 LMSGNO,B,3
+\COPYF MSG SY
+\COPYF MSG SY MSG2
+MAP1 H,B,2
+MAP1 M,B,2
+
+ADD'MSGNO:
+        CALL DEL'MSGNO
+        MSG'DID = TO'MSGFIL
+        MSG2'DID = MSG'DID
+        LMSGNO = 0
+        TMD'KTYPE = "1"
+        TMD'KTMH'NO = TMH'NO
+        TMD'KNO = -1
+        USE TMD INTO TMD'REC KEY TMD'KEY
+        DO
+                GETPRV TMD INTO TMD'REC
+                \CHKKEY TMD
+                IF TMD'CTL # 0 EXIT
+                MSG'SPACE = SPACE
+                \STRDTT DTT="TMD'DTT" DDATE="MSG'DATA"
+                H = INT(TMD'TIME/100)
+                M = TMD'TIME - (H*100)
+                \LOOKUP FROM="TMD" ON="TTY"
+                MSG'DATA = CHR(7) + MSG'DATA + " at " + (H USING "#Z") + ":" + &
+                        (M USING "#Z") + " by " + TMD'UB'UID + " type " + TTY'DESC
+                ADD MSG FROM MSG'REC
+                IF LMSGNO = 0 THEN
+                        TMH'TMSGNO = MSG'RCN
+                        UPDATE TMH
+                ELSE
+                        RDLOCK MSG2 LMSGNO INTO MSG2'REC
+                        MSG2'CH = MSG'RCN
+                        WRITE MSG2 FROM MSG2'REC
+                ENDIF
+                LMSGNO = MSG'RCN
+                IF TMD'MSGNO # 0 THEN
+                        MSG'DID = TO'MSGFIL
+                        MSG2'DID = MSG'DID
+                        \LOOPMSG FLDNAM="TMD'MSGNO" APPEND="LMSGNO" COPY="Y" &
+                                LAST'COPY="LMSGNO" SET'DID="N" SET'DID2="N"
+                ENDIF
+        LOOP
+        LMSGNO = 0
+        TMD'KTYPE = "2"
+        TMD'KTMH'NO = TMH'NO
+        TMD'KNO = -1
+        USE TMD INTO TMD'REC KEY TMD'KEY
+        DO
+                GETPRV TMD INTO TMD'REC
+                \CHKKEY TMD
+                IF TMD'CTL # 0 EXIT
+                MSG'SPACE = SPACE
+                \STRDTT DTT="TMD'DTT" DDATE="MSG'DATA"
+                H = INT(TMD'TIME/100)
+                M = TMD'TIME - (H*100)
+                \LOOKUP FROM="TMD" ON="TTY"
+                MSG'DATA = CHR(7) + MSG'DATA + " at " + (H USING "#Z") + ":" + &
+                        (M USING "#Z") + " by " + TMD'UB'UID + " type " + TTY'DESC
+                ADD MSG FROM MSG'REC
+                IF LMSGNO = 0 THEN
+                        TMH'OMSGNO = MSG'RCN
+                        UPDATE TMH
+                ELSE
+                        RDLOCK MSG2 LMSGNO INTO MSG2'REC
+                        MSG2'CH = MSG'RCN
+                        WRITE MSG2 FROM MSG2'REC
+                ENDIF
+                LMSGNO = MSG'RCN
+                IF TMD'MSGNO # 0 THEN
+                        MSG'DID = TO'MSGFIL
+                        MSG2'DID = MSG'DID
+                        \LOOPMSG FLDNAM="TMD'MSGNO" APPEND="LMSGNO" COPY="Y" &
+                                LAST'COPY="LMSGNO" SET'DID="N" SET'DID2="N"
+                ENDIF
+        LOOP
+RETURN
+
+COPY "CVTDTT"
+
+MAP1 PHONE(3),S,28
+MAP1 ADDR(5),S,40                               ! Address block
+MAP1 X,F
+\COPYF PTY MC MODE="PRI"
+MAP1 BALFWD,F
+\COPYF DOC MODE="PRI"
+
+SET'UP:
+        ?TAB(24,1) ; TAB(-1,A'RED) ; "Computing current information ...";
+        IF CUS'NO # TMH'NO THEN
+                CUS'KNO = TMH'NO
+                CUS'SPACE = SPACE
+                CUS'SIC'NO = TMH'SIC'NO
+                CUS'SIC'EXT = TMH'SIC'EXT
+                USE CUS INTO CUS'REC KEY CUS'KEY
+                TMH'SIC'NO = CUS'SIC'NO
+                TMH'SIC'EXT = CUS'SIC'EXT
+                CUS'CR'LIMIT = CUS'CR'LIMIT/100
+        ENDIF
+        CALL ADD'MSGNO
+        IF TMH'CALL'ALTNO # 0 THEN
+                ALA'KLST'NO = LST'NO
+                ALA'KNO = TMH'CALL'ALTNO
+                USE ALA INTO ALA'REC KEY ALA'KEY
+                ALB'KLST'NO = LST'NO
+                ALB'KNO = TMH'CALL'ALTNO
+                USE ALB INTO ALB'REC KEY ALB'KEY
+                CALL DO'ALT'STUFF
+        ENDIF
+        CALL DO'FREE'FREIGHT
+        CALL DO'LST'STUFF
+        LST'REC = OLST'REC
+        IF CUS'NO = TMH'NO THEN
+                CALL GET'HST'DATA
+                DOC'SPACE = SPACE
+                DOC'CUS'NO = TMH'CUS'NO
+                DMN = 12 : DDY = 31 : DYR = 199                 !![12]
+                DOC'ORG'DTT = DTT
+                \SETKEY DOCA MODE="KEY"
+                USE DOCA INTO DOC'REC KEY DOCA'KEY
+                DO
+                        GETPRV DOCA INTO DOC'REC
+                        IF DOC'CUS'NO # DOCA'KCUS'NO THEN DOCA'CTL = 3
+                        IF DOCA'CTL # 0 EXIT
+                        IF DOC'AMT <= 0 REPEAT
+                        IF DOC'TYPE = 1 EXIT
+                LOOP
+                IF DOCA'CTL # 0 THEN DOC'SPACE = SPACE
+                ?TAB(24,1) ; TAB(-1,9) ;
+        ENDIF
+RETURN
+
+DO'FREE'FREIGHT:
+        IF CUS'FFP'NO # 0 THEN
+            IF FFP'NO # CUS'FFP'NO THEN
+                FFP'SPACE=SPACE
+                FF'PROFILE'YN = CUS'FFP'NO
+            ENDIF
+        ELSE
+            IF CUS'FREE'FRT # "" THEN
+                FF'PROFILE'YN = CUS'FREE'FRT
+            ENDIF
+        ENDIF
+RETURN
+
+DO'LST'STUFF:
+        FOR X = 1 TO 3
+                \DPHONE X OUTPUT="PHONE(X)"
+                IF LST'PTY'NO(X) # "" THEN
+                        PTY'KNO = LST'PTY'NO(X)
+                        PTY'SPACE = SPACE
+                        USE PTY INTO PTY'REC KEY PTY'KEY
+                        PHONE(X) = PHONE(X) + " " + PTY'DESC
+                ENDIF
+        NEXT X
+        \NFMTADR ADDRESS="ADDR" COUNTRY="Y" MAXI="5"
+RETURN
+
+MAP1 CUR'YEAR,B,1
+MAP1 JJ,F
+MAP1 I,F
+MAP1 II,F
+
+MAP1 CY(12),B,5
+MAP1 CY,B,5
+MAP1 LY(12),B,5
+MAP1 LY,B,5
+MAP1 PY(12),B,5
+MAP1 PY,B,5
+MAP1 MASK,S,6
+MAP1 MASK1,S,8
+MAP1 SCALEX,B,3
+MAP1 SMSG,S,10
+MAP1 DESC(13),S,5
+
+GET'HST'DATA:
+        JJ = 0
+        DTT = DATE
+        \FINDYR SCHEDULE="N" YEAR="CUR'YEAR"
+        HST'KYEAR = CUR'YEAR
+        HST'KCUS'NO = TMH'CUS'NO
+        HST'KSEC'NO = 0
+        HST'KTRK'NO = 0
+        HST'KTYPE = "O"
+        HST'SPACE = SPACE
+        USE HST INTO HST'REC KEY HST'KEY
+        FOR I = 1 TO 12
+                JJ = JJ MAX ABS(HST'SALE'AMT(I))
+                CY(I) = HST'SALE'AMT(I)
+        NEXT I
+        HST'KYEAR = CUR'YEAR - 1
+        HST'SPACE = SPACE
+        USE HST INTO HST'REC KEY HST'KEY
+        FOR I = 1 TO 12
+                JJ = JJ MAX ABS(HST'SALE'AMT(I))
+                LY(I) = HST'SALE'AMT(I)
+        NEXT I
+        HST'KYEAR = CUR'YEAR - 2
+        HST'SPACE = SPACE
+        USE HST INTO HST'REC KEY HST'KEY
+        FOR I = 1 TO 12
+                JJ = JJ MAX ABS(HST'SALE'AMT(I))
+                PY(I) = HST'SALE'AMT(I)
+        NEXT I
+        CASE
+        IF JJ <= 999949 THEN
+                SCALEX = 100
+                SMSG = "Dollars"
+                MASK = "#,###-"
+        ELSE
+        IF JJ <= 9999949
+                SCALEX = 10000
+                SMSG = "Hundreds"
+                MASK = "###.#-"
+        ELSE
+        IF JJ <= 99999949 THEN
+                SCALEX = 100000
+                SMSG = "Thousands"
+                MASK = "###.#-"
+        ELSE
+                SCALEX = 1000000
+                SMSG = "10 thous."
+                MASK = "###.#-"
+        ENDCASE
+        MASK1 = "#," + MASK
+        CY = 0 : LY = 0 : PY = 0
+        FOR I = 1 TO 12
+                CY = CY + CY(I)
+                \FROUND CY(I)/SCALEX CY(I)
+                LY = LY + LY(I)
+                \FROUND LY(I)/SCALEX LY(I)
+                PY = PY + PY(I)
+                \FROUND PY(I)/SCALEX PY(I)
+        NEXT I
+        \FROUND CY/SCALEX CY
+        \FROUND LY/SCALEX LY
+        \FROUND PY/SCALEX PY
+        SF = 0
+        FOR II = 1 TO 12
+                DTT = GLC'PER'START(II)
+                IF DDY # 1 OR DMN < 1 OR DMN > 12 THEN
+                        SF = 1
+                        II = 13
+                ELSE
+                        DESC(II) = "  " + UCS(MONTHS(DMN))
+                ENDIF
+        NEXT II
+        IF SF = 1 THEN
+                FOR II = 1 TO 12
+                        DTT = GLC'PER'START(II)
+                        IF DMN >= 1 AND DMN <= 12 THEN
+                                DESC(II) = (DMN USING "##") + "/" + (DDY USING "#Z")
+                        ENDIF
+                NEXT II
+        ENDIF
+RETURN
+
+FIX'DTT:
+        DMN = 12 : DDY = 31 : DYR = 199                     !![12]
+        TMH'TNEXT'DTT = DTT
+        TMH'TLAST'DTT = 0
+        TMD'KTYPE = "1"
+        TMD'KTMH'NO = TMH'NO
+        TMD'KNO = -1
+        USE TMD INTO TMD'REC KEY TMD'KEY
+        DO
+                GETPRV TMD INTO TMD'REC
+                \CHKKEY TMD
+                IF TMD'CTL # 0 EXIT
+                IF TMH'TLAST'DTT = 0 THEN TMH'TLAST'DTT = TMD'DTT
+                IF TMD'AUTO'NXT # "N" THEN
+                        \LOOKUP FROM="TMH" ON="FRQ" FLDNAM="TMH'TFRQ'NO"
+                        IF FRQ'DAYS # 0 THEN
+                                DTT = TMD'DTT
+                                CALL CNV'DTT
+                                YDAYS = YDAYS + FRQ'DAYS
+                                CALL UCNV'DTT
+                        ELSE
+                                DMN = 12 : DDY = 31 : DYR = 199     !![12]
+                        ENDIF
+                        TMH'TNEXT'DTT = DTT
+                ENDIF
+                DMN = 12 : DDY = 31 : DYR = 199                     !![12]
+        LOOP UNTIL TMH'TNEXT'DTT # DTT
+
+        DMN = 12 : DDY = 31 : DYR = 199                             !![12]
+        TMH'ONEXT'DTT = DTT
+        TMH'OLAST'DTT = 0
+        TMD'KTYPE = "2"
+        TMD'KTMH'NO = TMH'NO
+        TMD'KNO = -1
+        USE TMD INTO TMD'REC KEY TMD'KEY
+        DO
+                GETPRV TMD INTO TMD'REC
+                \CHKKEY TMD
+                IF TMD'CTL # 0 EXIT
+                IF TMH'OLAST'DTT = 0 THEN TMH'OLAST'DTT = TMD'DTT
+                IF TMD'AUTO'NXT # "N" THEN
+                        \LOOKUP FROM="TMH" ON="FRQ" FLDNAM="TMH'OFRQ'NO"
+                        IF FRQ'DAYS # 0 THEN
+                                DTT = TMD'DTT
+                                CALL CNV'DTT
+                                YDAYS = YDAYS + FRQ'DAYS
+                                CALL UCNV'DTT
+                        ELSE
+                                DMN = 12 : DDY = 31 : DYR = 199        !![12]
+                        ENDIF
+                        TMH'ONEXT'DTT = DTT
+                ENDIF
+                DMN = 12 : DDY = 31 : DYR = 199                         !![12]
+        LOOP UNTIL TMH'ONEXT'DTT # DTT
+        CALL PRE'UPDATE|NM|
+RETURN
+
+COPYF "CMNFIL[SY]",NOAFR
+
+LFA'OE1HDR:
+        IF CUS'NO # TMH'CUS'NO THEN
+                \ADDCUS ASK'FIRST="Y"
+                IF ENTRY # "Y" RETURN           !!KLUDGE
+        ENDIF
+        IF CUS'CR'STAT = 5 THEN
+            ENTRY = "Cannot take orders for customer on hold status"
+            GOTO DO'ERR
+        ENDIF
+        CMN'SPACE = SPACE
+        CMN'SAV'RCN(1) = TMH'CUS'NO
+        CMN'SAV'RCN(2) = 1
+        CMN'SAV'RCN(3) = 1
+        CMN'TO'PRGNAM = "OE1HDR"
+        CMN'FRM'PRGNAM = "EXTRNL"
+        \WINDOW VUEMLT="1" FULL="Y" PRGNAM="OE1HDR" APID="OE" COMMON="CMN'REC"
+RETURN
+
+TELEPHONE:
+        XCALL GIN,"Auto phone dialer not on line!"
+RETURN
+
+PROC'CHAIN:
+!!      PASS'RCN = LST'RCN
+        CMN'FRM'PRGNAM = "MC1LST"
+        PASS'FRM'PRGNAM = "MC1LST"
+        IF LST'LINKED'IN = 1 THEN
+                PASS'SELECT = 99
+        ELSE
+                PASS'SELECT = SELECT(|NM|)
+        ENDIF
+        IF SPASS'WINDOW # 101 AND SPASS'WINDOW # 102 THEN
+                PASS'WINDOW = WINDOW + 48
+        ELSE
+                PASS'WINDOW = SPASS'WINDOW
+        ENDIF
+!!      PASS'LST'REC = LST'REC
+!!      PASS'OLD'REC = LST'REC
+        REL TMH
+        SNDCMN PASSING'REC
+        CHAIN "AR1TMD"
+RETURN
+
+E'TTER:
+        \TABC FLDNAM="TMH'TTER" DSPNAM="DSP'TER'DESC" &
+                SF'TEST="E'TTER'SF" APRE="TER" AKEY="NO"
+RETURN
+
+E'TTER'SF:
+        IF TER'TO # "T" AND TER'TO # "B" THEN
+                SF = 2
+                ENTRY = "Invalid territory for Telemarketing!"
+        ENDIF
+RETURN
+
+E'OTER:
+        \TABC FLDNAM="TMH'OTER" DSPNAM="DSP'TER'DESC" &
+                SF'TEST="E'OTER'SF" APRE="TER" AKEY="NO"
+RETURN
+
+E'OTER'SF:
+        IF TER'TO # "O" AND TER'TO # "B" THEN
+                SF = 2
+                ENTRY = "Invalid territory for Outside Sales!"
+        ENDIF
+RETURN
+
+E'CALL'ALTNO:
+        IF INX2 = FN'N AND EDSPSW = 0 AND ECFLD = lastfn THEN
+                CMN'SPACE = SPACE
+                CMN'TO'PRGNAM="MC1LST"
+                CMN'SAV'RCN(1) = TMH'NO
+                CMN'SAV'RCN(2) = ARC'PRF'NO
+                CMN'SAV'RCN(4) = TMH'CALL'ALTNO  !!Force a value.
+                IF CMN'SAV'RCN(4) = 0 THEN CMN'SAV'RCN(4) = -1
+                CMN'MODE = 6
+                \WINDOW PRGNAM="MC1LST"         &
+                        APID="MC"               &
+                        COMMON="CMN'REC" PUSH="Y"
+                TMH'CALL'ALTNO = CMN'SAV'RCN(4)
+                CALL SET'CALL'ALTNO
+                IER1 = 0
+        ELSE
+!!If we decide to tab on ALA instead then special func-w will have to do.
+                \TABC NPRE="ALB" NKEY="NO" FLDNAM="TMH'CALL'ALTNO"   &
+                        BAD1="LST'NO" DSPNAM="PRE'DSP'CALL'COMPANY"        &
+                        KFLD1="TMH'NO" MAND="N" APID="MC"       &
+                        FUNCWFLD="COMPANY" SMALL="Y"
+                IF TMH'CALL'ALTNO = 0 CALL SET'CALL'ALTNO
+        ENDIF
+RETURN
+
+SET'CALL'ALTNO:
+        IF TMH'CALL'ALTNO # 0 THEN
+                ALB'KLST'NO = TMH'NO
+                ALB'KNO = TMH'CALL'ALTNO
+                ALB'SPACE = SPACE
+                USE ALB INTO ALB'REC KEY ALB'KEY
+        ELSE
+                ALB'CTL = 3
+        ENDIF
+        IF ALB'CTL # 0 THEN
+                TMH'CALL'ALTNO = 0
+                CALL PRE'DSP'CALL'COMPANY
+        ENDIF
+RETURN
+
+COPYF "LSTFIL[MC]"=OLST,NOAFR
+\COPYF ALA MC
+\COPYF ALB MC
+
+PRE'DSP'CALL'COMPANY:
+        LST'REC = OLST'REC
+        ALA'KNO = ALB'NO
+        ALA'SPACE = SPACE
+        USE ALA INTO ALA'REC KEY ALA'KEY
+        CALL DO'ALT'STUFF
+        CALL DO'LST'STUFF
+        CALL BKG'|SCREEN|
+        CALL DSP'CALL'COMPANY
+        LST'REC = OLST'REC
+RETURN
+
+DO'ALT'STUFF:
+        \TM'DOALT
+RETURN
+
+LINKER:
+        IF V''SYSTEM="UNIX" THEN
+                \WINDOW VUEMLT="|NM|" FULL="Y" ACTION="LINKER2"
+        ELSE
+                CHAIN "ARRTMH"
+        ENDIF
+RETURN
+
+LINKER2:
+        XCALL LINK,1,"arrtmh "
+RETURN
+
+E'SIC'NO:
+         \TABC ON="SIC" FROM="CUS" DSPZERO="(Unknown)"
+        IF EDSPSW = 0 AND CUS'SIC'NO = 0 AND TOC'SIC'MAND = "Y" THEN
+                ENTRY = "This is a mandatory field!"
+                CALL DO'ERR
+        ENDIF
+RETURN
+
+E'VOL'NO:
+        \TABC FLDNAM="TMH'VOL'NO" DSPFLD="Y" APRE="VOL" AKEY="NO" &
+                DSPZERO="(Unknown)"
+        IF EDSPSW = 0 AND TMH'VOL'NO = "" AND TOC'VOL'MAND = "Y" THEN
+                ENTRY = "This is a mandatory field!"
+                CALL DO'ERR
+        ENDIF
+RETURN
+
+E'CLST'NO:
+        \TABPASS
+        \TSTF
+        IF TABPASS = 0 AND TMH'CLST'NO = 0 THEN
+                LST'SHORT'CMP = "(Unknown)"
+                CALL DSP'COMPANY
+                IF EDSPSW = 0 AND TOC'CLST'MAND = "Y" THEN
+                        ENTRY = "This is a mandatory field!"
+                        CALL DO'ERR
+                ENDIF
+        ELSE
+                \NTABLST FLDNAM="TMH'CLST'NO" ALTS="N" WINDOW="N"       &
+                        DSPNAM="DSP'COMPANY" DOERR="GOTO" MAND="N"      &
+                        PROFILE="TOC'CPRF'NO"
+        ENDIF
+RETURN
+
+COPYF "CUSFIL",=CUSZ,NOAFR
+
+PROC'AR2TMH:
+        CUS'KNO = TMH'NO
+        CUS'SPACE = SPACE
+        CUS'SIC'NO = TMH'SIC'NO
+        CUS'SIC'EXT = TMH'SIC'EXT
+        RDLOCK CUS INTO CUS'REC KEY CUS'KEY
+        CUSZ'REC = CUS'REC
+        DSP AR2TMH
+        IF TOC'SIC'LRG = "N" THEN
+                \GAFR AR2TMH AFR="X:CUS'SIC'NO+X:CUS'SIC'EXT" EDIT="N"
+        ENDIF
+        IF TOC'VOL'LRG = "N" THEN
+                \GAFR AR2TMH AFR="X:TMH'VOL'NO"
+        ENDIF
+        IF TOC'CHK'LRG = "N" THEN
+                \GAFR AR2TMH AFR="X:TMH'CHK'CR'YN"
+        ENDIF
+        IF TOC'CAT'LRG = "N" THEN
+                \GAFR AR2TMH AFR="X:TMH'CAT'YN+X:CUS'CATALOG"
+        ENDIF
+        IF TOC'HOW'LRG = "N" THEN
+                \GAFR AR2TMH AFR="X:TMH'HOW'NO"
+        ENDIF
+        IF TOC'PRD'LRG = "N" THEN
+                \GAFR AR2TMH AFR="X:TMH'PRD'NO"
+        ENDIF
+        IF TOC'CLST'LRG = "N" THEN
+                \GAFR AR2TMH AFR="X:TMH'CLST'NO"
+        ENDIF
+        IF CUS'CTL # 0 AND TOC'CAT'LRG # "N" THEN
+                \GAFR AR2TMH AFR="X:CUS'CATALOG" EDIT="N"
+        ENDIF
+        IF QTO = "T" THEN
+                \GAFR AR2TMH AFR="XN:TMH'OSORT"
+        ELSE
+        IF QTO = "O" THEN
+                \GAFR AR2TMH AFR="XN:TMH'TSORT"
+        ENDIF
+        ENDIF
+        DDB AR2TMH
+        GDB AR2TMH
+        TMH'SIC'NO = CUS'SIC'NO
+        TMH'SIC'EXT = CUS'SIC'EXT
+        CALL TST'FUNC
+        IF CUS'CTL = 0 THEN
+                IF CUSZ'REC # CUS'REC AND TST'FUNC = 0 THEN
+                        WRITE CUS FROM CUS'REC
+                ELSE
+                        REL CUS
+                ENDIF
+        ENDIF
+        CUS'CR'LIMIT = CUS'CR'LIMIT/100
+RETURN
+
+E'PRD'NO:
+        \TABC APRE="PRD" AKEY="NO" FLDNAM="TMH'PRD'NO" DSPFLD="Y" APID="TO" &
+                DSPZERO="(Unknown)"
+        IF EDSPSW = 0 AND TMH'PRD'NO = "" AND TOC'PRD'MAND = "Y" THEN
+                ENTRY = "This is a mandatory field!"
+                CALL DO'ERR
+        ENDIF
+RETURN
+
+E'HOW'NO:
+        \TABC APRE="HOW" AKEY="NO" FLDNAM="TMH'HOW'NO" DSPFLD="Y" APID="TO" &
+                DSPZERO="(Unknown)"
+        IF EDSPSW = 0 AND TMH'HOW'NO = "" AND TOC'HOW'MAND = "Y" THEN
+                ENTRY = "This is a mandatory field!"
+                CALL DO'ERR
+        ENDIF
+RETURN
+
+ADDLPR:
+        IF PASS'PRF'NO # PRF'KNO THEN
+                USE PRF INTO PRF'REC KEY PRF'KEY
+                IF PRF'CTL = 0 THEN
+                        \ADDLPR ERRORS="N"
+                ENDIF
+        ENDIF
+RETURN
+
+E'TSORT:
+
+E'OSORT:
+
+E'MSORT1:
+
+E'MSORT2:
+
+RETURN

@@ -1,0 +1,179 @@
+! @#$^&* 88 37 0 0 0 0 0 0 0 0 0 0 64 *&^$#@ 
+!*! Updated on Fri Nov 10 10:03:06 2017 by Cheryl Eberhard  1 times 
+!*! Updated on Thu Nov 18 14:13:18 2010 by Cheryl Eberhard  1 times 
+!*! Updated on Mon Dec 28 11:53:54 2009 by Elaine Ross 1 times 
+!%W% %G% %U% - SCCS
+!* Updated on 02-Oct-95 at 4:27 PM by Cheryl Eberhard; edit time: 0:00:12
+!* Updated on 23-Mar-92 at 12:25 PM by Eric Eberhard; edit time: 0:02:50
+PROGRAM OERCOD,8.0(2)
+!!
+COPY    "LINKER"                !!LINK MAPS AND MACROS
+!!
+!!                        V. I. C. S.
+!!                     of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           1575 Sullivan Lane Suite 2
+!!              Camp Verdes, AZ  86322
+!!               (928) 567-3727
+
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!Print Labels:  Eric S. Eberhard, 04/14/86
+!!
+!!
+!!Revision History:
+!!
+!!7.2   12/06/88 ASC    New version created
+!!
+!![1] 04/25/90 ASC      Adjusted Kill to use r instead of R'FILENME for
+!!                      alternate device problem
+!!
+!![2] 04/20/91 ESE      Func-R in to read changes broken.
+!!
+!![3] 12/17/91 ESE      Tested wrong field for VIL'PRG'FLAG - was (2).
+!!                      Would cause labels to not print.
+!!
+!!7.3a  03/23/92 ESE    New release.
+!!
+!![1] 08/05/93 ESE      NEW: New PRH caching
+!!                      IH: need VICSIT.SBR 7.3a(7) and a lot of other
+!!                          programs (see ESEPRH.CMD).
+!!
+!!7.4   09/30/95 CAE    New version created
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![2]  03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!!
+!!
+\SSRPTMAPS                      !!Standard report module maps
+!!
+MAP1    FORMID,S,6
+!!
+\COPYF  LIN MODE="PRI"
+\COPYF  SUB MODE="PRI"
+COPYF   "LINKEY",=LIN2
+COPYF   "SUBKEY",=SUB2
+\COPYF  LST MC
+\COPYF MAS SA
+MAP1    CASH'ONLY,S,50
+MAP1    CALC'BTOTAL,B,5
+
+ON ERROR GOTO ERTRAP
+
+BEGIN:
+        \LNKIN
+                                !!MODIFY:  below if program name changed ...
+        IF PRGNAM # "OERCOD" AND PRGNAM # "OEXCOD" THEN
+                ENTRY = "Cannot run program directly"
+                CALL DO'ERR
+                GOTO ABORT
+        ENDIF
+        IF INC'INTERFACE = 5 THEN
+                ENTRY = "Not a T-Shirt program!"
+                CALL DO'ERR
+                GOTO ABORT
+        ENDIF
+        LDUSR                   !!DO NOT NOT NOT USE SECURITY IN THIS PROGRAM
+!!
+        \SETPRT                         !!Sets print code
+        R'MSGDB = "OEMSG"
+        MAP1 ADDR(6),S,40
+        \NFMTADR MAXI="6" ARRAY="ADDR"
+        COPYF "FMTKEY[SY]"
+        FMT'KTYP = "R"
+        FMT'KNAME = "OERCOD"
+        RDKEY FMT
+        IF FMT'CTL = 0 THEN
+                rno = FMT'RCN
+                CALL IRPT2'OERCOD
+        ELSE
+                CALL IRPT'OERCOD
+        ENDIF
+        INIT'RPT = 1
+
+!!NOTE:  HDR is already locked ... leave that way
+
+        IF PRGNAM = "OERCOD" THEN
+                IF HDR'PQU'STAT # "Q" OR HDR'ACTION = SPACE THEN
+                        ENTRY = "Invalid HDR: "
+                        \HDRERR
+                        CALL DO'ERRL
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+
+        BOX'KHDR'LOC'NO = HDR'LOC'NO
+        BOX'KDOC'TYPE = HDR'DOC'TYPE
+        BOX'KHDR'NO = HDR'NO
+MAP1 TST'SHIPMENT,B,2
+        IF PRGNAM = "OEXCOD" THEN
+                TST'SHIPMENT = HDR'SHIPMENT
+        ELSE
+                TST'SHIPMENT = HDR'SHIPMENT + 1
+        ENDIF
+        BOX'KSHIPMENT = TST'SHIPMENT
+        BOX'KNO = 0
+        USE BOX INTO BOX'REC KEY BOX'KEY
+        DO
+                GETNXT BOX INTO BOX'REC
+                IF BOX'CTL # 0 OR BOX'HDR'LOC'NO # HDR'LOC'NO OR         &
+                   BOX'DOC'TYPE # HDR'DOC'TYPE OR BOX'HDR'NO # HDR'NO OR &
+                   BOX'SHIPMENT # TST'SHIPMENT EXIT
+                        CALC'BTOTAL = BOX'SHP'TOTAL - BOX'SHP'DISC -    &
+                        BOX'SHP'ODISC - BOX'SHP'RETRO + BOX'OLD'DR -    &
+                        BOX'OLD'CR - BOX'OLD'CASH +                     &
+                        BOX'SHP'STX1 + BOX'SHP'STX2
+                        IF VIL'PRG'FLAG(1) = 1                          OR &
+                           (VIL'PRG'FLAG(1) = 2 AND CALC'BTOTAL > 0    AND &
+                            TRH'COD'STATUS # 1)                         OR &
+                           (VIL'PRG'FLAG(1) = 3 AND (CALC'BTOTAL  <= 0  OR &
+                            TRH'COD'STATUS = 1))                        THEN
+                                IF TRH'COD'STATUS = 3 THEN CASH'ONLY = "CASH OR CERTFIED CHECK ONLY"
+                                CALL RPT'DETAIL
+                ENDIF
+        LOOP
+        CALL RPT'END
+        IF PRTCOD # 1 AND PRTCOD <= 3 AND PRT'EXSPL # "N" THEN
+                RR1 = rdvf
+                RR2 = PGECNT
+                IF RR2 = 0 THEN RR2 = 1
+!!              XCALL SPOOL,r,PRT'DEVCD,RR1,RR2,FORMID
+                \SPOOL
+        ENDIF
+        IF PRGNAM = "OERCOD" THEN UPDATE HDR
+        CALL CLEAN'UP
+END
+
+ABORT:                          !!Used for abnormal exit of program
+                                !!such as error conditions or user
+                                !!voluntary exit.
+        IF INIT'RPT = 1 THEN
+                PRINT TAB(-1,14);TAB(-1,A'RED);
+                ENTRY = "Report has been Aborted"
+                CALL DO'ERR
+                rtnadr = 0
+                CALL RPT'END                               !!Close print file
+!![1]           IF PRTCOD = 2 OR PRTCOD = 3 KILL R'FILENME !!Kill (erase) it
+                IF PRTCOD = 2 OR PRTCOD = 3 KILL r !!Kill (erase) it
+        ENDIF
+        PRGNAM="ABORT"
+        CALL CLEAN'UP
+END
+
+CLEAN'UP:
+        IF PRGNAM # "ABORT" THEN PRGNAM = "GOOD"
+        \LNKOUT
+RETURN
+
+COPYR   "OERCOD"
+COPY    "RPTMAT"
+COPY    "FORMAT"
+COPY    "BASERR"

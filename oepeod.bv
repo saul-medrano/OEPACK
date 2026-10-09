@@ -1,0 +1,1504 @@
+! @#$^&* 24 0 0 0 0 0 0 0 0 0 0 0 0 *&^$#@ 
+!*! Updated on Mon Nov 15 11:00:06 2021 by Cheryl Eberhard  1 times 
+!*! Updated on Tue Sep 15 14:58:15 2020 by Cheryl Eberhard  1 times 
+!*! Updated on Fri Jul 13 12:34:35 2018 by Cheryl Eberhard  1 times 
+!%W% %G% %U% - SCCS
+!* Updated on 18-Jul-95 at 2:14 PM by Eric Eberhard; edit time: 0:23:41
+PROGRAM OEPEOD,8.0(11)           !!EOD edit list/posting [7-9-B]
+GLOBAL REVISION="001"
+GLOBAL LHS'MARK = "N"
+GLOBAL SHS'MARK = "N"
+GLOBAL HHS'MARK = "N"
+GLOBAL GLI'MARK = "N"
+GLOBAL BCH'MARK = "N"
+GLOBAL TRX'MARK = "N"
+GLOBAL PASREC1 = "TLT'REC"                      !![17]
+GLOBAL PASREC2 = "WSL'REC"                      !![17]
+!!OEPEOD.BV - Report Mainline Program for REPORT MODULE: OEPEOD
+!!              Report Program Using the SELECTOR (Schema)
+!!
+!!                        V. I. C. S.
+!!                     of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!     Model program SSRPT written by:
+!!
+!! Written by Eric S. Eberhard, Kenneth J. Shook, V.I.C.S., Camp Verde, AZ
+!! And Tom Faust, Software Designs, Spokane, WA, December 1985
+!!
+!! Last model update - 04/23/87 KJS
+!!                     07/27/88 ESE/KJS - Add setting of start/end keys.
+!!                     04/20/90 KJS/CLS Changed KILL statement on abort
+!!                                      to use 'r' instead of R'FILENME.
+!!
+!! Copyright 1985 Alpha Base Systems, Inc., Los Angeles, CA
+!!
+!!      Revision History:
+!!
+!![1] 07/31/90 ESE      More carefully release records (OEWRIT[1]).
+!!
+!![2] 08/01/90 ESE      Fix [1].
+!!
+!![3] 08/03/90 ESE      Support "internal" credit memos.
+!!
+!![4] 08/18/90 ESE      Add the secondary TRX keys!
+!!
+!![5] 08/18/90 ESE      Use TRXD instead of TRXD.
+!!
+!![6] 11/15/90 HLB      Mapped unmapped variables
+!!
+!![7] 11/26/90 HLB      Access to UKY'NO incorrectly commented out in
+!!                      OEWRIT.CPY
+!!
+!![8] 11/26/90 ESE      Add QTY keys.
+!!
+!![9] 12/06/90 MCT      Allow creation of invoice and inventory batch by
+!!                      Promise Date.
+!![10] 12/19/90 ESE     QTY key change removed, PHS key added.
+!!
+!![11] 01/09/91 BAP     Changed repost program to OEPEO2.
+!!
+!![12] 01/09/91 BAP     Really changed repost program to OEPEO2.
+!!
+!![13] 01/16/91 ESE     Allow sales only to post to PHS (OEWRIT.CPY).
+!!
+!![14] 01/18/91 ESE     Add net change to PHS.
+!!
+!![15] 01/22/91 ESE     Fixed PHS'INVENTORY in OEWRIT to work if "O"
+!!
+!![16] 01/25/91 HLB     Modified OEWRIT to update PHS for transfers
+!!
+!![17] 01/31/91 HLB     Modified for SRP stuff
+!!
+!![18] 01/31/91 ESE     Set shipment number correctly in TRX records.
+!!
+!![19] 02/08/91 ESE     Try to prevent deadlocks by locking BSC.
+!!
+!![20] 03/20/91 ESE     Do OEPDOC posting if control record set to skip.
+!!                      All CACHE stuff not commented.
+!!
+!![21] 03/29/91 BAP     Changed call do'errs to do'errls
+!!
+!![22] 04/04/91 KJS      Fixed afr of number of copies
+!!
+!![23] 04/04/91 ESE     Made credits not post in here.
+!!
+!![24] 05/07/91 KJS     Corrected FINDYR/FINDPR macros for FUNKY date ranges
+!!                      Also removed code to delete TRXQ.
+!![25] 06/27/91 ESE     Serial file changed.  VCR:INC7:SRL*.CPY
+!!
+!![26] 07/02/91 ESE     Minor change ...
+!!
+!![27] 07/18/91 ESE/HLB Delete empty headers and LIN, SUB, and WGP
+!!                      with no HDR.
+!!
+!![28] 07/18/91 ESE     Only clean up if posting.
+!!
+!![29] 07/31/91 ESE     Fix invalid A/R distribution.
+!!
+!![30] 08/08/91 KJS     Changed to get method from abspec if passed
+!!                      that way (for unix).
+!!
+!![31] 08/09/91 HLB     Enable [27]
+!!
+!![32] 08/13/91 HLB     HHS'ACTION should not be set to space
+!!
+!![33] 08/26/91 ESE     Use new VICQTY.SBR.
+!!
+!![34] 09/03/91 ESE     Make work with new credit checking.
+!!
+!![35] 09/25/91 ESE     Cosmetic and slight speed improvements.
+!!
+!![36] 09/25/91 ESE     Set cost fraction (speeds G/L post later).
+!!
+!![37] 10/02/91 MRW     Added # of copies to print in BGP job.
+!!
+!![38] 10/14/91 ESE     Added code for user keys (UKY).
+!!
+!![39] 11/18/91 HLB     Interference with PROC'FTIME.  Caused problems
+!!                      with return processing.  See OEWRIT[15]
+!!
+!![40] 12/02/91 ESE/HLB Error messages if deleting bad WGP,LIN,SUB
+!!
+!![41] 12/26/91 HLB     Modify [27] to delete if no key.
+!!
+!![42] 01/22/92 ESE     It occasionally let a zero invoice slip through.
+!!
+!![43] 01/28/92 ESE     DB error - record not locked - caused in [41].
+!!
+!![44] 03/07/92 ESE     Would repost in background!!
+!!
+!!7.3a 03/16/92 ESE     New WGP, LIN, & SUB stuff.
+!!
+!![45] 05/14/92 ESE     Small change not really needed.
+!!
+!![46] 11/05/92 ESE     NEW: Change in DOKITS.MAC for T-Shirt shop orders.
+!!
+!![47] 11/06/92 ESE     NEW:  Disable new VICQTY.SBR.
+!!
+!![48] 11/09/92 ESE     NEW:  T-Shirt posting of shop orders.
+!!
+!![49] 12/08/92 JMS     Add SRL keys when necessary.  See OEWRIT
+!!
+!![50] 01/12/93 ESE     NEW:  true 7.3 edition.
+!!
+!![51] 03/03/93 ESE/HLB Re-wrote batch finding process to stop locking
+!!                      problems.
+!!
+!![52] 04/07/93 ESE     NEW: do not change purchase date re: serial in X-fer.
+!!
+!![53] 04/19/93 HLB     NEW: Modified to work with new costing macro
+!!                      See OEWRIT.
+!!
+!![54] 05/20/93 ESE     NEW: remove AFR file.
+!!                      IH: must accompany OEPDOC, OERCTL, AR1AR3, AR1BAT
+!!
+!![55] 07/12/93 ESE     NEW: error display for changes in invoice number.
+!!                      IH: need .R too.
+!!
+!![56] 08/05/93 ESE     NEW: New PRH caching
+!!                      IH: need VICSIT.SBR 7.3a(7) and a lot of other
+!!                          programs (see ESEPRH.CMD).
+!!
+!![57] 08/10/93 ESE     NEW: cache more stuff in UNIX only.
+!!
+!![58] 09/15/93 ESE     NEW: faster looper.
+!!
+!![59] 11/11/93 ESE     NEW: added an error message.  Make it work better
+!!                      if bad keys.
+!!
+!![60] 05/03/94 ESE     NEW: use new HHSP key (see NEWHHS.TXT).
+!!
+!![61] 06/14/94 HLB     NEW: The size of the mill in the MIL file has been
+!!                      changed.  If INC'ROOT = "Y" (Maintain history totals
+!!                      by root), this program must be sent with INXCLC,
+!!                      INPBCH, and OEPQTY and the MIL file must be run
+!!                      through MDR and the key changed.  T-Shirt Only!!
+!!
+!![7.4] 01/30/95 ESE    FIX: Kits very bad news - unpredictable at times.
+!!
+!![1] 03/08/95 HLB      FIX: When checking GLI batch, make sure that it
+!!                      is not waiting for chaining repost. (OEWRIT)
+!!
+!![2] 07/18/95 ESE      NEW: OEPACK supported.
+!!
+!![3] 01/02/96 ESE      FIX: FINDYR macro incorrect if AR not matching GL.
+!!
+!![4] 01/04/96 ESE      NEW: Force UOM = 1 for T-Shirt.
+!!
+!![5] 06/17/96 SLM      FIX: Was not printing TOTAL or DISC
+!!
+!![6] 07/08/96 ESE      FIX: not updating kits properly.
+!!
+!![7] 07/09/96 ESE      FIX: not updating kits properly.
+!!
+!![8] 07/11/96 ESE      NEW: support new post level (see oerctl!!!).
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![9]  03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!![10] 06/10/97  ESE   FIX: write/nolock error fixed in vics.mac
+!!
+!![11] 07/14/97  ESE   FIX: change in OEWRIT.CPY to fix build kit pricing.
+!!
+!!
+!!A note about the schema and stack and various modes of this program:
+!!      There are really three modes to this program for two different
+!!      ways of executing a report.
+!!
+!!              1. User chooses execution in foreground (current user job):
+!!
+!!              2. User chooses execution in background (BGP job):
+!!
+!!                      a. This program runs in foreground
+!!                         and sets up the stack and places this
+!!                         program on the QUEUE for execution
+!!
+!!                      b. This program runs in BGP job and uses
+!!                         information set in 2a above.
+!!
+!!
+!!The program logic is as follows:
+!!
+!!      First we always LDUSR, check pass security, then ...
+!!        (Checks first byte of PWASTR only to determine if allowed to run)
+!!
+!!      Find out if we are running in background (IN'BGP = 1)
+!!
+!!              If we are in background (2b above):
+!!                     -retrieve standard PQU info which occurs in report macros
+!!                     -call SET'USR'DATA and retrieve user info placed
+!!                              on stack (in 2a above).  I suggest using
+!!                              SETUSR macro.
+!!                     -execute report beginning at BEGIN
+!!                     -exit program at ABORT if abnormal, or NORMAL'BGP'FINISH
+!!                              if all is OK
+!!
+!!
+!!              If not in background then we:
+!!                      -calls STANDARD'SCREEN and get standard PQU
+!!                              questions answered.  Programmer may
+!!                              modify this screen (VICSRP.S[11,10])
+!!                              to input user data
+!!                      -calls PUT'USR'DATA where you may make your
+!!                              own input screen and MUST put any
+!!                              user data onto stack if PRW'STK # "N"
+!!                              (or use PUTUSR macro).
+!!                      -IF PRW'STK = "Y" then we go into mode 2a above:
+!!                              -Setup PQU for standard stack data
+!!                              -exit program at END'AFTER'PUT'ON'STACK
+!!                                      on normal exit, ABORT on abnormal
+!!                      -IF PRW'STK = "N" then we go into mode 2b above
+!!                              -execute report beginning at BEGIN
+!!                              -exit program at ABORT if abnormal,
+!!                                      or NORMAL'FINISH if normal exit
+!!
+!!Note:  unlike the old model this program does not exit to perform
+!!       a SELECTOR select/sort ... so nothing needs saving on the QUEUE
+!!       etc.  For those who care, XCALL LINK is used to execute SCHEMA
+!!
+SIGNIFICANCE 11
+
+!!Program control globals
+
+GLOBAL SCHEMA'TEST="Y"          !!Changes PUTUSR and SETUSR behavior
+                                !!and MUST be 'N' if using old select
+                                !!otherwise 'Y' regardless of below global
+
+GLOBAL ALLOW'SCHEMA="N"         !!Causes standard report macros to copy
+                                !!in SCHEMA logic.  Without this NO
+                                !!select or sort can ever be peformed
+
+GLOBAL PROGRAM'FILL="N"         !!If 'Y' will allow program to
+                                !!fill particular values into select/sort
+                                !!areas of USRHDR.  See PRGM'FILL'SLH
+
+GLOBAL ABORT'NOSL="N"           !!If 'Y' will abort when 0 records selected
+                                !!If 'N' will ask screen questions again
+                                !!If 'C' will continue through program flow
+
+        !!The following globals directly affect SELECT.MAC[16,14]
+        !!Which does the actual selection process.  Set the key packets
+        !!in the label "SET'START'END'KEYS" below.
+
+!!GLOBAL STARTKEY="STR'KEY"     !!MODIFY: If set, will cause primary key to
+                                !!start at given value.  Replace STR'KEY
+                                !!with your key packet and set key to starting
+                                !!values.
+
+!!GLOBAL ENDKEY="END'KEY"       !!MODIFY: If set, will cause primary key to
+                                !!stop at given value.  Replace END'KEY
+                                !!with your key packet and set key to ending
+                                !!values.  If using STARTKEY above, make sure
+                                !!you use different key packets!!
+
+        !!The following globals are use in VICSRP.S[11,10]
+        !!which is the screen used in STANDARD'SCREEN
+        !!They are the defaults to the fields on that screen, name of
+        !!the screen, and edit routines on that screen.
+
+        !!The defaults MUST have three quotes if literals
+        !!or single quotes if variables
+
+SYMBOL SCREEN="VICSRP"          !!Default screen
+GLOBAL DFLT'PRW'SUM="""N"""     !!Default for Summary option (Y/N)
+GLOBAL DFLT'PRW'SEL="""N"""     !!Default for Select/Sort option (Y/N)
+!GLOBAL PRW'SEL'EDITS = "ADDITIONAL EDITS ON PRW'SEL"  !!Enable if you
+                                !!need more than standard edit for PRW'SEL
+
+                !!These second two must be "" (NO default)
+                !!or numbers or a variable
+
+GLOBAL DFLT'PRW'SCHEMA=""       !!Default for Schema number in (####)
+CIF DFLT'PRW'SCHEMA = "" THEN
+        GLOBAL DFLT'PRW'SCHEMA="SPACE"  !!Default for Schema number in (####)
+ENDCIF
+
+GLOBAL DFLT'PRW'HEADER=""       !!Default for Schema header in (####)
+CIF DFLT'PRW'HEADER = "" THEN
+        GLOBAL DFLT'PRW'HEADER="SPACE"  !!Default for Schema header in (####)
+ENDCIF
+
+!GLOBAL USER'SELECT="LABLE'NAME" !!To perform your own \SELECT macro call
+
+!!Standard file definitions:
+!!
+        COPYF   "HHSFIL",NOAFR          !! Data File
+        COPYF   "HHSPKY"                !! Key File
+        \COPYF MAS SA
+        \COPYF VIL IN
+
+!!Standard copied maps:
+!!
+        \SSRPTMAPS                      !! SSRPT.MAC
+
+!!User file definitions and maps
+                                        !!MODIFY:  add your maps and
+                                        !!         COPYF's here
+
+        COPYF "CMNFIL[SY]"
+        \COPYF LOC IN MODE="PRI"
+        \COPYF VIA IN MODE="PRI"
+        MAP1    FIRST'HDR'NO,B,3
+        MAP1    FIRST'LOC'NO,B,2
+        MAP1    FIRST'TRX'NO,F
+        MAP1    LAST'TRX'NO,F
+
+        \COPYF HHS
+        \COPYF LHS
+        \COPYF SHS
+        \COPYF SHL
+        \COPYF SHS
+        COPYF "HDRFIL",NOAFR
+        COPYF "LINFIL",NOAFR
+        COPYF "SUBFIL",NOAFR
+        \COPYF HHSP OE HHSP2 MODE="KEY"
+
+!!Skip fields on STANDARD'SCREEN parameters
+
+        MAP1    NOSEL,B,1               ! Set = to 1 to bypass Selection choice
+        MAP1    NOSUM,B,1               ! Set = to 1 to bypass Summary choice
+        MAP1    NOSTACK,B,1             ! Set = to 1 to bypass stack choice
+        MAP1    NOSCHEMA,B,1            ! Set = to 1 to bypass SCHEMA choice
+        MAP1    NOHEADER,B,1            ! Set = to 1 to bypass HEADER choice
+!!Skip fields in SELECT program paramaters (defined in HEADER PRW'HEADER)
+!!                                         (and defined by PRW'SCHEMA   )
+
+        MAP1    NOSRT,B,1               ! Set = to 1 to disallow change of
+                                        ! SORT parameters in the passed header.
+        MAP1    NOSLCT,B,1              ! Set = to 1 to disallow change of
+                                        ! the SELECT parameters in the
+                                        ! passed header
+        MAP1    NOSEE,B,1               ! Set = to 1 to not LINK to SELECT
+                                        ! and sort screen at ... not allow
+                                        ! user to see or modifiy the
+                                        ! passed header that will still
+                                        ! be used for select and sort.
+        MAP1    NOCOPIES,B,1            ! Set # to 0 to bypass COPIES choice
+                                        ! and hard code number of copies
+!!Misc user parameters
+
+        MAP1    DSK                     ! USR Params for RPT Stack
+                MAP2    DEV,S,3
+                MAP2    DRV,S,2
+        MAP1    PPN,S,7
+
+        LCL1    TMP'II,F
+        MAP1    FORMID,S,6
+        MAP1    H'QUE,B,1,60            ! Standard Hold Que
+        MAP1    P'QUE,B,1,20            ! Standard Process Que
+
+        MAP1    ASKEXT,S,1              ! Ask any key to Exit in select/sort
+
+                                        !                       to print
+        MAP1    LV,F,6,1                ! Start level - do not change
+
+        MAP1    RP'GROUP,S,1            ! Group headers (Y-N)
+        MAP1    RP'SKIP,B,1             ! Break line skip count
+        MAP1    SAV'PRTNO,S,4           ! Save area for AFRing
+
+ON ERROR GOTO ERTRAP
+
+BEGIN:
+
+
+        GETCMN          !!MODIFY:  if you use SNDCMN to get to this program
+        GETCMN CMN'REC
+                        !!         with a different area than PASS'SEL'AR
+                        !!  If MY'REC <= 998 bytes
+                        !!         add following:  MY'REC = PASS'SEL'REC
+                        !!
+                        !!  If MY'REC > 998 bytes
+                        !!        add following:  GETCMN MY'REC
+                        !!                        PASS'SEL'REC = MY'REC
+
+
+                        !!MODIFY:  If you need to do input statements
+                        !!         (from a menu or command or .DO file)
+                        !!         code as follows:
+                        !!
+                        !!      IF NOT IN'BGP THEN
+                        !!                      !!Input if not in background
+                        !!              INPUT MY'VARIABLE1
+                        !!              INPUT MY'VARIABLE2
+                        !!      ENDIF
+                        !!
+                        !!NOTE:  you may also want to test your common area!
+
+        COPYF "WSLFIL",NOAFR
+        \DOPASS
+        \READCTL APID="OE/IN" GL="N"
+        IF OEC'BATCH'YN # "Y" THEN
+                ENTRY = "Your system not set up for batching"
+                CALL DO'ERRL
+                GOTO ABORT
+        ENDIF
+MAP1 NOBIN'ERR,S,1
+        IF V''SYSTEM = "UNIX" THEN
+                XCALL GETENV,"OEPQTY_NOBIN",NOBIN'ERR
+        ENDIF
+        USE OC2 OEC'RCN INTO OC2'REC
+        COPYF "IN2FIL[IN]"
+        USE IN2 UB'CNO INTO IN2'REC
+        IF IN2'CTL # 0 THEN
+                ENTRY = "Cannot read IN2 control record!"
+                CALL DO'ERR
+                GOTO ABORT
+        ENDIF
+CIF WH AND NOT WH THEN
+        IF IN2'WH'YN = "Y" THEN
+                \READCTL APID="WH" GL="N"
+                IF WHC'SPCASE = "Y" THEN
+                    ENTRY = "Currently not programmed for seperate cases/pieces oepqty/oewrit/poprcv/oepeod!"
+                    CALL DO'ERR
+                    GOTO ABORT
+                ENDIF
+        ENDIF
+ENDCIF
+!![38] - below
+        CALL SET'KEYS'LEN
+        IF V''WO'KEY # 0 THEN
+                UKY'KKY = V''WO'KEY - 2
+                UKY'KHDR'LOC'NO = HDR'LOC'NO
+                UKY'KDOC'TYPE = HDR'DOC'TYPE
+                UKY'KHDR'NO = HDR'NO
+                UKY'KSHIPMENT = HDR'SHIPMENT
+                USE UKY INTO UKY'REC KEY UKY'KEY
+        ENDIF
+!![38] - above
+        \READCTL APID="MC" GL="N"
+        \READCTL APID="AR" GL="Y"
+
+MAP1 ABUTIL'FLG,B,1                     !0=memory, 1=not, 2=notfound
+MAP1 ABUTIL'SIZE,B,4
+
+        IF OEC'SKIPDOC = "Y" THEN                       !![20]
+                ENTRY = "OEPDOC.RUN"
+                XCALL ABUTIL,15,ENTRY,ABUTIL'SIZE,ABUTIL'FLG
+                IF ABUTIL'FLG = 2 THEN
+                        XCALL ABUTIL,6,"OE",UB'SYS,"B",ABUTIL'FLG
+                        XCALL ABUTIL,15,ENTRY,ABUTIL'SIZE,ABUTIL'FLG
+                        XCALL ABUTIL,6,"OE",UB'SYS,"",ABUTIL'FLG
+                ENDIF
+                IF ABUTIL'FLG = 2 THEN
+                        ENTRY = ENTRY + " not found!"
+                        CALL DO'ERRL                    !![21]
+                        GOTO ABORT
+                ENDIF
+                I = MEM(0)
+                IF I < ABUTIL'SIZE THEN
+                        ENTRY = "Not enough user memory to link to OEPDOC!"
+                        CALL DO'ERRL                    !![21]
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+
+        IF IN'BGP = 0 THEN
+                XCALL ABSPEC,ENTRY                      !![30]
+                IF ENTRY # "" THEN                      !![30]
+                        WSL'METHOD = ENTRY
+                ELSE
+                        INPUT "",WSL'METHOD
+                ENDIF
+                IF WSL'METHOD = 3 THEN
+                        INPUT PRW'PRTNO
+                        INPUT PRW'COPIES                !![37]
+                        PRW'STK = "N"                   !![44] - was 'Y'
+                        PRW'SUM = "N"
+                        PRW'SEL = "N"
+!![37]                  PRW'COPIES = 1
+!![12]below
+!!                      CMN'TO'PRGNAM = "OEPEOD"
+!!                      CMN'FRM'PRGNAM = "OEPEOD"
+                        CMN'TO'PRGNAM = "OEPEO2"
+                        CMN'FRM'PRGNAM = "OEPEO2"
+!![12]above
+                        WSL'METHOD = 1
+                ENDIF
+        ENDIF
+        IF WSL'METHOD = 1 THEN
+                PQD'DATA = "End-of-Day Posting"
+        ELSE
+                PQD'DATA = "End-of-Day Edit List"
+        ENDIF
+        PQU'PROG = "OEPEOD"
+
+        \VICSRPT                                !!SSRPT.MAC
+
+        IF WSL'METHOD = 1 THEN
+!![19]
+                BSC'RCN = 0 : REL BSC
+                BSC'CTL = 99
+                OPEN BSC
+                IF BSC'CTL # 0 THEN
+                        ENTRY = "BSC file in use!  Try later."
+                        CALL DO'ERRL
+                        GOTO ABORT
+                ENDIF
+                GLI'RCN = 0 : REL GLI
+                GLI'CTL = 99
+                OPEN GLI
+                IF GLI'CTL # 0 THEN
+                        ENTRY = "GLI Batch file in use!  Try later."
+                        CALL DO'ERRL
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+
+        CIF V''GENCODES = "Y" THEN
+                \SETAPP V''TMP
+                R'MSGDB = "|V''TMP|MSG"         !!MODIFY:  IF YOU DON'T HAVE SETAPP
+                                                !!         OR IF DIFFERENT.
+        CELSE
+                R'MSGDB =  |APID|MSG            !!MODIFY:  IF YOU DON'T HAVE SETAPP
+        ENDCIF
+
+        CALL IRPT'OEPEOD                        !! Initialize report module
+        INIT'RPT = 1                    !! Set switch - report initialized.
+
+
+                                        !!MODIFY: below code to suit
+                                        !!        for fancy file reads
+                                        !!        or multiple detail lines.
+
+
+!![59] - make below read by key ...
+        HHSP2'KCOMPLETE = "N"                           !![60]
+        HHSP2'RCN = 0
+        RDKEY HHSP2 KEY HHSP2'KEY
+        DO
+                GETNXT HHSP2
+                IF HHSP2'CTL # 0 EXIT
+                USE HHS HHSP2'RCN INTO HHS'REC
+                IF HHS'COMPLETE = "Y" EXIT
+                IF HHS'BATCH'YN = "N" REPEAT            !![60]
+                IF HHS'CTL # 0 THEN                     !![59] nuke bad keys
+                        HHSP'KEY = HHSP2'KEY2
+                        DELKEY HHSP
+                        REPEAT
+                ENDIF
+                IF HHS'PRGNAM # "CHERYL" AND HHS'POST'LEVEL # 255 THEN
+                        ENTRY = "REPOST needed on: "
+                        \KERROR HHS MODE="D"
+                        ENTRY = ENTRY + " pgm: " + HHS'PRGNAM
+                        CALL DO'ERRL
+                        REPEAT
+                ENDIF
+                CMN'SAV'RCN(1) = HHS'RCN
+                CALL PRINT'REPORT
+                IF WSL'METHOD = 1 THEN
+                        RDLOCK HHS HHSP2'RCN INTO HHS'REC
+                        CALL PROCESS'ONE'HDR
+                        IF IERROR = 1 THEN              !![55] this section
+                                IERROR = 0
+                                R'DETNO = 3
+                                CALL RPT'DETAIL
+                        ENDIF
+                ENDIF
+        LOOP
+
+        IF LAST'LOC'NO # 0 THEN
+                IF LOC'NO # LAST'LOC'NO THEN
+                        LOC'KNO = LAST'LOC'NO
+                        USE LOC INTO LOC'REC KEY LOC'KEY
+                ENDIF
+                R'DETNO = 2
+                CALL RPT'DETAIL
+        ENDIF
+        R'ENDNO = 1
+        CALL RPT'END
+
+
+        IF PRTCOD # 1 AND PRTCOD <= 3 AND PRT'EXSPL # "N" THEN
+                RR1 = rdvf
+!!              RR2 = PGECNT MAX 1      !!MODIFY: will set from .R file
+                RR2 = PRW'COPIES MAX 1
+!!              XCALL SPOOL,r,PRT'DEVCD,RR1,RR2,PQU'FORMID
+                \SPOOL
+        ENDIF
+
+        IF IN'BGP CALL NORMAL'BGP'FINISH ELSE CALL NORMAL'FINISH
+END
+
+
+!!Exit routines - one for each type of possible exit!!
+MAP1 ABORTED,B,1
+
+ABORT:                          !!Used for abnormal exit of program
+                                !!such as error conditions or user
+                                !!voluntary exit.
+        IF INIT'RPT THEN
+                PRINT TAB(-1,14);TAB(-1,A'RED);
+                ENTRY = "Report has been Aborted"
+                CALL DO'ERRL
+                rtnadr = 0
+                CALL RPT'END                               !!Close print file
+                IF PRTCOD = 2 OR PRTCOD = 3 KILL r         !!Kill (erase) it
+        ENDIF
+        ABORTED = 1
+        IF IN'BGP CALL NORMAL'BGP'FINISH ELSE CALL NORMAL'FINISH
+END
+
+END'AFTER'PUT'ON'STACK:         !!Normal exit after report has been QUEUE'd
+                !!MODIFY:  if you need to do a SNDCMN upon completion, one
+                !!                 goes here and in NORMAL'FINISH
+END
+
+NORMAL'FINISH:                          !!Normal exit after report compelted
+        CALL CLEAN'UP
+                !!MODIFY:  if you need to do a SNDCMN upon completion, one
+                !!                 goes here and in END'AFTER'PUT'ON'STACK
+RETURN
+
+NORMAL'BGP'FINISH:                      !!Normal exit after report completed
+                                        !!running on BGP
+        CALL CLEAN'UP
+RETURN
+
+CLEAN'UP:               !!Called unless case 2a above (just put rpt on stack)
+                        !!including ABORT, BGP, etc.
+                        !!MODIFY:  release any record locks, close files, etc.
+        IF WSL'METHOD = 1 AND ABORTED = 0 THEN          !![28]
+                CALL CLEAN'EOD
+                CALL CLEAN'HDR                          !![27]
+        ENDIF
+        XCALL DB,22,HHSP'PKT                    !!General release
+
+        CIF ALLOW'SCHEMA = "Y" THEN
+                CALL FREE'SELECT'WORK'FILE
+        ENDCIF
+RETURN
+
+!! Standard report module subroutines !!
+
+COPYR   "OEPEOD"
+                                !!MODIFY:  if you changed STANDARD'SCREEN
+                                !!         to use a different screen.
+CIF SCREEN="VICSRP" THEN
+        COPY    "DSK0:VICSRP[11,10]"
+CELSE
+        COPYS   "|SCREEN|"
+ENDCIF
+                                !!MODIFY:  if company control or program
+                                !!         name changes since you generated
+                                !!         this program.
+                                !!         VPRGDESC may be used to send
+                                !!         a variable as a description
+                                !!         rather than PRGDESC which requires
+                                !!         a literal.
+
+\SSRPT PRGNAM="OEPEOD" VPRGDESC="PQD'DATA" CMP'CONTROL="Y"
+\\TSTFUNC                               !!TSTFNC.MAC
+
+
+!! User modifyable subroutines !!
+
+DSP'STANDARD'SCREEN:            !! Leave here - used in \WINDOW call
+                                !! in select/sort macros
+                                !!
+                                !! WARNING: NEVER EVER NEVER do ANYTHING
+                                !! except the DSP SCREEN when dspsw = 220
+                                !! (E.G. put IF  statement around ALL
+                                !!  other code)
+!![12]  IF CMN'TO'PRGNAM = "OEPEOD" AND CMN'FRM'PRGNAM = "OEPEOD" THEN
+        IF CMN'TO'PRGNAM = "OEPEO2" AND CMN'FRM'PRGNAM = "OEPEO2" THEN  !![12]
+                II = 1
+        ELSE
+                DSP |SCREEN|
+                IF dspsw # 220 THEN
+                        ENTRY = "For "+PQD'DATA
+                        ENTRY = SPACE( INT((72 - LEN(ENTRY))/2) ) + ENTRY !!Center it
+                        CALL DSP'VICSRP'ENTRY
+                ENDIF
+        ENDIF
+RETURN
+
+TITLES:
+        \TITLES FAKE
+RETURN
+
+DSP'FAKE:
+   DSP |SCREEN|
+RETURN
+
+DDB'FAKE:
+   DDB |SCREEN|
+RETURN
+
+GDB'FAKE:
+   INX1 = I'RT
+   INX2 = 0
+   IF CMN'TO'PRGNAM = "OEPEO2" AND CMN'FRM'PRGNAM = "OEPEO2" RETURN
+   GDB |SCREEN|
+RETURN
+
+GDB'STANDARD'SCREEN:            !! Leave here - needed for re-GDB when
+                                !! no selections made ... you may make
+                                !! your own screen ... but it must have
+                                !! all LABELS that are in VICSRP.S
+
+!!      AUTO'ROW = 12           !!MODIFY:  If autoprompting used, set to 1st
+                                !!blank line on screen ... already set to 11
+                                !!in MAP statement for VICSRP
+
+!![12]IF CMN'TO'PRGNAM = "OEPEOD" AND CMN'FRM'PRGNAM = "OEPEOD" THEN
+   IF CMN'TO'PRGNAM = "OEPEO2" AND CMN'FRM'PRGNAM = "OEPEO2" THEN       !![12]
+!![10]  PRW'REC = CMN'OTHER
+        CALL TITLES
+   ELSE
+        ENTRY = "*       "      !!Leave blanks!
+        XCALL PRTQUE,SS'STACK'TST
+        IF UB'PRTSTK = "X" OR NOSTACK = 1 OR SS'STACK'TST = "N" THEN
+                ENTRY[2;1] = "X"                !!disable stack option
+                PRW'STK = "N"
+        ENDIF
+        IF UB'PRTOVR # 0 THEN
+                ENTRY[3;1] = "X"                !!disable printer option
+                PRW'PRTNO = UB'PRTOVR
+        ENDIF
+        IF NOSUM = 1 THEN
+                ENTRY[4;1] = "X"                !!disable summary option
+                PRW'SUM = "N"
+        ENDIF
+        IF NOCOPIES # 0 THEN                    !!disable copies option
+                ENTRY[8;1] = "X"
+                PRW'COPIES = NOCOPIES
+        ENDIF
+
+        CIF ALLOW'SCHEMA = "Y" THEN
+                IF NOSEL = 1 THEN
+
+!!MODIFY:  to force a select/sort without giving the user a choice you
+!!         must set PRW'SEL = "Y", and set PRW'SCHEMA and optionally
+!!         set PRW'HEADER ... you may want to set NOSRT and NOSLCT to
+!!         prevent the user from changing the preset SCHEMA header.
+!!         If you leave PRW'HEADER = 0 all records will be selected
+!!         (e.g. select ALL and SORT them) unless you leave NOSLCT = 0
+!!         to allow the user to enter selection criteria.
+
+                        ENTRY[5;1] = "X"        !!disable select option
+                        PRW'SEL = "N"
+                        ENTRY[6;1] = "X"        !!disable schema option
+                        PRW'SCHEMA = 0
+                        ENTRY[7;1] = "X"        !!disable header option
+                        PRW'HEADER = 0
+                ENDIF
+                IF NOSCHEMA = 1 THEN ENTRY[6;1] = "X"   !!disable schema option
+                IF NOHEADER = 1 THEN ENTRY[7;1] = "X"   !!disable header option
+        CELSE
+                ENTRY[5;1] = "X"
+                PRW'SEL = "N"
+                ENTRY[6;1] = "X"
+                PRW'SCHEMA = 0
+                ENTRY[7;1] = "X"
+                PRW'HEADER = 0
+        ENDCIF
+        IF INSTR(1,ENTRY,"X") # 0 THEN
+                \AFR EDIT="N"
+        ENDIF
+        CALL TITLES
+        CALL TST'FUNC : IF TST'FUNC = 1 GOTO ABORT
+   ENDIF
+RETURN
+
+E'PRTNO:
+                                !!MODIFY:  if custom STANDARD'SCREEN
+        \TABPRT
+RETURN
+
+SET'ASKEXT:
+        ASKEXT = PRT'CRT
+RETURN
+
+PUT'USR'DATA:
+
+        !!  MODIFY:  modify the following as needed
+        !!  This is where user defined parameters are entrered and then if
+        !!  PRW'STK # "N" then the data must be "stacked" on the PQD file
+        !!  for later use.
+
+        !!VICS macros make the below typical:
+
+!!      DSP |SCREEN|                            !!It may be better to
+!!                                              !!change STANDARD'SCREEN
+!!                                              !!instead of having a second
+!!      GDB |SCREEN|                            !!screen here ...
+!!      CALL TST'FUNC : IF TST'FUNC = 1 GOTO ABORT
+!![17]  \PUTUSR TLT'REC WSL'REC                 !!this part is always needed
+!![17]                                          !!when user data is saved
+        \PUTUSR                                 !![17]
+
+!!To get multiple records stacked on PQD code as follows:
+!!
+!!      \PUTUSR WR1'REC WR2'REC WR3'REC ... etc.
+!!
+!!Make sure and read them off in SETUSR in the same order!
+
+RETURN
+
+SET'USR'DATA:
+
+        !!   This is where the PQD'DATA is pulled in for Print Execution.
+        !!   PQU'DTAPTR contains the 1st record. See above for layout
+        !!   This routine will only be called if executed by stack
+        !!   in the background execution mode.
+
+!VICS macros make the below typical:
+
+!![17]  \SETUSR TLT'REC WSL'REC
+        \SETUSR                                 !![17]
+
+RETURN
+
+CHECK'SCHEMA:
+                !!MODIFY:  Set SF = 1 to skip a schema during tabbing
+                !!         and disallow it for use in this report.
+!!      IF SCH'PDBID[1;5] # "OEHHSP"[1;5] THEN SF = 1
+RETURN
+
+CHECK'HEADER:
+                !!MODIFY:  Set SF = 1 to skip a header during tabbing
+                !!         and disallow it for use in this report.
+RETURN
+
+CIF STARTKEY OR ENDKEY THEN
+        CIF ALLOW'SCHEMA # "Y" THEN
+                ERROR - Why set start or end key if schema not used?
+        ENDCIF
+        SET'START'END'KEYS:
+                !!MODIFY:  Set starting and ending key values from here.
+                !!         If stack is allowed then remember to save what
+                !!         is needed in PUTUSR and SETUSR.
+                !!         Be SURE and set the company number to UB'CNO
+                !!         as selector will not set it for you!
+        RETURN
+ENDCIF
+
+CIF PROGRAM'FILL = "Y" THEN
+        CIF ALLOW'SCHEMA # "Y" THEN
+                ERROR - Why set program fill if schema not used?
+        ENDCIF
+PRGM'FILL'SLH:
+!!      ! MODIFY:  Here is where you can force a sort and select
+!!      !          using SCHEMA.
+!!
+!!      \FORCE'SORT DBID="APCAT" SORT="DESC" ORDER="A"
+!!              ! CLR="N" &     Only if you do not want sort area cleared.
+!!              ! OCCUR="1"     Only if you want specify which field. (1-6)
+!!      ! Call this macro up to six times to force sort fields.
+!!      !Note: Field sorting order is order of macro occurance.
+!!
+!!      \FORCE'FLD DBID="APDOC" FIELD="NO" COMP="GT" VALUE="10"
+!!              ! CONT="AND" ST'PAREN="(" EN'PAREN=")"  ! Optional here on
+!!              ! DETAIL'NO=1   ! Normally not passed because fields are added
+!!                              ! Set this to # of existing FIELD to change.
+!!
+!!      \FORCE'FLD DETAIL'NO="SLD'NO" CONT=" "
+!!              ! USE ABOVE TO CLEAR LAST CONTINUATION WHEN IF STATEMENTS
+!!              ! ARE USED TO SET SELECT FIELDS
+!!
+!!      ! Call this macro for each field in the selection.
+!!
+RETURN
+ENDCIF
+
+\COPYF TRH AR MODE="PRI"
+MAP1 LAST'LOC'NO,B,3                                    !![35]
+
+
+PRINT'REPORT:                   !!MODIFY - add your reporting logic here
+!![35] - below
+        IF LAST'LOC'NO # HHS'LOC'NO THEN
+                IF LAST'LOC'NO # 0 THEN
+                        IF LOC'NO # LAST'LOC'NO THEN
+                                LOC'KNO = LAST'LOC'NO
+                                USE LOC INTO LOC'REC KEY LOC'KEY
+                        ENDIF
+                        R'DETNO = 2
+                        CALL RPT'DETAIL
+                ENDIF
+                SUBTOTAL'SPACE = SPACE
+                LAST'LOC'NO = HHS'LOC'NO
+        ENDIF
+!![35] - above
+        NEW'SHIPMENT = HHS'SHIPMENT                     !![18]
+MAP1 SVIA'DESC,S,30
+
+        MAP1 TRHPTR,X,30
+        MAP1 VIAPTR,X,30
+
+        CASE
+        IF HHS'PROC < 5 THEN
+                \USELST HHS'NAM'NO
+                IF VIA'NO # HHS'VIA'NO THEN
+                        VIA'KNO = HHS'VIA'NO
+                        \VUSE VIA - VIAPTR
+                        SVIA'DESC = VIA'DESC
+                ELSE
+                        VIA'DESC = SVIA'DESC
+                ENDIF
+                IF TRH'NO # HHS'TRH'NO THEN
+                        TRH'KNO = HHS'TRH'NO
+                        \VUSE TRH - TRHPTR
+                ENDIF
+                VIA'DESC = TRH'DESC + " via " + VIA'DESC
+        ELSE
+        IF HHS'PROC = 5 THEN
+                LST'COMPANY = "Shop Order"
+                VIA'DESC = ""
+        ELSE
+                LST'COMPANY = "Transfer"
+                VIA'DESC = ""
+        ENDCASE
+
+!![5]   \HDRSUM BALANCE="TOTAL" DISC="DISC"
+        \HDRSUM HHS BALANCE="TOTAL" DISC="DISC"         !![5]
+
+        GTOTAL = GTOTAL + TOTAL
+        STOTAL = STOTAL + TOTAL                 !![35]
+
+        GDISC = GDISC + DISC
+        SDISC = SDISC + DISC                    !![35]
+
+        CNT = CNT + 1
+        SCNT = SCNT + 1                         !![35]
+        R'DETNO = 1
+        CALL RPT'DETAIL
+RETURN
+
+MAP1 TAX1,B,5
+MAP1 TAX2,B,5
+MAP1 DISC,B,5
+MAP1 TOTAL,B,5
+MAP1 GTOTAL,B,5
+MAP1 FREIGHT,B,5
+MAP1 OTHER,B,5
+MAP1 CNT,B,5
+MAP1 GDISC,B,5                          !![6]
+MAP1 SUBTOTAL'SPACE,S                   !![35]
+        MAP2 SCNT,B,5
+        MAP2 STOTAL,B,5
+        MAP2 SDISC,B,5
+
+!![38]MAP1      UKY'NO,F,6              !![7] To allow mapped compile
+COPY "OEWRIT"                           !!FIND'AND'WRITE'QTY:
+                                        !!POST'TO'TRX:
+                                        !!FIND'AND'WRITE'HST:
+                                        !!FIND'AND'WRITE'PHS:
+                                        !!FIND'AND'WRITE'SLH:
+
+PROCESS'ONE'HDR:
+!![9] - Below
+!!      IF OEC'IDTTO # "Y" THEN
+!!              SDATE = HHS'PSTDT
+!!      ELSE
+!!              SDATE = HHS'ORDER'DTT
+!!      ENDIF
+        IF OEC'IDTTO = "Y" THEN
+                SDATE = HHS'ORDER'DTT
+        ELSE
+        IF OEC'IDTTO = "P" THEN
+                SDATE = HHS'PROM'DTT
+        ELSE
+                SDATE = HHS'PSTDT
+        ENDIF
+        ENDIF
+!![9] - Above
+        IF HHS'BATCH'YN = "Q" THEN              !!Clean-up flag
+                ?TAB(24,1) ; TAB(-1,A'RED) ; "Cleaning up TRX file for repost: ";TAB(-1,9) ;
+                I = 0
+                TRXD'KLOC'NO = 0
+                TRXD'KTRK'NO = 0
+                TRXD'KATT'NO1 = 0
+                TRXD'KATT'NO2 = 0
+                TRXD'KDATE = 0
+                USE TRXD INTO TRX'REC KEY TRXD'KEY
+                DO
+                        GETNXT TRXD INTO TRX'REC
+                        \CHKKEY TRXD APID="IN" LASTFIX="ATT'NO2"
+                        IF TRXD'CTL # 0 EXIT
+                        I = I + 1
+                        IF I/10 = INT(I/10) ?TAB(24,40) ; I ;
+                        IF TRX'STAT = "P" AND TRX'HDR'LOC'NO # 0       AND &
+                                   TRX'DOC'TYPE # 0 AND TRX'HDR'NO # 0 AND &
+                                   TRX'LIN'NO # 0 AND TRX'SHIPMENT # 0 AND &
+                                   TRX'TRK'NO = 0 AND TRX'QTY = 0      THEN
+!!We are fairly sure this came from OE and anyway it has no part number,
+!!and no quantity, so blow it away!
+                                RDCOND TRX TRXD'RCN INTO TRX'REC
+                                IF TRX'CTL = 0 THEN
+                                        \SETKEY TRX MODE="KEY" APID="IN"
+                                        DELETE TRX KEY TRX'KEY
+                                        \SETKEY TRX MODE="KY2" APID="IN"
+!![24]                                  TRXQ'KMODE = "F"
+                                        \DELKEY TRX MODE="KY2" APID="IN"
+!![24]                                  TRXQ'KMODE = "L"
+!![24]                                  DELKEY TRXQ
+                                ENDIF
+                        ENDIF
+                LOOP
+                ?TAB(24,1) ; TAB(-1,9) ;
+        ENDIF
+        HHS'BATCH'YN = "Q"
+        UPDATE HHS FROM HHS'REC
+        \CHO HHS
+        HDR'REC = HHS'REC
+        IF HDR'PROC < 5 THEN
+                MAP1 VILPTR,X,30
+                \VUSE VIL - VILPTR
+                \SSGET ARCUS INLOC INVIL SCHEMA="20"            !![35]
+        ELSE
+                CUS'TAXABLE = "N"
+        ENDIF
+        \SSGET INLOC SCHEMA="20"
+        LHS'HDR'LOC'NO = HHS'LOC'NO
+        LHS'DOC'TYPE = HHS'DOC'TYPE
+        LHS'HDR'NO = HHS'NO
+        LHS'SHIPMENT = HHS'SHIPMENT
+        LHS'NO = 0
+        \SETKEY LHS MODE="KEY"
+        \LOOPER PRE="LHS" ACTION="POST'LHS" OPR="USE" FAST="Q"
+        HHS'BATCH'YN = "N"
+        \SETKEY HHSP MODE="KEY"
+        \COMPLETE                       !![60] and fix key.
+        IF HHSP'KCOMPLETE # HHS'COMPLETE THEN
+                DELKEY HHSP
+                \SETKEY HHSP MODE="KEY"
+                ADDKEY HHSP
+        ENDIF
+        IF OEC'SKIPDOC = "Y" CALL DO'OEPDOC
+        WRITE HHS FROM HHS'REC
+        \CHO HHS
+        MOST'CACHE'SPACE = SPACE        !!Keeps PRH cached.
+RETURN
+
+POST'LHS:
+        CACHE'LHS'CNT = (CACHE'LHS'CNT + 1) MIN 255
+        IF CACHE'LHS'CNT <= CACHE'MAX1 THEN
+                CACHE'LHS'REC(CACHE'LHS'CNT) = LHS'REC
+        ENDIF
+        IF LHS'BATCH'YN # "Y" RETURN                    !!KLUDGE
+        \VICS'START ACTION="SET'REPOST"
+        \VICS'RDLOCK LHS BY'RCN="Y"
+        \VICS'POST LHS ACTION="POST'LHS2"
+        \VICS'END ACTION="FIX'TRX'KEYS"
+        QTY'RCN = 0 : REL QTY
+        PHS'RCN = 0 : REL PHS
+        SLH'RCN = 0 : REL SLH
+        HST'RCN = 0 : REL HST
+RETURN
+
+POST'LHS2:
+        LIN'REC = LHS'REC
+        CALL FIND'PRH
+        IF PRH'CTL # 0 THEN
+                ENTRY = "Part not found!"
+                \KERROR PRH APID="IN" MODE="K"
+                ENTRY = ENTRY + "/"
+                \KERROR LHS
+                GOTO DO'ERRL                            !!KLUDGE
+        ENDIF
+        IF INC'INTERFACE = 5 THEN
+                FOR TMP'II = 1 TO 6
+                        IF LHS'TORDER'QTY(TMP'II) # 0 THEN
+                                SUB'KNO = TMP'II
+                                CALL SET'SUB'REC
+                                SHS'REC = SUB'REC
+                                CALL POST'SHS2
+                        ENDIF
+                NEXT TMP'II
+                SUB'FLAG = 2
+        ELSE
+                SHS'HDR'LOC'NO = HHS'LOC'NO
+                SHS'DOC'TYPE = HHS'DOC'TYPE
+                SHS'HDR'NO = HHS'NO
+                SHS'SHIPMENT = HHS'SHIPMENT
+                SHS'LIN'NO = LHS'NO
+                SHS'NO = 0
+                SUB'FLAG = 0
+                \SETKEY SHS MODE="KEY"
+                \LOOPER PRE="SHS" ACTION="POST'SHS" OPR="USE" FAST="Q"
+        ENDIF
+        IF SUB'FLAG = 0 THEN
+                XXX'REC = LIN'XXX'OVR
+                SAV'TQTY = LIN'COM'QTY
+                SAV'BQTY = LIN'BO'QTY
+                TQTY = LIN'COM'QTY
+                BQTY = LIN'BO'QTY
+                SUB'SPACE = SPACE
+                SUB'RPROC = LIN'RPROC
+                CALL FIND'AND'WRITE'QTY
+                CALL POST'TO'TRX
+                CALL FIND'AND'WRITE'SLH
+                CALL FIND'AND'WRITE'HST
+                CALL PROCESS'PHS
+!!              CALL FIND'AND'WRITE'PHS
+        ENDIF
+        LHS'BATCH'YN = "N"
+RETURN
+
+POST'SHS:
+        IF SHS'BATCH'YN # "Y" RETURN                    !!KLUDGE
+        \VICS'RDLOCK SHS BY'RCN="Y"
+        \VICS'POST SHS ACTION="POST'SHS2"
+RETURN
+
+POST'SHS2:
+        SUB'FLAG = 2
+        SUB'REC = SHS'REC
+        XXX'REC = SUB'XXX'OVR
+        SAV'TQTY = SUB'COM'QTY
+        SAV'BQTY = SUB'BO'QTY
+        TQTY = SUB'COM'QTY
+        BQTY = SUB'BO'QTY
+        CALL FIND'AND'WRITE'QTY
+        TC'YN = "N"
+        CALL POST'TO'TRX
+        IF PRH'CUTS'YN = "Y" AND TQTY3 # 0 THEN
+                TC'YN = "Y"
+                \FROUND (TQTY3*UOM'DUNITS)/UOM'NUNITS TQTY3
+                CALL POST'TO'TRX
+        ENDIF
+        CALL FIND'AND'WRITE'SLH
+        CALL FIND'AND'WRITE'HST
+!!      CALL FIND'AND'WRITE'PHS
+        CALL PROCESS'PHS
+        SHS'BATCH'YN = "N"
+RETURN
+
+COPY "FNDUOM[SA]",PRE="LIN"                     !!FIND'UOM:
+
+!![20] - rewrote FIND'PRH
+
+!!FIND'PRH:
+!!      IF PRH'TRK'NO # LIN'TRK'NO THEN
+!!              PRH'KTRK'NO = LIN'TRK'NO
+!!              USE PRH INTO PRH'REC KEY PRH'KEY
+!!              \FACTORQTY MODE="Q" PRE="PRH"
+!!              \FACTORQTY MODE="P" PRE="PRH"
+!!      ENDIF
+!!RETURN
+
+FIND'PRH:
+        \VUSEPRH SKIP'MAP="Y" ACTION="FIND'PRH2"
+RETURN
+
+FIND'PRH2:
+        \FACTORQTY MODE="Q" PRE="PRH"
+        \FACTORQTY MODE="P" PRE="PRH"
+RETURN
+
+COPYF "CMNFIL[SY]"
+
+SET'REPOST:
+        CMN'SPACE = SPACE
+!![12]BELOW
+!!      CMN'TO'PRGNAM = "OEPEOD"
+!!      CMN'FRM'PRGNAM = "OEPEOD"
+        CMN'TO'PRGNAM = "OEPEO2"
+        CMN'FRM'PRGNAM = "OEPEO2"
+!![12]ABOVE
+        JNL'LPRGNAM = "OEXQTY"
+        JNL'FLAG = "Y"
+        JNL'CMN'REC = CMN'REC
+        ENTRY = ""
+        JNL'DESC = "End of day OE batch inventory posting."
+!![11]  JNL'PRGNAM = "OEPEOD"
+        JNL'PRGNAM = "OEPEO2"                           !![11]
+        JNL'USER'ID = UB'UID
+RETURN
+
+FIX'TRX'KEYS:
+        IF JNL'KEY'DBID = "INTRX" THEN
+!!Hang keys on added TRX records after deleting possible '0' rec on TRXD.
+                TRX'RCN = JNL'KEY'RCN
+                TRXD'RCN = TRX'RCN
+                TRXD'KLOC'NO = 0
+                TRXD'KTRK'NO = 0
+                TRXD'KATT'NO1 = 0
+                TRXD'KATT'NO2 = 0
+                TRXD'KDATE = 0
+                DELKEY TRXD
+                TRX'REC = JNL'REC
+                \SETKEY TRX MODE="KY2" APID="IN" BAD1="TRXQ"
+                \ADDKEY TRX MODE="KY2" APID="IN" BAD1="TRXQ"
+        ENDIF
+RETURN
+
+!![20] - below
+
+\COPYF HDR MODE="PRI"
+\COPYF STX IN MODE="PRI"
+MAP1 SKIP'HTOTAL,B,5
+
+COPY    "LINKER"                !!LINK MAPS AND MACROS
+
+MAP1 CALC'HTOTAL,B,5                                    !![42]
+MAP1 SUM'VIA,B,5
+MAP1 Q,F
+MAP1 OLD'INTERNAL,B,3
+MAP1 IERROR,B,1
+
+DO'OEPDOC:
+        IF HHS'INV'YN = "Y" RETURN                      !!KLUDGE !![26]
+        SKIP'JNL = JNL'DID
+        HDR'REC = HHS'REC
+        IF HDR'SHP'TOTAL < 0 RETURN                     !!KLUDGE !![23]
+!![42] - below
+        SUM'VIA = 0
+        FOR Q = 1 TO 7
+                SUM'VIA = SUM'VIA + HDR'SHP'VTTL(Q)
+        NEXT Q
+        CALC'HTOTAL = HDR'SHP'TOTAL - HDR'SHP'DISC                      &
+                        - HDR'SHP'ODISC - HDR'SHP'RETRO + HDR'OLD'DR    &
+                        - HDR'OLD'CR - HDR'OLD'CASH                     &
+                        + HDR'STX1FINAL + HDR'STX2FINAL + SUM'VIA
+        IF CALC'HTOTAL = 0 AND HDR'OLD'CASH = 0 AND HDR'OLD'CR = 0 THEN
+                RETURN
+        ENDIF
+!![42] - above
+        HDR'RCN = HHS'RCN
+        STX'SPACE = SPACE
+        STX'KLOC'NO = HDR'LOC'NO
+        STX'KNO = HDR'STX'NO
+        USE STX INTO STX'REC KEY STX'KEY
+        IF STX'CTL # 0 THEN
+                STX'KLOC'NO = 0
+                USE STX INTO STX'REC KEY STX'KEY
+        ENDIF
+        I = HHS'RCN
+        HDR'PQU'STAT = "Q"
+        HDR'ACTION = "P"
+        REPOSTING = 0
+        ENTRY = "OEPDOC"
+        PRGNAM = "OEPEO2"
+        CACHE'TEST = "YES"
+        OLD'INTERNAL = HDR'INTERNAL             !![55]
+!![55]  IERROR = 1                              !![55]
+        IERROR = 0                              !![55]
+        XCALL LINK,1,ENTRY,CNT'REC,INC'REC,ARC'REC,OEC'REC,HDR'REC,      &
+                HDR'RCN,LOC'REC,LOC'RCN,VIA'REC,VIA'RCN,CUS'REC,CUS'RCN, &
+                LST'REC,PRGNAM,PASS'SEL'REC,TRH'REC,TRH'RCN,I,           &
+                STX'REC,PRT'REC,VIL'REC,REPOSTING,SKIP'JNL,CACHE'REC
+!![29] - removed cache clearing.
+        IF PRGNAM[1;4] # "GOOD" THEN
+                IF PRGNAM = "ABORT" THEN
+                        ENTRY = "Invoicing aborted: "
+                ELSE
+                        ENTRY = PRGNAM + " (inv) aborted: "
+                ENDIF
+                \HDRERR
+                ENTRY = ENTRY + ":" + HDR'ACTION
+                CALL DO'ERRL
+                GOTO ABORT
+        ENDIF
+        IF HDR'INTERNAL # OLD'INTERNAL THEN IERROR = 1          !![55]
+        HDR'PQU'STAT = SPACE
+!![32]  HDR'ACTION = SPACE
+        HHS'REC = HDR'REC
+        SKIP'HTOTAL = 0
+        FOR I = 1 TO 7
+                SKIP'HTOTAL = SKIP'HTOTAL + HDR'SHP'VTTL(I)
+        NEXT I
+        SKIP'HTOTAL = HDR'SHP'TOTAL - HDR'SHP'DISC           &
+                - HDR'SHP'ODISC - HDR'SHP'RETRO              &
+                + HDR'STX1FINAL + HDR'STX2FINAL + SKIP'HTOTAL
+        RDLOCK CUS
+        IF OEC'CRL'FLAG = 5 THEN                                !![34]
+                CUS'FAST'AR = CUS'FAST'AR + SKIP'HTOTAL         !![34]
+        ELSE                                                    !![34]
+                CUS'TMP'AR = CUS'TMP'AR - SKIP'HTOTAL
+        ENDIF                                                   !![34]
+        WRITE CUS
+RETURN
+
+!![20] - above
+
+\COPYF CUS AR
+\COPYF HHS
+
+CLEAN'EOD:
+!!
+        IF OEC'SKIPDOC # "Y" RETURN                     !!KLUDGE
+!![60]  HHS'SPACE = SPACE
+!!      \SETKEY HHSP MODE="KEY"
+!!      HHSP'RCN = 0
+!!      RDKEY HHSP
+!!      GETNXT HHSP
+!!      IF HHSP'CTL = 0 THEN
+!!              ENTRY = "For some reason end-of-day key not clear!" !![59]
+!!              GOTO DO'ERR                             !!KLUDGE
+!![60]  ENDIF
+
+        ?TAB(-1,0) ; TAB(-1,A'RED) ; "Resetting customer A/R fields!"
+        ?TAB(24,1);
+
+        \OPENFL CUS
+        IF CUS'CTL # 0 THEN
+                ENTRY = "Customer file in use!"
+                GOTO DO'ERR                             !!KLUDGE
+        ENDIF
+
+        \OPENFL HHS
+        IF HHS'CTL # 0 THEN
+                ENTRY = "Archive orders file in use!"
+                GOTO DO'ERR                             !!KLUDGE
+        ENDIF
+
+        IF OEC'CRL'FLAG # 5 THEN                        !![34]
+
+                \TCOUNT'START XX "Processing customer file"
+
+                USE CUS 1 INTO CUS'REC
+                DO
+                        RDSEQ CUS
+                        IF CUS'CTL # 0 EXIT
+                        IF CUS'TMP'AR # 0 THEN
+                                RDLOCK CUS
+                                CUS'TMP'AR = 0
+                                WRITE CUS
+                                USE CUS
+                                RDSEQ CUS
+                        ENDIF
+                        \TCOUNT XX
+                LOOP
+                \TCOUNT'END XX
+        ENDIF                                           !![34]
+RETURN
+
+!![27] Below
+
+\COPYF HDR OE HDR2 MODE="KEY"
+\COPYF LIN OE LIN2 MODE="KEY"
+\COPYF SUB OE SUB2 MODE="KEY"
+
+CLEAN'HDR:
+        \TCOUNT'START XX "Cleaning up header file"
+        HDR'SPACE = SPACE
+        \SETKEY HDR MODE="KEY"
+        HDR2'KEY = HDR'KEY
+        RDKEY HDR2
+        DO
+                GETNXT HDR2
+                IF HDR2'CTL # 0 EXIT
+                \TCOUNT XX
+                HDR'KEY = HDR2'KEY2
+                LIN'KEY = HDR2'KEY2
+                LIN'KNO = 0
+                RDKEY LIN
+                GETNXT LIN
+                LIN'KEY = LIN'KEY2
+                IF LIN'KHDR'LOC'NO # HDR'KLOC'NO OR LIN'KDOC'TYPE # &
+                   HDR'KDOC'TYPE OR LIN'KHDR'NO # HDR'KNO THEN LIN'CTL = 1
+                IF LIN'CTL # 0 THEN
+                        RDLOCK HDR HDR2'RCN INTO HDR'REC
+                        IF HDR'CTL = 0 THEN
+                                DELETE HDR KEY HDR'KEY
+                                \SETKEY HDR MODE="KY2"
+                                \DELKEY HDR MODE="KY2"
+!![38] - below
+                                HHS'HDR'GONE = 1
+                        ELSE
+                                HHS'HDR'GONE = 0
+                        ENDIF
+                        IF HDR'KEYS'LEN > 2 THEN
+                                FOR I = 1 TO (HDR'KEYS'LEN-2)
+                                        UKY'KKY = I
+                                        UKY'KHDR'LOC'NO = HDR'LOC'NO
+                                        UKY'KDOC'TYPE = HDR'DOC'TYPE
+                                        UKY'KHDR'NO = HDR'NO
+                                        UKY'KSHIPMENT = 0
+                                        IF HHS'HDR'GONE = 1 THEN
+                                                RDLOCK UKY INTO UKY'REC KEY UKY'KEY
+                                        ELSE
+                                                USE UKY INTO UKY'REC KEY UKY'KEY
+                                        ENDIF
+                                        IF UKY'CTL = 0 THEN
+                                                IF HHS'HDR'GONE = 1 THEN
+                                                        DELETE UKY KEY UKY'KEY
+                                                        \SETKEY UKY MODE="KY2"
+                                                        \DELKEY UKY MODE="KY2"
+                                                ENDIF
+                                                UKY'KY = UKY'KY + 10
+                                                UKY'SHIPMENT = HHS'SHIPMENT
+                                                \SETKEY UKY MODE="KEY"
+                                                ADD UKY FROM UKY'REC KEY UKY'KEY
+                                                \SETKEY UKY MODE="KY2"
+                                                \ADDKEY UKY MODE="KY2"
+                                        ENDIF
+                                NEXT I
+                        ENDIF
+!![38] - above
+                ENDIF
+        LOOP
+!![27] Commented out for now until fix cancel/replace backorder bug
+!![31]CIF TEMPORARY AND NOT TEMPORARY THEN
+        \COPYF SUB OE SUB2
+        USE SUB2 1 INTO SUB'REC
+        DO
+                RDSEQ SUB2 INTO SUB'REC
+                IF SUB2'CTL # 0 EXIT
+                \TCOUNT XX
+                HDR'KLOC'NO = SUB'HDR'LOC'NO
+                HDR'KDOC'TYPE = SUB'DOC'TYPE
+                HDR'KNO = SUB'HDR'NO
+                RDKEY HDR
+                IF HDR'CTL # 0 THEN
+                        RDLOCK SUB SUB2'RCN INTO SUB'REC
+                        ENTRY = "Deleted SUB="
+                        \KERROR SUB MODE="D"
+                        CALL DO'ERRLO
+                        \SETKEY SUB MODE="ALL"
+                        \DELKEY SUB MODE="KY2"
+                        DELETE SUB KEY SUB'KEY
+!![41] Below
+                        IF SUB'CTL # 0 THEN
+                                RDLOCK SUB SUB2'RCN INTO SUB'REC !![43]
+                                DELETE SUB SUB2'RCN
+                        ENDIF
+!![41] Above
+                ENDIF
+        LOOP
+        \COPYF LIN OE LIN2
+        USE LIN2 1 INTO LIN'REC
+        DO
+                RDSEQ LIN2 INTO LIN'REC
+                IF LIN2'CTL # 0 EXIT
+                \TCOUNT XX
+                HDR'KLOC'NO = LIN'HDR'LOC'NO
+                HDR'KDOC'TYPE = LIN'DOC'TYPE
+                HDR'KNO = LIN'HDR'NO
+                RDKEY HDR
+                IF HDR'CTL # 0 THEN
+                        RDLOCK LIN LIN2'RCN INTO LIN'REC
+                        ENTRY = "Deleted LIN="
+                        \KERROR LIN MODE="D"
+                        CALL DO'ERRLO
+                        \SETKEY LIN MODE="ALL"
+                        \DELKEY LIN MODE="KY2"
+                        DELETE LIN KEY LIN'KEY
+!![41] Below
+                        IF LIN'CTL # 0 THEN
+                                RDLOCK LIN LIN2'RCN INTO LIN'REC        !![43]
+                                DELETE LIN LIN2'RCN
+                        ENDIF
+!![41] Above
+                ENDIF
+        LOOP
+!![31] ENDCIF
+        \TCOUNT'END XX
+RETURN
+
+COPY "SETKYL"           !!SET'KEYS'LEN:                 !![38]

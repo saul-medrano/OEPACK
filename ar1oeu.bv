@@ -1,0 +1,2078 @@
+! @#$^&* 1337 20 310 0 0 0 0 0 0 0 0 0 300 *&^$#@ 
+!*! Updated on Fri Jun  7 16:29:30 2024 by Saul Medrano 1 times 
+!*! Updated on Fri Feb  2 17:02:12 2024 by Will Carroll 1 times 
+!*! Updated on Wed Jun  7 19:49:33 2023 by Will Carroll 5 times 
+!%W% %G% %U% - SCCS
+!* Updated on 05-Jan-96 at 12:33 PM by Eric Eberhard; edit time: 0:14:52
+GLOBAL V''LINKEE="Y"
+PROGRAM AR1OEU,8.0(45)
+!!
+!!                       V. I. C. S.
+!!                    of Camp Verde, AZ
+!!
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!Program to enter unapplied cash from order entry.
+!!
+!!          Kenneth J. Shook and Eric S. Eberhard
+!!
+!!                      V.I.C.S.
+!!
+!!                  October 24, 1986
+!!
+!!      Revision History:
+!!
+!!7.2   12/06/88 ASC    New version created
+!!
+!![1] 11/02/89 KJS      Mapped unmapped variables & corrected mispellings.
+!!
+!![2] 07/10/90 BAP      Fixed bad checkbook number when not using checkbook
+!!
+!![3] 08/16/90 HEIDI    Message to check for overapplying order was not
+!!                      working due to incorrectly declared variable
+!!
+!![4] 12/28/90 ESE      Use different batches for cash and applied.
+!!
+!![5] 01/02/91 ESE      Often created a new batch when not needed.
+!!
+!![6] 01/05/91 ESE      When posting to A/R from OE posting allow
+!!                      application to unposted DR/CR.
+!![7] 07/12/91 ESE      Check DR and CR before doing anything in apply mode.
+!!
+!![8] 08/13/91 ESE      Change security measures.
+!!
+!![9] 11/05/91 ESE      Small change for OEPDOC.
+!!
+!![10] 12/04/91 ESE     Record not locked on BAT error fixed?
+!!
+!![11] 01/24/92 ESE     Made to match OE1SHP to prevent "cannot apply
+!!                      all DR/CR" errors.  Need matching OE1SHP.RUN(118).
+!![12] 01/27/92 ESE     Fix subscript out of range error.
+!!
+!![13] 01/30/92 ESE     Only default payment amount to balance of
+!!                      check.
+!!
+!![14] 02/18/92 ESE     Correct checkbook number was not always used.
+!!
+!!7.3a[15] 06/23/92 ESE/KJS Conversion for 7.3a & multiple payments.
+!!
+!![16] 07/22/92 ESE     Fix some stuff related to credit cards.
+!!                      Make correct total on order header.
+!!
+!![17] 07/24/92 ESE     Correct another bug with credit cards.
+!!
+!![18] 10/20/92 ESE     MOD: Would apply credits funny if from OE.
+!!
+!![19] 12/21/92 ESE     FIX: Correct batch counts on payment batches.
+!!
+!![20] 12/29/92 ESE     FIX: Handle keys correctly for all documents added.
+!!
+!![21] 01/15/93 ESE     NEW: Ignore shipment when applying unapplieds.
+!!
+!![22] 01/15/93 ESE     FIX: Set STAT properly in all cases.
+!!
+!![23] 05/14/93 ESE     NEW: Allow manual entry of credit card number.
+!!                      IH: need AR3OEU.S as well.
+!!
+!![24] 09/14/93 HLB     FIX: Change to BATBSC macro to better verify that
+!!                      nothing can be added to the current file that is
+!!                      already in the archive file.
+!!
+!![25] 10/22/93 ESE     NEW: link in ability to add a payment to an order.
+!!
+!![26] 11/23/93 HLB     NEW: Allow more than one unapplied batch.
+!!
+!![27] 12/10/93 HLB/SLM/ESE FIX: Problem with DOCD access.
+!!
+!![28] 05/20/94 HLB     FIX: DOC'PERIOD was not set.
+!!
+!![29] 06/02/94 HLB     NEW: Increase the ability to apply existing checks
+!!                      and to apply checks to multiple transactions.
+!!                      NOTE: This program MUST be installed with a version
+!!                      of VUEMLT.SYS that is 7.3(64)-8 or later!!
+!!                      Must be installed with AR1OEU.S
+!!
+!![30] 07/01/94 HLB     NEW: Credit card handling
+!!
+!![31] 08/05/94 HLB     FIX: Set DOC'SHIPMENT correctly.
+!!
+!![32] 08/18/94 ESE/JMS NEW: Display amount in F5 window for checks.
+!!
+!![33] 09/16/94 JMS     FIX: Use unique edit for AR3OEU screen for G/L number
+!!                      and UGL Number. Had been using same edits for both
+!!                      fields. Positions in the screens on longer the same.
+!!                      Must be installed with AR3OEU.S
+!!
+!![34] 10/05/94 ESE     FIX: Set UGL number not working in all cases.
+!!
+!![35] 05/09/95 HLB     NEW: Added an option to include the unapplied
+!!                      credits in the Max Credits
+!!
+!!7.4   09/30/95 CAE    New version created
+!!
+!!
+!![36] 11/08/95 HLB     NEW: Work with OEPACK
+!!
+!![37] 11/30/95 HLB     FIX: If applying cash on a credit card order,
+!!                      was not applying correctly or printing right
+!!                      on the invoice.
+!!
+!![38] 01/02/96 ESE      FIX: FINDYR macro incorrect if AR not matching GL.
+!!
+!![39] ???????????????
+!!
+!![40] 01/05/96 ESE     NEW: Do not auto apply if credit card terms.
+!!                      MUST use matching OEPACK and OE1SHP!
+!!
+!![41] 01/08/96 ESE     FIX: Make correct amount on apply.
+!!
+!![42] 03/26/96 ESE     FIX: deposits on order for credit cards screen ugly.
+!!
+!![43] 06/26/96 ESE     NEW: Do not apply DR to CR if credit card.  Good idea
+!!                      to send oe2cre.run and oepdoc.run as well.
+!!                      Also allows for better description when applying.
+!!8.0  02/04/97 CAE     New version created
+!!
+!![44] 02/04/97 CAE     NEW: Changes for year 2000.
+!!
+!![45] 09/22/97 SLM     NEW: Recompile with new BATBSC.MAC  This macro has
+!!                           been modified to search for gaps in AR batch
+!!                           numbers when the customer reaches 9999 batch.
+!!                           Requires environment variables ARGAP = "Y" and
+!!                           you can set a start batch with ARGAPBCH = ????
+!!                           or whatever start batch you want.
+!!
+
+        COPYF   "HDRFIL[OE]",NOAFR
+        COPYF   "HDRKEY[OE]"
+        COPYF   "BATFIL",=NOAFR
+        COPYF   "BATKEY"
+        COPYF   "BATFIL",=BAT2,NOAFR
+        COPYF   "BATKEY",=BAT2
+        COPYF   "DOCFIL",=DOC2,NOAFR
+        COPYF   "DOCFIL",=DOC3
+        COPYF   "CMNFIL[SY]"
+        \COPYF  CKB CB
+        \COPYF  LOC IN MODE="DTA"
+        \COPYF  MSG SY                                  !![30]
+        \COPYF  OEC OE                                  !![36]
+        \COPYF  OC2 OE                                  !![36]
+
+        COPY    "FORMAD"
+        COPY    "CVTMAP"
+
+        MAP1 OEPACK'APPLY'NETS,S,1
+        MAP1 TODAYS'DATE,B,3,DATE
+        MAP1 NEW'MACT,B,2
+        MAP1 NEW'PTC,B,2
+        MAP1 NEW'CST,B,2
+        MAP1 NEW'CKB'NO,B,2
+        MAP1 CHECK'ADDED,S,1,"N"
+        MAP1 TWO'FTIME,B,1
+
+        MAP1 CMN'OTHER'OVR,@CMN'OTHER
+                MAP2 NEW'DR,B,5
+                MAP2 NEW'CR,B,5
+
+        MAP1    USED'SPACE,S
+                MAP2 CURRENT'CHK'AMT,B,5
+                MAP2 BALANCE,B,5
+                MAP2 USED,B,5
+                MAP2 OLD'CHK'AMT,B,5
+                MAP2 OLD'DOC'AMT,B,5
+
+        MAP1    NEW'STAT,S,1
+        MAP1    TOTAL,B,5
+        MAP1    NEW'DOC,B,1
+        MAP1    LAST'TRN,B,2
+        MAP1    II,F,6
+        MAP1    CALC'HTOTAL,B,5         !![3]
+        MAP1    DSPFLG,B,1
+        MAP1    UNUSED'DR,B,5
+        MAP1    UNUSED'CR,B,5
+        MAP1    ORGAMT,B,5
+        MAP1    PAID,B,5
+        MAP1    LINKED,B,1              !![9]
+!![1] Above
+        MAP1    NOPLACE,B,1             !![29]
+        MAP1    FRM'DESC,S,18
+
+        GETCMN CMN'REC
+        IF CMN'FRM'PRGNAM = "APLTW2" THEN               !![43] all this
+                FRM'DESC = "OE2CRE auto apply"
+                CMN'FRM'PRGNAM = "APLTWO"
+        ELSE
+        IF CMN'FRM'PRGNAM = "APLTWP" THEN
+                FRM'DESC = "OEPDOC auto apply"
+                CMN'FRM'PRGNAM = "APLTWO"
+        ELSE
+                FRM'DESC = "Misc Auto Apply"
+        ENDIF
+        ENDIF
+        IF CMN'FRM'PRGNAM = "DOPAY" THEN
+                XCALL LINK,2,BAT'REC,CHK'REC,DOC'REC
+                DOC2'REC = DOC'REC
+        ELSE
+!![30]  IF CMN'TO'PRGNAM # "AR1OEU" THEN
+        IF CMN'TO'PRGNAM # "AR1OEU" AND CMN'TO'PRGNAM # "AR1CC" THEN !![30]
+                LINKED = 1              !![9]
+                XCALL LINK,2,CMN'REC
+                IF CMN'FRM'PRGNAM # "APLTWO" THEN
+                        XCALL LINK,2,CMN'REC,LOC'REC,ARC'REC,HDR'REC,HDR'RCN
+                ENDIF
+!![30]          IF CMN'TO'PRGNAM # "AR1OEU" THEN
+                IF CMN'TO'PRGNAM # "AR1OEU" AND CMN'TO'PRGNAM # "AR1CC" THEN  !![30]
+                        ENTRY = "CANNOT RUN PROGRAM DIRECTLY"
+                        CALL DO'ERR
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+        ENDIF
+        IF CMN'FRM'PRGNAM = "APLTWO" THEN               !![9] - moved here.
+                CMN'EXTRA = CMN'OTHER
+        ENDIF
+        IF V''JOBNAM[1;3] # "BGP" AND CMN'FRM'PRGNAM # "OEDRCR"         AND &
+                 CMN'FRM'PRGNAM # "APLTWO" AND CMN'FRM'PRGNAM # "DOPAY" THEN !![8]
+                \DOPASS
+        ELSE
+                LDUSR                                   !![8]
+                PWASTR = "YYYYYYYY"                     !![8]
+        ENDIF
+        \READCTL APP="AR" GL="Y"
+        !![36] Next IF
+!![41]  IF CMN'TO'PRGNAM = "AR1CC" THEN
+        IF CMN'FRM'PRGNAM # "APLTWO" THEN               !![41]
+                \READCTL APP="OE" GL="N"
+                USE OC2 UB'CNO INTO OC2'REC
+        ENDIF
+        IF CMN'FRM'PRGNAM # "OEDRCR" AND CMN'FRM'PRGNAM # "APLTWO" THEN
+                RDCOND HDR CMN'SAV'RCN(1) INTO HDR'REC
+                IF HDR'CTL # 0 THEN
+                        ENTRY = "Could not read header after flpsbr: "+HDR'CTL
+                        CALL DO'ERR
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+
+        CALL GET'UNAPPLIED'BATCH
+        IF CMN'FRM'PRGNAM # "APLTWO" THEN
+                CALL FIND'EXISTING'UNAPPLIED
+                CALL COMPUTE'ORDER'TOTAL
+                IF CMN'FRM'PRGNAM # "DOPAY" THEN
+                        CHK'AMT = CALC'HTOTAL
+                ENDIF
+                DOC2'DOC'TYPE = HDR'DOC'TYPE
+                DOC2'HDR'NO = HDR'NO
+                DOC2'HDR'LOC'NO = HDR'LOC'NO
+                DOC2'DTT = TODAYS'DATE
+        ENDIF
+
+        IF (CMN'FRM'PRGNAM = "OEDRCR" OR CMN'FRM'PRGNAM = "APLTWO") &
+                                        AND CMN'TO'PRGNAM # "AR1CC" THEN
+
+                IF CMN'FRM'PRGNAM = "APLTWO" THEN
+                                                        !!INVOICE NUMBER
+                                                        !!CR NUMBER
+                                                        !!AMOUNT
+                                                        !!CUS'NO
+                                                        !!DATE
+                        MAP1 CMN'EXTRA
+                                MAP2 CR'INV'TYPE,B,1
+                                MAP2 CR'INVOICE,B,3
+                                MAP2 DR'INV'TYPE,B,1
+                                MAP2 DR'INVOICE,B,3
+                                MAP2 APL'AMT,B,5
+                                MAP2 APL'DTT,B,3
+                                MAP2 APL'CUS'NO,B,3
+                                MAP2 APL'SOURCE,S,2
+!!NOT USED                      MAP2 APL'YP,S,1
+!!                              MAP2 APL'YEAR,B,1
+!!                              MAP2 APL'PERIOD,B,1
+                        HDR'NAM'NO = APL'CUS'NO
+                        TODAYS'DATE = APL'DTT
+!![7] - below (Check for both docs before doing anything).
+                MAP1 SAV'DOCV'RCN,B,4
+                        DOCV'KINV'TYPE = DR'INV'TYPE
+                        DOCV'KINVOICE = DR'INVOICE
+!![43]                  RDKEY DOCV
+                        USE DOCV INTO DOC'REC KEY DOCV'KEY      !![43]
+                        IF DOCV'CTL # 0 GOTO KLUDGE
+                        TRH'KNO = DOC'TRH'NO    !![43]
+                        \VUSE TRH
+!![WC]
+                        CALL CHK'INV'UNSET
+                        IF TRH'CTP'NO # 0 AND INV'UNSET = "" THEN  !![43] Is on credit card
+                                ENTRY = "Cannot apply credit (DR is Credit Card): "
+                                \KERROR DOCV MODE="K" CNO="N"
+                                ENTRY = ENTRY + " to " + STR(DR'INV'TYPE)+"-"+STR(DR'INVOICE) !![7]
+                                CALL DO'ERRL
+                                GOTO ABORT
+                        ENDIF
+                        SAV'DOCV'RCN = DOCV'RCN
+!![7] - above
+                        DOCV'KINV'TYPE = CR'INV'TYPE
+                        DOCV'KINVOICE = CR'INVOICE
+                        USE DOCV INTO DOC'REC KEY DOCV'KEY
+                        IF DOCV'CTL # 0 THEN
+                                ENTRY = "Cannot apply credit (CR not found): "
+                                \KERROR DOCV MODE="K" CNO="N"
+                                ENTRY = ENTRY + " to " + STR(DR'INV'TYPE)+"-"+STR(DR'INVOICE) !![7]
+                                CALL DO'ERRL
+                                GOTO ABORT
+                        ENDIF
+                        TRH'KNO = DOC'TRH'NO    !![43]
+                        \VUSE TRH
+
+                        CALL CHK'INV'UNSET
+                        IF TRH'CTP'NO # 0 AND INV'UNSET = "" THEN  !![43] Is on credit card
+                                ENTRY = "Cannot apply credit (CR is Credit Card): "
+                                \KERROR DOCV MODE="K" CNO="N"
+                                ENTRY = ENTRY + " to " + STR(DR'INV'TYPE)+"-"+STR(DR'INVOICE) !![7]
+                                CALL DO'ERRL
+                                GOTO ABORT
+                        ENDIF
+                        BALANCE = -APL'AMT
+                        CALL PAY'IT
+!![7]                   DOCV'KINV'TYPE = DR'INV'TYPE
+!!                      DOCV'KINVOICE = DR'INVOICE
+!![7]                   USE DOCV INTO DOC'REC KEY DOCV'KEY
+                        USE DOCV SAV'DOCV'RCN INTO DOC'REC      !![7]
+                        IF DOCV'CTL # 0 THEN
+                            KLUDGE:                             !![7]
+                                ENTRY = "Cannot apply invoice (DR not found): "
+                                \KERROR DOCV MODE="K" CNO="N"
+                                ENTRY = ENTRY + " to " + STR(CR'INV'TYPE)+"-"+STR(CR'INVOICE) !![7]
+                                CALL DO'ERRL
+                                GOTO ABORT
+                        ENDIF
+                        BALANCE = APL'AMT
+                        TWO'FTIME = 1
+                        CALL PAY'IT
+
+                ELSE
+                        CALL APPLY'TO'DR'CR
+                        DOC2'AMT = TOTAL
+                        DOC2'UGL'NO = ARC'UGL'NO
+                        DOC2'HDR'LOC'NO = HDR'LOC'NO
+                        DOC2'HDR'NO = HDR'NO
+                        DOC2'DOC'TYPE = HDR'DOC'TYPE
+                        CALL GET'UNAPPLIED'DOC
+                        CALL ADD'UNAPPLIED
+                ENDIF
+                IF ARC'CB'YN = "Y" THEN
+                        CKB'KNO = ARC'CKB'NO
+                        USE CKB INTO CKB'REC KEY CKB'KEY
+                        BAT'GLA'MACT(1) = CKB'MACT
+                        BAT'GLA'PTC(1) = CKB'PTC
+                        BAT'GLA'CST(1) = CKB'CST
+                        BAT'GLA'MACT(2) = CKB'DMACT
+                        BAT'GLA'PTC(2) = CKB'DPTC
+                        BAT'GLA'CST(2) = CKB'DCST
+                        BAT'CKB'NO = ARC'CKB'NO
+                ELSE
+                        BAT'CKB'NO = 1                          !![2]
+                        CKB'CTL = 3
+                ENDIF
+                IF CKB'CTL # 0 THEN
+!![2]                   BAT'CKB'NO = 0
+                        BAT'GLA'MACT(1) = ARC'CMACT
+                        BAT'GLA'PTC(1) = ARC'CPTC
+                        BAT'GLA'CST(1) = ARC'CCST
+                        BAT'GLA'MACT(2) = ARC'DMACT
+                        BAT'GLA'PTC(2) = ARC'DPTC
+                        BAT'GLA'CST(2) = ARC'DCST
+                ENDIF
+        ELSE
+                CALL DO'OEU'STUFF
+        ENDIF
+!![10]  BAT'TRY'POST = ""
+!![10]  UPDATE BAT FROM BAT'REC
+        BAT2'TRY'POST = ""                      !![10]
+        UPDATE BAT2 FROM BAT2'REC               !![10]
+        CMN'TO'PRGNAM = "GOOD"          !!For LINKer to see if successfull
+        IF CMN'FRM'PRGNAM = "APLTWO" THEN
+                CMN'SAV'RCN(1) = BAT'YEAR
+                CMN'SAV'RCN(2) = BAT'BATCH
+        ENDIF
+
+ABORT:
+        BAT2'RCN = 0
+        REL BAT2
+        BAT'RCN = 0
+        REL BAT
+        DOC'REC = 0
+        REL DOC
+        BSC'RCN = 0
+        REL BSC
+        CHK'RCN = 0
+        REL CHK
+        IF GLW'OPEN = 1 THEN
+                UNLOCK GLW
+        ENDIF
+        CASE
+        IF CMN'FRM'PRGNAM = "OEDRCR" THEN
+                XCALL LINK,3,CMN'REC,LOC'REC,ARC'REC,HDR'REC,HDR'RCN !!CMN'OTHER has actual amount applied
+        ELSE
+        IF CMN'FRM'PRGNAM = "APLTWO" THEN
+                IF LINKED = 1 THEN
+                        XCALL LINK,3,CMN'REC    !![9]
+                ELSE
+                        SNDCMN CMN'REC          !![9]
+                ENDIF
+        ELSE
+                HDR'RCN = 0
+                REL HDR
+                IF CMN'FRM'PRGNAM = "DOPAY" THEN
+                        SNDCMN CMN'REC
+                ENDIF
+        ENDCASE
+        ? TAB(24,1);
+END
+
+COPY    "FORMAT"
+COPY    "BASERR"
+COPY    "CVTDTT"
+
+
+MAP1 INV'UNSET,S,1        !![WC] flag unsettled invoice to void authorization
+!![WC]
+CHK'INV'UNSET:
+    !![WC] Test ATQ for capture/settled
+    \UCNVATQ PRE="DOC" VIN="A"
+    ATQ'SOURCE = "OE"
+    \SETKEY ATQT MODE="KEY" APID = "CV"
+    USE ATQT INTO ATQ'REC KEY ATQT'KEY
+    IF ATQT'CTL = 0 THEN
+        IF ATQ'SCODE = "" THEN
+            !![WC] check for unsettled Invoice
+            INV'UNSET = "Y"
+        ENDIF
+    ELSE
+        INV'UNSET = ""
+        ENTRY =""
+!![WC]      \KERROR ATQT APID="CV" MODE="K" CNO="N"
+!![wc]      XCALL GIN,"ATQT N/F ATQT'CTL ="+ATQ'CTL+" KEY="+ENTRY
+        ENTRY = ""
+    ENDIF
+
+RETURN
+
+E'UGL'NO:
+        \TABC NPRE="UGL" NKEY="NO" APRE="UGLD" AKEY="DESC"      &
+                        FLDNAM="DOC'UGL'NO" DSPNAM="DSP'UGL'DESC"
+        IF EDSPSW = 0 THEN DOC2'UGL'NO = DOC'UGL'NO
+RETURN
+
+!![33] start;
+E'UGL'NO3:
+        \TABC NPRE="UGL" NKEY="NO" APRE="UGLD" AKEY="DESC"      &
+                        FLDNAM="DOC'UGL'NO" DSPNAM="DSP'UGL'DESC3"
+        IF EDSPSW = 0 THEN DOC2'UGL'NO = DOC'UGL'NO
+RETURN
+!![33] end;
+
+DO'DUP:
+        DOC'SPACE = SPACE       !! clear record
+        DOC'CUS'NO = CHK'CUS'NO
+DO'DUP2:                        !! Kludge
+        DOC'INTERUPT = "N"
+        DOC'TYPE = BAT'TYPE
+        DOC'YEAR = BAT'YEAR
+        DOC'BATCH = BAT'BATCH
+        DOC'STAT = NEW'STAT
+        IF DOC'STAT = "" THEN DOC'STAT = "U"                    !![22]
+        DOC'CKB'DTT = CHK'CHECK'DTT
+        DOC'DTT = CHK'CR'DTT
+!![14]  IF DOC'TYPE = 1 THEN
+        IF DOC'TYPE = 2 THEN                                    !![14]
+                IF ARC'CB'YN = "Y" THEN                         !![2]
+                        DOC'CKB'NO = BAT'CKB'NO
+                ELSE
+                        DOC'CKB'NO = 1
+                ENDIF
+        ELSE
+                DOC'CKB'NO = 0                          !!Application
+        ENDIF
+        DOC'CKB'CHECK = CHK'CHECK'NO
+        DOC'TRN = CHK'TRN
+        DOC'PERIOD = BAT'PERIOD                                 !![28]
+RETURN
+
+ADD'RECORD:                             !![21] corrected below to handle
+                                        !!     both document type keys.
+        CALL FIND'NEXT'SEQ
+        IF CMN'TO'PRGNAM # "AR1CC" THEN         !![30]
+                DOC'MSGNO = 0
+        ELSE
+                DOC'MSGNO = DOC2'MSGNO          !![30]
+        ENDIF
+        ADD DOC FROM DOC'REC KEY DOC'KEY
+        IF DOC'CTL = 0 THEN
+                \SETKEY PRE="DOCA" MODE="KEY"
+                ADDKEY DOCA
+                IF DOC'STAT # "U" THEN
+                        \SETKEY PRE="DOCD" MODE="KEY"
+                        ADDKEY DOCD
+                        IF DOC'SEQ = 0 THEN
+                                \SETKEY PRE="DOCP" MODE="KEY"
+                                ADDKEY DOCP
+                        ENDIF
+                        IF DOC'TYPE = 2 THEN
+                                \SETKEY PRE="DOCC" MODE="KEY"
+                                DOCC'KCHK'ORG = (DOC'YEAR * 10^9) +     &
+                                                (DOC'BATCH * 10^4) +    &
+                                                DOC'TRN
+                                ADDKEY DOCC
+                        ENDIF
+                ENDIF
+                IF DOC'SEQ = 0 THEN
+                        \SETKEY PRE="DOCI" MODE="KEY"
+                        ADDKEY DOCI
+                        IF DOC'HDR'NO # 0 THEN
+                                \SETKEY PRE="DOCO" MODE="KEY"
+                                ADDKEY DOCO
+                        ENDIF
+                        IF DOC'INVOICE # 0 THEN
+                                \SETKEY PRE="DOCV" MODE="KEY"
+                                ADDKEY DOCV
+                        ENDIF
+                ENDIF
+        ENDIF
+!![19]  BAT'COUNT = BAT'COUNT + 1
+!![19]  UPDATE BAT
+RETURN
+
+FIND'NEXT'SEQ:
+        DOCA'KCUS'NO = DOC'CUS'NO
+        DOCA'KORG'DTT = DOC'ORG'DTT
+        DOCA'KORG'NO = DOC'ORG'NO
+        DOC'SEQ = 1
+        DO
+                DOCA'KSEQ = DOC'SEQ
+                RDKEY DOCA
+                DOCA'KEY = DOCA'KEY2
+                IF DOCA'CTL # 0 OR DOCA'KCUS'NO # DOC'CUS'NO OR &
+                        DOCA'KORG'DTT # DOC'ORG'DTT OR          &
+                        DOCA'KORG'NO # DOC'ORG'NO EXIT
+                DOC'SEQ = DOC'SEQ + 1
+        LOOP
+RETURN
+
+ADD'UPDATE'CHECK:
+        IF CHECK'ADDED # "Y" THEN
+                CHECK'ADDED = "Y"
+                NEW'MACT = BAT'GLA'MACT(1)
+                NEW'PTC = BAT'GLA'PTC(1)
+                NEW'CST = BAT'GLA'CST(1)
+                IF ARC'CB'YN = "Y" THEN                         !![2]
+                        NEW'CKB'NO = BAT'CKB'NO
+                ELSE
+                        NEW'CKB'NO = 1
+                ENDIF
+                MAP1 VDESC,S,30
+                MAP1 OCC,B,1
+                IF CMN'TO'PRGNAM = "AR1CC" THEN                 !![30]
+                        VDESC = "Credit Card Payments"
+                        APL'SOURCE = "CV"
+                        OCC = 6
+                ELSE
+                IF CMN'FRM'PRGNAM = "DOPAY" THEN
+                        VDESC = "O/E POS Deposit"
+                        APL'SOURCE = "OE"
+                        OCC = 2                         !![4]
+                ELSE
+                IF CMN'FRM'PRGNAM = "APLTWO" THEN
+                        VDESC = "Applications"
+                        OCC = 3                         !![4]
+                ELSE
+                        VDESC = "O/E Deposit/Applied"
+                        APL'SOURCE = "OE"
+                        OCC = 2                         !![4]
+                ENDIF
+                ENDIF
+                ENDIF
+!![5] - remove checkbook argument to let it default in macro.
+                \BATBSC VDESC="VDESC" APID="AR" PAY="Y"                   &
+                        PRGNAM="AR1OEU"                                   &
+                        DTT="TODAYS'DATE" VSOURCE="APL'SOURCE" OCCUR="OCC" &
+                        TRN="CHK" BTYPE="2" MACT="NEW'MACT" PTC="NEW'PTC" &
+                        CST="NEW'CST" MODE="MOD'MODE" FIND'MODE="""A""" &
+                        CKB'NO="NEW'CKB'NO"
+                BAT'COUNT = BAT'COUNT + 1
+                UPDATE BAT
+                CHK'YEAR = BAT'YEAR             !Year
+                CHK'BATCH = BAT'BATCH           !Batch Number
+                CHK'TRN = LAST'TRN + 1          !Transaction Number
+
+                CHK'CUS'NO = HDR'NAM'NO         !Customer Number
+                CHK'CR'DTT = TODAYS'DATE        !Credit Date
+                CHK'STAT = "U"                  !Status flag
+                CHK'DOC'AMT = CHK'AMT           !Total Distributed
+                CHK'DOC'DISC = 0                !Total Dist. Discounts
+
+                IF CHK'CHECK'DTT = 0 THEN CHK'CHECK'DTT = CHK'CR'DTT
+                \SETKEY PRE="CHK" MODE="KEY"
+                ADD CHK FROM CHK'REC KEY CHK'KEY
+                \SETKEY PRE="CHK" MODE="KY2"
+                \ADDKEY PRE="CHK" MODE="KY2"
+        ELSE
+                IF CHANGE = 1 THEN
+                        IF CHK'CHECK'DTT = 0 THEN CHK'CHECK'DTT = CHK'CR'DTT
+                        CHK'DOC'AMT = CHK'DOC'AMT - OLD'CHK'AMT + CHK'AMT
+                        UPDATE CHK FROM CHK'REC
+                ENDIF
+        ENDIF
+RETURN
+
+E'CHK'DTT:
+        \EDTDTE FLDNAM="CHK'CHECK'DTT"
+RETURN
+
+GET'UNAPPLIED'BATCH:
+        BAT2'KTYPE = 1
+        BAT2'KYEAR = 1
+        BAT2'KBATCH = 1
+        RDLOCK BAT2 INTO BAT2'REC KEY BAT2'KEY
+        IF BAT2'CTL # 0 THEN
+                ENTRY = "Unapplied batch missing.  Run Control Record Maintenance"
+                CALL DO'ERR
+                CTRLC'ABORT = 1
+                GOTO ABORT
+        ENDIF
+RETURN
+
+FIND'EXISTING'UNAPPLIED:
+        DOCO'KHDR'LOC'NO = HDR'LOC'NO
+        DOCO'KDOC'TYPE = HDR'DOC'TYPE
+        DOCO'KHDR'NO = HDR'NO
+        DOCO'KSHIPMENT = 0
+        DOCO'RCN = 0
+        USE DOCO INTO DOC3'REC KEY DOCO'KEY
+        DO
+                GETNXT DOCO INTO DOC3'REC
+                IF DOCO'KHDR'LOC'NO # DOC3'HDR'LOC'NO                   &
+                   OR DOCO'KDOC'TYPE # DOC3'DOC'TYPE OR                 &
+                   DOCO'KHDR'NO # DOC3'HDR'NO THEN DOCO'CTL = 3
+                IF DOCO'CTL # 0                                         OR  &
+                                        (DOC3'CUS'NO = HDR'NAM'NO       AND &
+                                         DOC3'TYPE = 1                  AND &
+                                         DOC3'YEAR = 1)                 EXIT !![26]
+!![26]                                   DOC3'YEAR = 1                  AND &
+!![26]                                   DOC3'BATCH = 1)                EXIT
+        LOOP
+        IF DOCO'CTL = 0 THEN
+                NEW'DOC = 0
+        ELSE
+                NEW'DOC = 1
+        ENDIF
+RETURN
+
+GEN'II:
+        DOC'KTRN = 0
+        DOC'KCHK'SEQ = 0
+        RDKEY DOC
+        DO
+                II = DOC'KTRN
+                GETNXT DOC
+                DOC'KEY = DOC'KEY2
+                IF DOC'CTL # 0 THEN II = 9999
+!!No need to check year,batch,trn because if room at end we would not be here!
+        LOOP UNTIL DOC'KTRN # (II + 1) OR II = 9999
+RETURN
+
+GET'UNAPPLIED'DOC:
+        IF NEW'DOC  = 1 THEN
+
+! DOESN'T EXIST IN DOCO - OR NO HDR'NO FIND UNIQUE TRANSACTION IN 1,1,1
+
+                DOC'KTYPE = 1
+                DOC'KYEAR = 1
+                DOC'KBATCH = 1
+
+!!Try and see if it will fit at end of unapplied batch
+
+                DOC'KTRN = -1
+                DOC'KCHK'SEQ = -1
+                RDKEY DOC
+                GETPRV DOC
+                DOC'KEY = DOC'KEY2
+!!I don't need to test batch number, year, and type
+                CASE
+                IF DOC'CTL # 0 THEN
+                                                !!No transactions
+                        II = 0
+                ELSE
+                IF DOC'KTRN < 9999 THEN
+                                                !!YES - use next number
+                        II = DOC'KTRN
+                ELSE
+                                                !!NO - look for "hole"
+                        CALL GEN'II
+                ENDCASE
+
+                IF II # 9999 THEN
+!!Got one
+                        DOC'SPACE = SPACE
+                        DOC'TYPE = 1            !Batch type (1,2,3)
+                        DOC'BATCH = 1           !Batch Number
+                        DOC'TRN =  II + 1       !Transaction Number
+                        DOC'YEAR = 1            !Fiscal Year
+                        DOC'CUS'NO = CHK'CUS'NO !Customer Number
+                        DOC'DTT = TODAYS'DATE
+                        \CNVDOC PRE="DOC"       !Doc'ORG'NO
+                        DOC'ORG'DD'DMN = 1      !Due or Disc Month
+                        DOC'ORG'DD'DDY = 1      !Due or Disc Day
+                        DOC'ORG'DD'DYR = 1      !Due or Disc Year
+                        DOC'ORG'DMN = 1         !Doc Month
+                        DOC'ORG'DDY = 1         !Doc Day
+                        DOC'ORG'DYR = 1         !Doc Year
+                        DOC'HDR'LOC'NO = DOC2'HDR'LOC'NO
+                        DOC'DOC'TYPE = DOC2'DOC'TYPE
+                        DOC'HDR'NO = DOC2'HDR'NO
+!!                      DOC'SHIPMENT = 0        !!supposed to be 0
+
+                        DOC'UGL'NO = DOC2'UGL'NO
+                        DOC'INV'TYPE = 0
+                        DOC'INVOICE = II + 1
+                        DOC'STAT= "G"           !Posting Status
+                        DOC'PRINT'YN = "N"      !Print Deposit slip Y/N
+                        IF DOC'HDR'NO = 0 THEN
+                                DOC'PO = "UNAPPLIED CR" !Purchase Order #
+                        ELSE
+                                DOC'PO = "OE: " + DOC'HDR'LOC'NO + "-" + DOC'DOC'TYPE + "-" + DOC'HDR'NO
+                        ENDIF
+                        CALL SET'KEY
+                        IF CMN'TO'PRGNAM # "AR1CC" THEN         !![30]
+                                DOC'MSGNO = 0
+                        ELSE
+                                DOC'MSGNO = DOC2'MSGNO          !![30]
+                        ENDIF
+                        ADD DOC FROM DOC'REC KEY DOC'KEY ! ADD ZERO DOC
+                        \SETKEY PRE="DOC" MODE="KY2"     ! Set all keys
+                        ADDKEY DOCA
+                        ADDKEY DOCD
+!![20] - FYI - below looks wrong too but cannot prove it!
+                        IF DOC'HDR'NO # 0 THEN
+                                ADDKEY DOCO
+                        ELSE
+                                ADDKEY DOCP
+                        ENDIF
+                        ADDKEY DOCI
+                        ADDKEY DOCV
+                        BAT2'COUNT = BAT2'COUNT + 1
+                        UPDATE BAT2 FROM BAT2'REC
+                ELSE
+                        ENTRY = "Unable to add Unapplied Document"
+                        CALL DO'ERR
+                        CTRLC'ABORT = 1
+                        GOTO ABORT
+                ENDIF
+
+                DOC2'ORG'NO = DOC'ORG'NO
+                DOC2'ORG'DDTT = DOC'ORG'DDTT
+                DOC2'ORG'DTT = DOC'ORG'DTT
+                DOC2'PO = DOC'PO
+                DOC2'INV'TYPE = DOC'INV'TYPE
+                DOC2'INVOICE = DOC'INVOICE
+        ELSE
+                DOC2'ORG'NO = DOC3'ORG'NO
+                DOC2'ORG'DDTT = DOC3'ORG'DDTT
+                DOC2'ORG'DTT = DOC3'ORG'DTT
+                DOC2'PO = DOC3'PO
+                DOC2'INV'TYPE = DOC3'INV'TYPE
+                DOC2'INVOICE = DOC3'INVOICE
+                DOC2'UGL'NO = DOC3'UGL'NO
+        ENDIF
+RETURN
+
+ADD'UNAPPLIED:
+        IF DOC2'AMT = 0 RETURN                                 !!KLUDGE
+        CALL DO'DUP
+        CALL FIND'CHK'SEQ
+        IF DOC'CHK'SEQ = 9999 RETURN
+        DOC'ORG'NO = DOC2'ORG'NO
+        DOC'ORG'DDTT = DOC2'ORG'DDTT
+        DOC'ORG'DTT = DOC2'ORG'DTT
+        DOC'AMT = DOC2'AMT
+        DOC'UGL'NO = DOC2'UGL'NO
+        DOC'PO = DOC2'PO
+        DOC'INV'TYPE = DOC2'INV'TYPE
+        DOC'INVOICE = DOC2'INVOICE
+        IF DOC2'HDR'NO # 0 THEN
+                DOC'HDR'LOC'NO = DOC2'HDR'LOC'NO
+                DOC'DOC'TYPE = DOC2'DOC'TYPE
+                DOC'HDR'NO = DOC2'HDR'NO
+        ENDIF
+        CALL SET'KEY
+        CALL ADD'RECORD
+RETURN
+
+E'UNP'AMT:
+        CALL TST'FUNC : IF TST'FUNC = 1 OR INX1 = I'UA RETURN
+                                !! replace below CHK'AMT w/CURRENT'CHK'AMT
+        CASE
+        IF INX1 = I'TAB THEN
+                DOC'AMT = CALC'HTOTAL MIN CURRENT'CHK'AMT
+        ELSE
+        IF DOC'AMT > (CURRENT'CHK'AMT-OLD'CHK'AMT+CHK'AMT) THEN
+                I = (CURRENT'CHK'AMT-OLD'CHK'AMT+CHK'AMT)/100
+                ENTRY = I USING "$#,###,###.##-"
+                ENTRY = "Application MUST BE <= Cash: "+ ENTRY
+                CALL DO'ERR
+        ELSE
+        IF DOC'AMT > (CALC'HTOTAL+OLD'DOC'AMT) THEN
+                ENTRY = "WARNING: total application > Order Total"
+                CALL DO'ERR
+                IER1 = 1
+        ENDCASE
+RETURN
+
+COMPUTE'ORDER'TOTAL:
+        \HDRSUM                                                          !![36]
+        IF CMN'TO'PRGNAM # "AR1CC" THEN
+                CALC'HTOTAL = (HDR'LIN'TOTAL - HDR'LIN'DISC             &!![36]
+                        + APPLY'HSUM + TAX'HSUM) MAX 0                   !![36]
+        ELSE
+                CALC'HTOTAL = BALANCE'HSUM                               !![36]
+        ENDIF
+RETURN
+
+E'CHK'AMT:
+        \TSTF
+        IF DOC'AMT = 0 THEN
+                DOC'AMT = CALC'HTOTAL MIN CHK'AMT
+        ENDIF
+        IF CHK'AMT < USED THEN
+                ENTRY = (USED/100) USING "$#,###,###.##-"
+                ENTRY = ENTRY + " already applied - check cannot be less this!"
+                CALL DO'ERR
+        ENDIF
+RETURN
+
+SET'KEY:
+        \SETKEY PRE="DOC" MODE="KEY"
+RETURN
+
+E'CKB'NO:
+        \TABC NPRE="CKB" NKEY="NO" APRE="CKBD" AKEY="DESC" &
+                DSPNAM="DSP'CKB'DESC" FLDNAM="BAT'CKB'NO" APID="CB"
+        IF TST'FUNC = 0 AND INX1 # I'UA THEN
+                BAT'GLA'MACT(1) = CKB'MACT
+                BAT'GLA'PTC(1) = CKB'PTC
+                BAT'GLA'CST(1) = CKB'CST
+                BAT'GLA'MACT(2) = CKB'DMACT
+                BAT'GLA'PTC(2) = CKB'DPTC
+                BAT'GLA'CST(2) = CKB'DCST
+                DSPFLG = 1
+                CALL E'ACT
+        ENDIF
+RETURN
+
+E'ACT:
+        \GETFLD AR1OEU BAT'GLA'MACT(1) V''TMP
+        IF EDSPSW = 255 THEN DSPFLG = 1
+        CASE
+        IF DSPFLG = 0 THEN
+                \EACT2 EMACT="BAT'GLA'MACT(1)" EPTC="BAT'GLA'PTC(1)"            &
+                ECST="BAT'GLA'CST(1)" DSPNAM="DSP'GLA'DESC"             &
+                ESFLD="|V''TMP|"
+        ELSE
+        IF EDSPSW # 2 THEN
+                \EACT2 EMACT="BAT'GLA'MACT(1)" EPTC="BAT'GLA'PTC(1)"            &
+                ECST="BAT'GLA'CST(1)" DSPNAM="DSP'GLA'DESC"             &
+                DSP="Y" ESFLD="|V''TMP|"
+        ENDCASE
+        DSPFLG = 0
+RETURN
+
+!![33] start;
+E'ACT3:
+        \GETFLD AR3OEU BAT'GLA'MACT(1) V''TMP
+        IF EDSPSW = 255 THEN DSPFLG = 1
+        CASE
+        IF DSPFLG = 0 THEN
+                \EACT2 EMACT="BAT'GLA'MACT(1)" EPTC="BAT'GLA'PTC(1)"    &
+                ECST="BAT'GLA'CST(1)" DSPNAM="DSP'GLA'DESC3"            &
+                ESFLD="|V''TMP|"
+        ELSE
+        IF EDSPSW # 2 THEN
+                \EACT2 EMACT="BAT'GLA'MACT(1)" EPTC="BAT'GLA'PTC(1)"    &
+                ECST="BAT'GLA'CST(1)" DSPNAM="DSP'GLA'DESC3"            &
+                DSP="Y" ESFLD="|V''TMP|"
+        ENDCASE
+        DSPFLG = 0
+RETURN
+!![33] end;
+
+MAP1 PASS,B,1           !![6] - and all reference to PASS
+MAP1 ORG'SGN,F          !![11] - rewrote below routine to be like OE1SHP
+                        !!       the two MUST have similar logic.
+MAP1 MAX'AMT,B,5        !![18]
+
+APPLY'TO'DR'CR:
+        UNUSED'DR = HDR'OLD'DR
+!![18]  UNUSED'CR = -HDR'OLD'CR
+!![18] - below
+!![41]  MAX'AMT = 0
+!!      FOR I = 1 TO 7
+!!              MAX'AMT = MAX'AMT + HDR'SHP'VTTL(I)
+!!      NEXT I
+!!      MAX'AMT = HDR'SHP'TOTAL - HDR'SHP'DISC - HDR'SHP'ODISC -        &
+!![41]          HDR'SHP'RETRO + HDR'STX1FINAL + HDR'STX2FINAL + MAX'AMT
+        \HDRSUM INVOICE="MAX'AMT"                       !![41]
+        IF HDR'OLD'CR > 0 AND MAX'AMT > 0 THEN
+!!We don't allow CR to drive positive invoice to a negative
+                UNUSED'CR = -(HDR'OLD'CR MIN MAX'AMT)
+        ELSE
+                UNUSED'CR = -HDR'OLD'CR
+        ENDIF
+!![18] - above
+        PASS = 0
+     DO UNTIL PASS = 2 OR (UNUSED'DR = 0 AND UNUSED'CR = 0)
+        PASS = PASS + 1
+        IF PASS = 1 THEN
+                DOCD'KID = "ARDOCD"
+        ELSE
+                DOCD'KID = "ARDOCA"
+        ENDIF
+        DOCD'KCUS'NO = HDR'NAM'NO
+        DOCD'KORG'DDTT = 0
+        DOCD'KORG'NO = 0
+        DOCD'KSEQ = 0
+        USE DOCD INTO DOC'REC KEY DOCD'KEY
+!![12] - below make second IF separate to prevent subscript out of range.
+!!Make sure below matches OEPACK and OE1SHP
+        DO UNTIL UNUSED'DR = 0 AND UNUSED'CR = 0
+                GETNXT DOCD INTO DOC'REC
+                IF DOCD'CTL # 0 OR DOC'CUS'NO # HDR'NAM'NO EXIT
+                IF DOC'HOLD'FLAG # "" REPEAT
+                IF DOC'INV'TYPE >= 1 AND DOC'INV'TYPE <= 9      AND &
+                                                DOC'SEQ = 0     AND &
+                                (DOC'STAT # "U" OR PASS = 2)    THEN
+                  IF LOC'ADD'COD(DOC'INV'TYPE) = "Y" THEN
+                    TRH'KNO = DOC'TRH'NO        !![40]
+                    \VUSE TRH
+                    IF TRH'CTP'NO = 0 THEN      !![40] Not on credit card
+                            CALL APPLY'TO'DR'CR2  !![35] Moved into a subroutine
+                    ELSE
+                        IF OEPACK'APPLY'NETS = "Y" THEN
+                            CALL APPLY'TO'DR'CR2
+                        ENDIF
+                    ENDIF
+                  ENDIF
+                !![35] Added ELSE part
+                ELSE
+                  IF DOC'INV'TYPE = 0 AND DOC'SEQ = 0 AND LOC'UNAPPL'COD = "Y" &
+                                                  AND DOC'HDR'NO = 0 THEN
+                    CALL APPLY'TO'DR'CR2
+                  ENDIF
+                ENDIF
+                DOCD'KEY = DOCD'KEY2
+                DOCD'KSEQ = -1
+                USE DOCD INTO DOC'REC KEY DOCD'KEY
+        LOOP
+    LOOP
+        DOCD'KID = "ARDOCD"                     !![27]
+        NEW'DR = HDR'OLD'DR - UNUSED'DR
+        NEW'CR = HDR'OLD'CR + UNUSED'CR
+        XCALL GETENV,"AR1OEU_AUTO_DR_CR",ENTRY
+        IF ENTRY = "Y" THEN
+                \TSTBIT HDR'MAN'FLAG 8 VAR="PASS" !!Do DR if on auto
+                IF PASS = 1 THEN
+                    HDR'OLD'DR = NEW'DR
+                ENDIF
+                \TSTBIT HDR'MAN'FLAG 4 VAR="PASS" !!Do CR if on auto
+                IF PASS = 1 THEN
+                    HDR'OLD'CR = NEW'CR
+                ENDIF
+        ENDIF
+        DOC'AMT = TOTAL
+        TRH'KNO = HDR'TRH'NO            !![40]
+        \VUSE TRH
+RETURN
+
+MAP1 ORG'INV'TYPE,B,1                                   !![35]
+MAP1 ORG'UGL'NO,B,2                                     !![35]
+MAP1 FROM'APPLY'TO'DR'CR2,B,1                           !![35]
+
+APPLY'TO'DR'CR2:        !![35] Moved this into a subroutine from above
+        FROM'APPLY'TO'DR'CR2 = 1                        !![35]
+        ORG'SGN = SGN(DOC'AMT)                          !![35]
+        ORG'INV'TYPE = DOC'INV'TYPE                     !![35]
+        ORG'UGL'NO = DOC'UGL'NO                         !![35]
+        \DOCBAL AKEY="DOCA" PRE="DOC" PRE2="DOC2"         &
+                BALANCE="BALANCE" ORGAMT="ORGAMT" UNPOSTED="Y" APID="AR"
+!![35]  IF SGN(BALANCE) # ORG'SGN REPEAT
+        IF SGN(BALANCE) # ORG'SGN AND &
+                (ORG'INV'TYPE # 0 OR SGN(BALANCE) >= 0) RETURN  !![35]
+        IF BALANCE > 0 THEN
+                IF UNUSED'DR # 0 THEN
+                        BALANCE = BALANCE MIN UNUSED'DR
+                        UNUSED'DR = UNUSED'DR - BALANCE
+                ELSE
+                        BALANCE = 0
+                ENDIF
+        ENDIF
+        IF BALANCE < 0 THEN
+                IF UNUSED'CR # 0 THEN
+                        BALANCE = BALANCE MAX UNUSED'CR
+                        UNUSED'CR = UNUSED'CR - BALANCE
+                ELSE
+                        BALANCE = 0
+                ENDIF
+        ENDIF
+        IF BALANCE # 0 CALL PAY'IT
+        FROM'APPLY'TO'DR'CR2 = 0                !![35]
+RETURN
+
+PAY'IT:
+                                        !! BALANCE HAS WHAT TO PAY
+        CHK'AMT = 0
+        CHK'CHECK'DTT = TODAYS'DATE
+        IF TWO'FTIME # 1 THEN
+                RDLOCK ARC
+                ARC'ZERO'CNT = ARC'ZERO'CNT + 1
+                IF ARC'ZERO'CNT > 99999 THEN ARC'ZERO'CNT = 1
+                WRITE ARC
+        ENDIF
+        CHK'CHECK'NO = "Ap:"+(ARC'ZERO'CNT USING "#####")
+        !![35] Next IF
+!!      IF FROM'APPLY'TO'DR'CR2 = 1 AND ORG'INV'TYPE = 0 THEN
+!!              DOC'UGL'NO = ORG'UGL'NO
+        IF FROM'APPLY'TO'DR'CR2 = 1 THEN
+                IF ORG'INV'TYPE = 0 THEN
+                    DOC'UGL'NO = ORG'UGL'NO
+                ELSE
+                    DOC'UGL'NO = 0
+                ENDIF
+        ELSE
+                DOC'UGL'NO = DOC2'UGL'NO
+        ENDIF
+!![35]  DOC'UGL'NO = DOC2'UGL'NO
+        IF CMN'FRM'PRGNAM = "APLTWO" THEN
+!![43]          CHK'ABA'NO = "Auto Apply"
+                CHK'ABA'NO = FRM'DESC                   !![43]
+        ELSE
+                ENTRY = "Order:"                        !Bank Number
+                \HDRERR PRE="HDR" APID="OE"
+                CHK'ABA'NO = ENTRY+"-"+HDR'SHIPMENT     !![1]
+        ENDIF
+        CALL ADD'UPDATE'CHECK
+        CALL DO'DUP2
+        DOC'AMT = BALANCE
+        CALL FIND'CHK'SEQ
+        IF DOC'CHK'SEQ = 9999 THEN
+                BALANCE = 0
+        ELSE
+                CALL SET'KEY
+                CALL ADD'RECORD
+                TOTAL = TOTAL - BALANCE         !WHAT TO PAY UNAPPLIED
+        ENDIF
+RETURN
+
+FIND'CHK'SEQ:
+        DOC'CHK'SEQ = 9999
+        CALL SET'KEY
+        RDKEY DOC
+        IF DOC'CTL = 0 THEN
+                ENTRY = "Highest Document Already Added.  Unapplied Not Created"
+                CALL DO'ERR
+                RETURN
+        ENDIF
+        GETPRV DOC
+        DOC'KEY = DOC'KEY2
+        IF DOC'CTL # 0 OR DOC'KYEAR # BAT'YEAR OR DOC'KBATCH # BAT'BATCH OR &
+                                                DOC'KTRN # CHK'TRN THEN
+                DOC'KCHK'SEQ = 0
+        ENDIF
+        DOC'CHK'SEQ = (DOC'KCHK'SEQ + 1) MIN 9999
+RETURN
+
+MAP1 GLW'CUS'LOADED,B,3
+\COPYF GLW GL
+
+E'CHECK'NO:
+        \TSTF
+        IF CHANGE = 1 THEN
+                DOCC'CTL = 0
+                RETURN                          !!KLUDGE
+        ENDIF
+
+        IF GLW'CUS'LOADED # HDR'NAM'NO THEN
+                CALL LOAD'GLW
+                GLW'CUS'LOADED = HDR'NAM'NO
+        ENDIF
+
+        \TABPASS
+        IF EFCHG = 0 THEN
+                IF ENTRY # "" THEN
+                        ENTRY = LEFT(ENTRY+SPACE(8),8)+STR(DOCC'RCN)
+                ENDIF
+        ENDIF
+
+        IF TABPASS = 1 THEN
+                \TABC PRE="GLW" APRE="GLW" AKEY="SPECIAL"               &
+                        DSPNAM="PRE'DO'DDBEDT" FLDNAM="CHK'CHECK'NO"    &
+                        MAND="N" FNN="N" FUNCW'FORMAT="FORMAT'CHK"      &
+                        DOERR="CALL" WARN="N" APID="GL" SMALL="Y"
+        ELSE
+                GLW'SPACE = SPACE
+                GLW'SPECIAL = ENTRY
+                \SETKEY GLW MODE="KEY" APID="GL"
+                USE GLW INTO GLW'REC KEY GLW'KEY
+                GETNXT GLW INTO GLW'REC
+                IF GLW'SPECIAL[1;8] # ENTRY[1;8] THEN
+                        GLW'CTL = 1
+                ENDIF
+        ENDIF
+
+        IF CHK'CHECK'NO = "" THEN
+                GLW'CTL = 1
+        ENDIF
+        USED'SPACE = SPACE
+        DOC'SPACE = SPACE
+        DOCC'RCN = 0
+        DOCC'CTL = GLW'CTL
+        IF GLW'CTL = 0 THEN
+                CALL DOCC'FROM'GLW
+                OLD'DOC'AMT = DOC'AMT
+                CALL FIND'CHK
+                IF CHK'CTL # 0 THEN
+                        ENTRY = "Cannot locate CHK record!"
+                        CALL DO'ERR
+                        IF EDSPSW # 0 GOTO ABORT ELSE RETURN !!KLUDGE
+                ENDIF
+                CALL SEE'IF'USED
+                BAT'KTYPE = 2                           !!Lock batch
+                BAT'KYEAR = DOC'YEAR
+                BAT'KBATCH = DOC'BATCH
+                RDLOCK BAT INTO BAT'REC KEY BAT'KEY
+                IF BAT'CTL # 0 THEN
+                        ENTRY = "Payment batch not found!"
+                        CALL DO'ERR
+                        IF EDSPSW # 0 GOTO ABORT ELSE RETURN  !!KLUDGE
+                ENDIF
+        ENDIF
+        IF TABPASS = 0 THEN
+                CALL DO'DDBEDT
+        ENDIF
+        IF IER1 = 0 RETURN                      !!KLUDGE
+
+        IF ARC'USE'ABA = "N" THEN
+                \GAFR AR1OEU AFR="X:ABA'NO"
+        ELSE
+                \GAFR AR1OEU AFR="E:ABA'NO"
+        ENDIF
+        IF ARC'USE'CHKDTT = "N" THEN
+                \GAFR AR1OEU AFR="X:CHECK'DTT"
+        ELSE
+                \GAFR AR1OEU AFR="E:CHECK'DTT"
+        ENDIF
+        \GAFR AR1OEU AFR="E:CHK'AMT"
+        IF DOCC'CTL # 0 THEN
+                DOC'SPACE = SPACE
+                NEW'STAT = "U"
+                IF ARC'CB'YN = "N" THEN
+                        \GAFR AR1OEU AFR="X:BAT'CKB'NO"
+                        \GETFLD AR1OEU BAT'GLA'MACT(1) V''TMP
+                        \EACT2 ESFLD="|V''TMP|" AFR="Y"
+                ELSE
+                        \GAFR AR1OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)"
+                ENDIF
+        ELSE
+                NEW'STAT = DOC'STAT
+                !![29] Moved CHK and BAT lookup before DDBEDT
+                IF NEW'STAT # "U" OR USED # 0 THEN
+!![29]                  \GAFR AR1OEU AFR="XN:BAT'CKB'NO+XN:DOC'UGL'NO+XN:CHK'CHECK'NO+XN:CHK'ABA'NO+XN:CHK'CHECK'DTT"
+                        \GAFR AR1OEU AFR="XN:BAT'CKB'NO+XN:DOC'UGL'NO+XN:CHK'ABA'NO+XN:CHK'CHECK'DTT" !![29]
+                        \GAFR AR1OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)"
+                        IF NEW'STAT # "U" THEN
+                                \GAFR AR1OEU AFR="XN:CHK'AMT"
+                        ENDIF
+                ENDIF
+        ENDIF
+        ZZZ'REC = DOC'REC
+RETURN
+
+COPYF "DOCKEY",=DOC3
+\COPYF DOC AR DOC7 MODE="PRI"
+
+DELETE'CHK:
+        DOC7'SPACE = SPACE
+        DOC7'TYPE = 2
+        DOC7'YEAR = CHK'YEAR
+        DOC7'BATCH = CHK'BATCH
+        DOC7'TRN = CHK'TRN
+        \SETKEY DOC MODE="KEY" ALTPRE="DOC7" ALTKEY="DOC7"
+        USE DOC7 INTO DOC7'REC KEY DOC7'KEY
+        DO
+                GETNXT DOC7 INTO DOC7'REC
+                \CHKKEY DOC ALTPRE="DOC7" ALTKEY="DOC7"
+                IF DOC7'CTL # 0 EXIT
+                ENTRY = STR(DOC7'ORG'NO) USING "#ZZZZZZZZZZZ"
+                IF ENTRY[1;4] = "1001" THEN
+                        BALANCE = 0
+                        CALL LOOP'FOR'BALANCE
+                        IF BALANCE # 0 THEN
+                                RDLOCK DOC DOC7'RCN INTO DOC'REC
+                                IF BALANCE >= DOC7'AMT THEN
+                                        DOC'REC = DOC7'REC
+                                        CALL DELETE'DOC
+                                ELSE
+                                        DOC'AMT = BALANCE
+                                        WRITE DOC FROM DOC'REC
+                                ENDIF
+                        ENDIF
+                ENDIF
+        LOOP
+RETURN
+
+DELETE'DOC:
+        \SETKEY DOC MODE="ALL"
+        DELETE DOC KEY DOC'KEY  !!Delete current DOC record
+        IF DOC'CTL # 0 THEN
+                ENTRY = "Invalid doc delete: "
+                \KERROR DOC MODE="K" CNO="N"
+                ENTRY = ENTRY + " Data="
+                \KERROR DOC MODE="D" CNO="N"
+                GOTO DO'ERR
+        ENDIF
+        DOCC'KCHK'ORG = (DOC'YEAR * 10^9) +                     &
+                                        (DOC'BATCH * 10^4) +    &
+                                        DOC'TRN
+        \DELKEY DOC MODE="KY2"
+        BAT'COUNT = (BAT'COUNT - 1) MAX 0
+        UPDATE BAT
+                !!Delete unapplied doc if not needed ...
+        DOCA'KCUS'NO = HDR'NAM'NO
+        DOCA'KORG'DTT = DOC'ORG'DTT
+        DOCA'KORG'NO = DOC'ORG'NO
+        DOCA'KSEQ = -1
+        RDKEY DOCA
+        GETPRV DOCA
+        DOCA'KEY = DOCA'KEY2
+        IF DOCA'CTL = 0 AND DOCA'KCUS'NO = HDR'NAM'NO   AND &
+                        DOCA'KORG'DTT = DOC'ORG'DTT     AND &
+                        DOCA'KORG'NO = DOC'ORG'NO       AND &
+                        DOCA'KSEQ = 0                   THEN
+                RDLOCK DOC DOCA'RCN INTO DOC'REC
+                IF DOC'CTL = 0 THEN
+                        \SETKEY DOC MODE="ALL"
+                        DELETE DOC KEY DOC'KEY
+                        DOCC'KCHK'ORG = (DOC'YEAR * 10^9)  + &
+                                        (DOC'BATCH * 10^4) + &
+                                                DOC'TRN
+                        \DELKEY DOC MODE="KY2"
+                        BAT2'COUNT = (BAT2'COUNT - 1) MAX 0
+                        UPDATE BAT2 FROM BAT2'REC
+                ENDIF
+        ENDIF
+RETURN
+
+LOOP'FOR'BALANCE:
+        \UCNVDOC DPRE="DOC3" NPRE="DOC7'ORG" TYPE="KTYPE" YEAR="KYEAR" &
+                BATCH="KBATCH" TRN="KTRN"
+        USE DOC3 INTO DOC3'REC KEY DOC3'KEY
+        IF DOC3'CTL # 0 THEN
+                ENTRY = "Invalid ORG document: "
+                \KERROR DOC MODE="K" CNO="N" ALTKEY="DOC3"
+                GOTO DO'ERR
+        ENDIF
+        BALANCE = BALANCE - DOC3'AMT
+        \SETKEY DOCA MODE="KEY" ALTPRE="DOC3"
+        DOCA'KSEQ = 1
+        USE DOCA INTO DOC3'REC KEY DOCA'KEY
+        DO
+                GETNXT DOCA INTO DOC3'REC
+                \CHKKEY DOCA ALTPRE="DOC3"
+                IF DOCA'CTL # 0 EXIT
+                BALANCE = BALANCE + DOC3'AMT
+        LOOP
+RETURN
+
+SEE'IF'USED:
+        BALANCE = 0
+        DOC7'ORG'NO = DOC'ORG'NO
+        CALL LOOP'FOR'BALANCE
+        DOC7'SPACE = SPACE
+        DOC7'TYPE = 2
+        DOC7'YEAR = CHK'YEAR
+        DOC7'BATCH = CHK'BATCH
+        DOC7'TRN = CHK'TRN
+        \SETKEY DOC MODE="KEY" ALTPRE="DOC7" ALTKEY="DOC7"
+        USE DOC7 INTO DOC7'REC KEY DOC7'KEY
+        DO
+                GETNXT DOC7 INTO DOC7'REC
+                \CHKKEY DOC ALTPRE="DOC7" ALTKEY="DOC7"
+                IF DOC7'CTL # 0 EXIT
+                IF DOC7'ORG'NO = DOC'ORG'NO REPEAT
+                ENTRY = STR(DOC7'ORG'NO) USING "#ZZZZZZZZZZZ"
+                IF ENTRY[1;4] = "1001" AND DOC7'HDR'NO = 0 THEN
+                        CALL LOOP'FOR'BALANCE
+                ENDIF
+        LOOP
+        IF BALANCE <= 0 THEN
+                ENTRY = BALANCE/100 USING "###,###.##-"
+                ENTRY = "Check completely applied! " + ENTRY
+                CALL DO'ERR
+        ENDIF
+        CURRENT'CHK'AMT = BALANCE MIN CHK'AMT
+        USED = CHK'AMT - CURRENT'CHK'AMT
+        OLD'CHK'AMT = CHK'AMT
+RETURN
+
+PRE'DDB'AR1OEU:
+        \GETFLD AR1OEU BAT'GLA'MACT(1) fldstr
+        DDB AR1OEU
+        fldstr = 0
+RETURN
+
+!![15] Below
+MAP1 DOC'RCN(14),B,4
+
+DO'OEU'STUFF:
+        !![30] AR1CC stuff
+        CASE
+        IF CMN'FRM'PRGNAM = "DOPAY" THEN
+                CALL REAL'SICK'KLUDGE
+        ELSE
+        IF CMN'TO'PRGNAM = "AR1CC" THEN
+                CALL FILL'IN'DOC
+                IF BAD = 0 THEN
+                        CALL REAL'SICK'KLUDGE
+                ENDIF
+        ELSE
+                \WINDOW TLR="5" ACTION="DO'OEU'STUFF2" RESTORE="N" &
+                                REPAINT="Y" AUTOSIZE="AR2OEU" L25NUM="6"
+        ENDCASE
+RETURN
+
+MAP1 TRHPTR,X,30
+\COPYF TRH MODE="PRI"
+
+!![30] Below
+!!Called when creating a credit card payment from ATQ.
+\COPYF ATQ CV
+MAP1 BAD,B,1
+FILL'IN'DOC:
+        BAD = 0
+        IF TRH'NO # HDR'TRH'NO THEN
+                TRH'KNO = HDR'TRH'NO
+                \VUSE TRH
+        ENDIF
+        IF TRH'CTP'NO = 0 THEN
+                ENTRY = "Error - The terms for this order is not a credit card type "+HDR'TRH'NO
+                \KERROR HDR MODE="D" APID="OE"
+                CALL DO'ERRL
+                BAD = 1
+        ELSE
+                CTP'SPACE = SPACE
+                CTP'KNO = TRH'CTP'NO
+                USE CTP INTO CTP'REC KEY CTP'KEY
+                IF CTP'CTL # 0 THEN
+                        ENTRY = "Unable to access credit card record "
+                        \KERROR CTP MODE="K"
+                        ENTRY = ENTRY + " for order "
+                        \KERROR HDR MODE="D" APID="OE"
+                        CALL DO'ERRL
+                        BAD = 1
+                ELSE
+                        \UCNVATQ AKEY="Y"
+                        USE ATQT INTO ATQ'REC KEY ATQT'KEY
+                        IF ATQT'CTL # 0 THEN
+                                ENTRY = "Authorization record not found for order "
+                                \KERROR HDR MODE="D" APID="OE"
+                                CALL DO'ERRL
+                                BAD = 1
+                        ELSE
+                                IF ATQ'STATUS # "A" THEN
+                                        ENTRY = "Error - This credit card order is not authorized! "+ATQ'STATUS
+                                        \KERROR ATQT MODE="D" APID="CV"
+                                        CALL DO'ERRL
+                                        BAD = 1
+                                ELSE
+                                        CALL FILL'IN'DOC2
+                                ENDIF
+                        ENDIF
+                ENDIF
+        ENDIF
+RETURN
+
+FILL'IN'DOC2:
+        IF ARC'CB'YN = "Y" THEN
+                CKB'KNO = CTP'CKB'NO
+                USE CKB INTO CKB'REC KEY CKB'KEY
+                BAT'GLA'MACT(1) = CKB'MACT
+                BAT'GLA'PTC(1) = CKB'PTC
+                BAT'GLA'CST(1) = CKB'CST
+                BAT'GLA'MACT(2) = CKB'DMACT
+                BAT'GLA'PTC(2) = CKB'DPTC
+                BAT'GLA'CST(2) = CKB'DCST
+                BAT'CKB'NO = CTP'CKB'NO
+        ELSE
+                BAT'CKB'NO = 1
+                CKB'CTL = 3
+        ENDIF
+        IF CKB'CTL # 0 THEN
+                BAT'GLA'MACT(1) = CTP'MACT
+                BAT'GLA'PTC(1) = CTP'PTC
+                BAT'GLA'CST(1) = CTP'CST
+                BAT'GLA'MACT(2) = ARC'DMACT
+                BAT'GLA'PTC(2) = ARC'DPTC
+                BAT'GLA'CST(2) = ARC'DCST
+        ENDIF
+        DOC2'UGL'NO = 0                 !!CTP'UGL'NO
+        CHK'CTP'NO = CTP'NO
+
+MAP1 MY'CARDNO,S,20
+        MY'CARDNO = ATQ'CARDNO
+        XCALL ABUTIL,11,MY'CARDNO,8    !!Remove all spaces/tabs
+        IF CVC'RCN # UB'CNO THEN
+            \READCTL APP="CV" GL="N"
+        ENDIF
+        MY'CARDNO = "*****************************************"[1,LEN(MY'CARDNO)-CVC'DIGITS] &
+                                 + MY'CARDNO[-CVC'DIGITS,-1]
+        CHK'ABA'NO = RIGHT(MY'CARDNO,18)
+
+CIF OLD AND NOT OLD THEN
+        CHK'ABA'NO = ATQ'CARDNO         !!Deal with oversize
+
+        IF LEN(ATQ'CARDNO) > 18 THEN
+        IF LEN(MY'CARDNO) > 18 THEN
+                MSG'DID = "ARMSG"
+                MSG'SPACE = SPACE
+                MSG'DATA = ATQ'CARDNO
+                ADD MSG FROM MSG'REC
+                DOC2'MSGNO = MSG'RCN
+        ELSE
+                DOC2'MSGNO = 0
+        ENDIF
+ENDCIF
+        CHK'EXP = ATQ'EXP
+        CHK'CHECK'DTT = TODAYS'DATE
+        CHK'CHECK'NO = ATQ'APPROVAL
+        DOC2'AMT = CALC'HTOTAL
+        CHK'AMT = CALC'HTOTAL
+        DOC'REC = DOC2'REC              !!??
+!![37]  HDR'OLD'CASH = CALC'HTOTAL      !!??
+        HDR'OLD'CASH = HDR'OLD'CASH + CALC'HTOTAL       !![37]
+        UPDATE HDR FROM HDR'REC
+RETURN
+!![30] Above
+
+DO'OEU'STUFF2:
+        DSP AR2OEU
+        DOC'CNT = 0
+        DO
+                REDO = 0
+                DOCO'KHDR'LOC'NO = HDR'LOC'NO
+                DOCO'KDOC'TYPE   = HDR'DOC'TYPE
+                DOCO'KHDR'NO     = HDR'NO
+                DOCO'KSHIPMENT   = 0    !![21]HDR'SHIPMENT
+                DOCO'RCN = 0
+                USE DOCO INTO DOC'REC KEY DOCO'KEY
+                DO
+                        GETNXT DOCO INTO DOC'REC
+!![21]                  \CHKKEY DOCO LASTFIX="SHIPMENT"
+                        \CHKKEY DOCO                            !![21]
+                        IF DOCO'CTL # 0 EXIT
+                        IF DOC'UGL'NO # 0 THEN
+                                CALL LOAD'ONE'DOC
+                                IF REDO = 1 EXIT
+                        ENDIF
+                LOOP
+                IF REDO = 0 THEN
+                        CALL DO'AR2OEU
+                ENDIF
+        LOOP WHILE INX1 = I'RT OR REDO = 1
+RETURN
+
+LOAD'ONE'DOC:
+        \SETKEY DOCA RCN="DOCO'RCN"
+        DOCA'KSEQ = 1                           !![16]
+        USE DOCA INTO DOC'REC KEY DOCA'KEY
+        DO
+                GETNXT DOCA INTO DOC'REC
+                \CHKKEY DOCA
+                IF DOCA'CTL # 0 EXIT
+                IF DOC'TYPE = 2 THEN            !Only pay records
+                        DOC'CNT = DOC'CNT + 1
+                        DOC'RCN(DOC'CNT) = DOCA'RCN
+                        CALL FIND'CHK
+                        CALL PRE'VDSP'AR2OEU
+                        IF DOC'CNT = 14 THEN
+                                CALL DO'AR2OEU
+                                IF REDO = 1 EXIT
+                        ENDIF
+                ENDIF
+        LOOP
+RETURN
+
+DO'AR2OEU:
+        DO
+                REDO = 0
+                ENTRY = "Letter to process, F1=Cash, F2=CC, [RET] for more, [ESC] to exit:"
+                CALL DSP'AR2OEU'PROMPT
+                ENTRY = ""
+                CALL GET'AR2OEU
+                ?TAB(24,1);TAB(-1,9);
+                IF ENTRY = "" AND INX2 # FN'1 AND INX2 # FN'2 EXIT
+                CASE
+                IF INX2 = FN'1 THEN
+                        DOC'SPACE = SPACE
+                        CHK'SPACE = SPACE
+MAP1 MODE,B,1
+                        MODE = 0                        !Checks
+                        UGL'MATCH = 1                   !![29]
+                        CALL DO'CASH'CC
+                        REDO = 1
+                ELSE
+                IF INX2 = FN'2 THEN
+                        IF INC'RCN # UB'CNO THEN
+                                IF ARC'IN'YN = "Y" THEN
+                                        \READCTL APP="IN" GL="N"
+                                ELSE
+                                        INC'INTERFACE = 1
+                                        INC'RCN = UB'CNO
+                                ENDIF
+                        ENDIF
+                        IF INC'INTERFACE # 5 OR INC'USE'CV # "Y" THEN
+                                DOC'SPACE = SPACE
+                                CHK'SPACE = SPACE
+                                MODE = 1                        !Credit Card
+                                UGL'MATCH = 1                   !![29]
+                                CALL DO'CASH'CC
+                        ELSE
+                                ENTRY = "Can't mix with auto verification!"
+                                CALL DO'ERR
+                        ENDIF
+                        REDO = 1
+                ELSE
+                        I = ASC(ENTRY) - 64
+                        IF I < 1 OR I > DOC'CNT THEN
+                                ENTRY = "Invalid Choice"
+                                CALL DO'ERR
+                                REPEAT
+                        ELSE
+                                CALL PROCESS'I
+                                REDO = 1
+                        ENDIF
+                ENDCASE
+                EXIT
+        LOOP WHILE REDO = 0
+        DOC'CNT = 0
+        \CLRWIN 9 4 22 4
+        \CLRWIN 9 8 22 77
+RETURN
+
+MAP1 CHANGE,B,1
+
+PROCESS'I:                      !For editing
+        RDLOCK DOC DOC'RCN(I) INTO DOC'REC
+        IF DOC'CTL # 0 THEN
+                ENTRY = "Payment vanished - cannot change!"
+                CALL DO'ERR
+                REL DOC
+        ELSE
+                CHANGE = 1
+                CALL FIND'CHK
+                BAT'KTYPE = 2
+                BAT'KYEAR = DOC'YEAR
+                BAT'KBATCH = DOC'BATCH
+                RDLOCK BAT INTO BAT'REC KEY BAT'KEY
+                IF BAT'CTL # 0 THEN
+                        ENTRY = "Payment batch not found "
+                        \KERROR BAT MODE="K" CNO="N"
+                        ENTRY = ENTRY + "!"
+                        CALL DO'ERR
+                ENDIF
+                IF CHK'CTL # 0 THEN
+                        ENTRY = "Check record not found "
+                        \KERROR CHK MODE="K" CNO="N"
+                        ENTRY = ENTRY + "!"
+                        CALL DO'ERR
+                ENDIF
+                IF CHK'CTL = 0 AND BAT'CTL = 0 THEN
+                        UGL'MATCH = 1                   !![29]
+                        !![29] Next IF
+                        IF DOC'STAT # "U" THEN
+                                CALL CHECK'UGL
+                        ENDIF
+                        MODE = SGN(CHK'CTP'NO)          !![16]
+                        CALL DO'CASH'CC
+                ENDIF
+                CHANGE = 0
+                REL BAT
+                REL CHK
+                REL DOC
+        ENDIF
+RETURN
+
+\COPYF UGL AR UGL2                              !![29]
+MAP1 UGL'MATCH,B,1
+
+!![29] This subroutine
+CHECK'UGL:
+        UGL'SPACE = SPACE
+        UGL2'SPACE = SPACE
+        DOC7'KTYPE = 2
+        DOC7'KYEAR = CHK'YEAR
+        DOC7'KBATCH = CHK'BATCH
+        DOC7'KTRN = CHK'TRN
+        DOC7'KCHK'SEQ = 0
+        USE DOC7 INTO DOC7'REC KEY DOC7'KEY
+        DO
+                GETNXT DOC7 INTO DOC7'REC
+                \CHKKEY DOC ALTPRE="DOC7" ALTKEY="DOC7" LASTFIX="TRN"
+                IF DOC7'CTL # 0 EXIT
+                IF DOC7'UGL'NO = 0 REPEAT
+                UGL2'KNO = DOC7'UGL'NO
+                USE UGL2 INTO UGL2'REC KEY UGL2'KEY
+                IF UGL'NO = 0 THEN
+                        UGL'REC = UGL2'REC
+                ELSE
+                        !!The next 3 fields can be different, no others
+                        UGL2'NO = UGL'NO
+                        UGL2'DESC = UGL'DESC
+                        UGL2'TRH'NO = UGL'TRH'NO
+                        IF UGL2'REC # UGL'REC THEN
+                                UGL'MATCH = 0
+                                EXIT
+                        ENDIF
+                ENDIF
+        LOOP
+RETURN
+
+FIND'CHK:
+        CHK'SPACE  = SPACE
+        CHK'KYEAR  = DOC'YEAR
+        CHK'KBATCH = DOC'BATCH
+        CHK'KTRN   = DOC'TRN
+        IF CHANGE = 0 THEN
+                USE CHK INTO CHK'REC KEY CHK'KEY
+        ELSE
+                RDLOCK CHK INTO CHK'REC KEY CHK'KEY
+        ENDIF
+        IF CHK'CHECK'DTT = 0 THEN CHK'CHECK'DTT = CHK'CR'DTT
+RETURN
+
+MAP1 LETTER,S,1
+MAP1 TYPE,S,14
+MAP1 SDATE,S,8
+MAP1 CHECK'CC,S,18
+MAP1 I,F
+MAP1 DOC'CNT,B,1
+MAP1 REDO,B,1
+
+PRE'VDSP'AR2OEU:
+        XLN = DOC'CNT - 1
+        LETTER = CHR(XLN + 65)
+        CASE
+        IF CHK'CTL # 0 THEN
+                TYPE = "*BAD"
+                CHECK'CC = "Cannot find check!"
+        ELSE
+        IF CHK'CTP'NO = 0 THEN
+                TYPE = "Cash"
+                CHECK'CC = CHK'CHECK'NO
+        ELSE
+                IF CTP'NO # CHK'CTP'NO THEN
+                        CTP'KNO = CHK'CTP'NO
+                        USE CTP INTO CTP'REC KEY CTP'KEY
+                ENDIF
+                TYPE = CTP'DESC
+                CHECK'CC = CHK'ABA'NO
+        ENDCASE
+        \STRDTT DTT="CHK'CHECK'DTT" DDATE="SDATE"
+        CALL VDSP'AR2OEU
+        XLN = 0
+RETURN
+
+DO'CASH'CC:
+        \WINDOW SCREEN="AR2OEU" TLR="10" TLC="36" BRC="80" BRR="23" &
+                                ACTION="DO'IT" WINNUM="7" L25NUM="7"
+RETURN
+
+E'CTP'NO:
+        \TABC ON="CTP" FROM="CHK" DSPNAM="DSP'CTP'DESC" MAND="Y"
+!![23] - below
+        IF CTP'ATIME # 0 THEN
+                \GAFR AR3OEU AFR="Y:CHK'CHECK'NO"
+        ELSE
+                \GAFR AR3OEU AFR="E:CHK'CHECK'NO"
+        ENDIF
+!![23] - above
+RETURN
+
+MAP1 VOID,B,1
+
+DO'AUTHORIZATION:
+        SF = 0                  !Assume Success
+        IF CTP'ATIME # 0 THEN
+                IF CHK'CHECK'NO = "" THEN               !![16]
+                        ?TAB(24,1);TAB(-1,A'RED);"Getting authorization - please wait ...";
+                        \AUTH CHK'ABA'NO CHK'EXP CHK'AMT CHK'CHECK'NO VOID
+                        IF CHK'CHECK'NO = "" THEN
+                                SF = 1
+                                ENTRY = "DENIED"
+                                CALL DSP'AUTH
+                                ENTRY = "Credit card NOT ACCEPTED!"
+                        ELSE
+                                ENTRY = CHK'CHECK'NO
+                                CALL DSP'AUTH
+                                ENTRY = "Credit card authorization done!"
+                        ENDIF
+                        \L24CHR CLR="Y"
+                ELSE                            !![16] this else condition
+                        ENTRY = CHK'CHECK'NO
+                        CALL DSP'AUTH
+                ENDIF
+!![23]  ELSE
+!![23]          CHK'CHECK'NO = "Not chkd"
+!![23]          CALL DSP'AUTH
+        ENDIF
+RETURN
+
+E'CARD'NO:
+!!      I = (ECFLD-1)/3+1               ! Calc subscript
+        IF CHK'ABA'NO # "" THEN
+                \CHKDOC DOC'NO=CHK'ABA'NO DOC'CTL=CHK'CTL
+                IF CHK'CTL # 0 THEN
+                        ENTRY = "Card invalid"
+                        CALL DO'ERR
+                ENDIF
+        ENDIF
+RETURN
+
+COPYF "DOCFIL",=ZZZ,NOAFR
+COPYF "DOCFIL",=SAV,NOAFR
+
+DO'IT:
+        USED'SPACE = SPACE
+        IF CHANGE = 0 THEN
+                CHECK'ADDED = "N"
+                NEW'STAT = "U"
+        ELSE
+                CHECK'ADDED = "Y"
+                NEW'STAT = DOC'STAT
+        ENDIF
+        IF MODE = 0 THEN
+                DSP AR1OEU
+        ELSE
+                DSP AR3OEU
+        ENDIF
+        MAP1 DDBEDT'AR1OEU,X,432
+        DDBEDT'AR1OEU = EDT'OVR
+!![29] Why not allow the UGL'NO to be changed?  This is only dangerous
+!!     if it is posted??  When the check is entered, the right UGL
+!!     replaces what they entered.
+!!      IF NEW'DOC # 1 OR CHANGE = 1 THEN
+!!              IF MODE = 0 THEN
+!!                      \GAFR AR1OEU AFR="X:DOC'UGL'NO" EDIT="N"
+!!              ELSE
+!!                      \GAFR AR3OEU AFR="X:DOC'UGL'NO" EDIT="N"
+!!              ENDIF
+!![29]  ENDIF
+
+        IF CHANGE = 1 THEN  !![17] move from within IF MODE = 0
+                ZZZ'REC = DOC'REC
+                DOCC'CTL = 0
+                CALL SEE'IF'USED
+                IF DOC'STAT # "U" THEN
+                        IF MODE = 0 THEN
+                                \GAFR AR1OEU AFR="XN:CHK'AMT" EDIT="N"
+                        ELSE
+                                \GAFR AR3OEU AFR="XN:CHK'AMT" EDIT="N"
+                        ENDIF
+                ENDIF
+                !![29] If this is an existing check, do not allow the
+                !!following to be changed.
+                IF MODE = 0 THEN
+                        \GAFR AR1OEU AFR="XN:BAT'CKB'NO+XN:CHK'CHECK'NO" EDIT="N"
+                        \GAFR AR1OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)" EDIT="N"
+                ELSE
+                        \GAFR AR3OEU AFR="XN:BAT'CKB'NO+XN:CHK'ABA'NO" EDIT="N"
+                        \GAFR AR3OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)" EDIT="N"
+                ENDIF
+        ENDIF
+        IF MODE = 0 THEN
+                IF ARC'USE'ABA = "N" THEN
+                        \GAFR AR1OEU AFR="X:ABA'NO" EDIT="N"
+                ENDIF
+                IF ARC'USE'CHKDTT = "N" THEN
+                        \GAFR AR1OEU AFR="X:CHECK'DTT" EDIT="N"
+                ENDIF
+                IF ARC'CB'YN = "N" THEN
+                        \GAFR AR1OEU AFR="X:BAT'CKB'NO" EDIT="N"
+                        \GETFLD AR1OEU BAT'GLA'MACT(1) V''TMP
+                        \EACT2 ESFLD="|V''TMP|" AFR="Y"
+                        BAT'GLA'MACT(1) = ARC'CMACT
+                        BAT'GLA'PTC(1) = ARC'CPTC
+                        BAT'GLA'CST(1) = ARC'CCST
+                        BAT'GLA'MACT(2) = ARC'DMACT
+                        BAT'GLA'PTC(2) = ARC'DPTC
+                        BAT'GLA'CST(2) = ARC'DCST
+                ELSE
+                        \GAFR AR1OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)" EDIT="N"
+                ENDIF
+                IF NEW'STAT # "U" OR USED # 0 THEN
+!![29]                  \GAFR AR1OEU AFR="XN:BAT'CKB'NO+XN:DOC'UGL'NO+XN:CHK'CHECK'NO+XN:CHK'ABA'NO+XN:CHK'CHECK'DTT" EDIT="N"
+                        \GAFR AR1OEU AFR="XN:BAT'CKB'NO+XN:DOC'UGL'NO+XN:CHK'ABA'NO+XN:CHK'CHECK'DTT" EDIT="N" !![29]
+                        \GAFR AR1OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)" EDIT="N"
+                        IF NEW'STAT # "U" THEN
+                                \GAFR AR1OEU AFR="XN:CHK'AMT" EDIT="N"
+                        ENDIF
+                ENDIF
+                !![29] This IF
+                IF UGL'MATCH = 0 AND NEW'STAT # "U" THEN
+                        \GAFR AR1OEU AFR="XN:DOC'AMT"
+                ELSE
+                        \GAFR AR1OEU AFR="E:DOC'AMT"
+                ENDIF
+                OLD'DOC'AMT = DOC'AMT
+                DDB AR1OEU
+                GDB AR1OEU
+        ELSE
+                OLD'DOC'AMT = DOC'AMT
+                !![29] This IF
+                IF UGL'MATCH = 0 AND NEW'STAT # "U" THEN
+                        \GAFR AR3OEU AFR="XN:DOC'AMT"
+                ELSE
+                        \GAFR AR3OEU AFR="E:DOC'AMT"
+                ENDIF
+                DDB AR3OEU
+                IF ARC'USE'CHKDTT = "N" THEN
+                        \GAFR AR3OEU AFR="X:CHECK'DTT" EDIT="N"
+                ENDIF
+                IF ARC'CB'YN = "N" THEN
+                        \GAFR AR3OEU AFR="X:BAT'CKB'NO" EDIT="N"
+                        \GETFLD AR3OEU BAT'GLA'MACT(1) V''TMP
+                        \EACT2 ESFLD="|V''TMP|" AFR="Y"
+                        BAT'GLA'MACT(1) = ARC'CMACT
+                        BAT'GLA'PTC(1) = ARC'CPTC
+                        BAT'GLA'CST(1) = ARC'CCST
+                        BAT'GLA'MACT(2) = ARC'DMACT
+                        BAT'GLA'PTC(2) = ARC'DPTC
+                        BAT'GLA'CST(2) = ARC'DCST
+                ELSE
+                        \GAFR AR3OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)" EDIT="N"
+                ENDIF
+!![29] Changed below from AR1OEU to AR3OEU.
+                IF NEW'STAT # "U" OR USED # 0 THEN
+                        \GAFR AR3OEU AFR="XN:BAT'CKB'NO+XN:DOC'UGL'NO+XN:CHK'CHECK'NO+XN:CHK'ABA'NO+XN:CHK'CHECK'DTT" EDIT="N"
+                        \GAFR AR3OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)" EDIT="N"
+                        IF NEW'STAT # "U" THEN
+                                \GAFR AR3OEU AFR="XN:CHK'AMT" EDIT="N"
+                        ENDIF
+                ELSE
+                IF CTP'ATIME # 0 AND CHK'CHECK'NO # "" THEN
+!![16] - this else condition
+                        \GAFR AR3OEU AFR="XN:BAT'CKB'NO+XN:DOC'UGL'NO+XN:CHK'CHECK'NO+XN:CHK'ABA'NO+XN:CHK'CHECK'DTT" EDIT="N"
+                        \GAFR AR3OEU AFR="XN:BAT'GLA'MACT(1)+XN:BAT'GLA'PTC(1)+XN:BAT'GLA'CST(1)" EDIT="N"
+                        \GAFR AR3OEU AFR="XN:CHK'AMT" EDIT="N"
+                ENDIF
+                ENDIF
+RE'DO'AR3OEU:
+                GDB AR3OEU
+                CALL TST'FUNC
+                IF TST'FUNC = 0 THEN
+                        CALL DO'AUTHORIZATION
+                        IF SF = 1 GOTO RE'DO'AR3OEU     !Auth failed
+                ENDIF
+                IF CHANGE = 0 THEN DOCC'CTL = 3
+        ENDIF
+        CALL TST'FUNC : IF TST'FUNC = 1 OR INX2 = 3 OR INX2 = 4 RETURN
+
+        INX1 = I'RT
+        INX2 = 0
+        EDSPSW = 255
+        IF DOCC'CTL = 0 THEN            !!Found existing
+                NEW'STAT = DOC'STAT     !!Get correct stat
+                IF CHANGE = 0 THEN
+                        CHECK'ADDED = "Y"                !![29]
+                        RDLOCK BAT BAT'RCN INTO BAT'REC
+                        RDLOCK CHK CHK'RCN INTO CHK'REC  !![29]
+                        RDLOCK DOC DOCC'RCN INTO NOPLACE
+                        IF DOC'CTL # 0 THEN
+                                ENTRY = "Invalid existing check!"
+                                CALL DO'ERR
+                                RETURN
+                        ENDIF
+                        !![29] Next IF
+                        IF DOC'HDR'NO # 0 THEN
+                                ENTRY = "ERROR - Document order header not zero "
+                                \KERROR DOC MODE="D"
+                                CALL DO'ERR
+                        ELSE
+                                DOC'HDR'LOC'NO = HDR'LOC'NO
+                                DOC'DOC'TYPE = HDR'DOC'TYPE
+                                DOC'HDR'NO = HDR'NO
+                                DOC'SHIPMENT = HDR'SHIPMENT + 1 !![31]
+                                UPDATE DOC FROM DOC'REC
+                                \SETKEY DOCO MODE="KEY"
+                                ADDKEY DOCO
+                                IF DOCO'CTL # 0 THEN
+                                        ENTRY = "ERROR - Unable to add order key "
+                                        \KERROR DOC MODE="D"
+                                        ENTRY = ENTRY + "Order: "
+                                        \KERROR HDR MODE="D" APID="OE"
+                                ENDIF
+                        ENDIF
+                        CHANGE = 1                      !![29]
+                ENDIF
+                SAV'REC = DOC'REC
+                CALL DELETE'CHK
+                DOC2'REC = SAV'REC
+!!Now let normal code add back DOC record(s) as needed (w/ stat = "P" or "G")
+!!                              will add additional keys as well.
+        ELSE
+!!HEIDI <- HERE
+REAL'SICK'KLUDGE:
+                DOC2'DOC'TYPE = HDR'DOC'TYPE
+                DOC2'HDR'NO = HDR'NO
+                DOC2'HDR'LOC'NO = HDR'LOC'NO
+                DOC2'DTT = TODAYS'DATE
+                DOC2'AMT = DOC'AMT
+                IF MODE = 0 AND CHK'CHECK'NO = "" THEN
+                        RDLOCK ARC
+                        ARC'ZERO'CNT = ARC'ZERO'CNT + 1
+                        IF ARC'ZERO'CNT > 99999 THEN ARC'ZERO'CNT = 1
+                        WRITE ARC
+                        CHK'CHECK'NO = "Cs:"+(ARC'ZERO'CNT USING "#####")
+                ENDIF
+                DOC2'UGL'NO = ARC'UGL'NO                !![34]
+        ENDIF
+
+        CALL ADD'UPDATE'CHECK
+
+        IF (DOC2'AMT-USED) # 0 THEN
+                CALL FIND'EXISTING'UNAPPLIED
+                CALL GET'UNAPPLIED'DOC
+                CALL ADD'UNAPPLIED
+        ENDIF
+
+!![16]  HDR'SAV'OCASH = HDR'SAV'OCASH + DOC2'AMT
+!![16] - below
+        HDR'SAV'OCASH = 0
+        DOCO'KHDR'LOC'NO = HDR'LOC'NO
+        DOCO'KDOC'TYPE   = HDR'DOC'TYPE
+        DOCO'KHDR'NO     = HDR'NO
+        DOCO'KSHIPMENT   = 0    !![21]HDR'SHIPMENT
+        DOCO'RCN = 0
+        USE DOCO INTO DOC'REC KEY DOCO'KEY
+        DO
+                GETNXT DOCO INTO DOC'REC
+!![21]          \CHKKEY DOCO LASTFIX="SHIPMENT"
+                \CHKKEY DOCO                            !![21]
+                IF DOCO'CTL # 0 EXIT
+                IF DOC'UGL'NO # 0 THEN
+                        \SETKEY DOCA RCN="DOCO'RCN"
+                        DOCA'KSEQ = 1
+                        USE DOCA INTO DOC'REC KEY DOCA'KEY
+                        DO
+                                GETNXT DOCA INTO DOC'REC
+                                \CHKKEY DOCA
+                                IF DOCA'CTL # 0 EXIT
+                                IF DOC'TYPE = 2 THEN
+                                        HDR'SAV'OCASH =         &
+                                                     HDR'SAV'OCASH + DOC'AMT
+                                ENDIF
+                        LOOP
+                ENDIF
+        LOOP
+!![16] - above
+        UPDATE HDR FROM HDR'REC
+        CALL COMPUTE'ORDER'TOTAL
+        IF (DOC2'AMT-USED) # (CURRENT'CHK'AMT-OLD'CHK'AMT+CHK'AMT) THEN
+                DOC2'AMT = (CURRENT'CHK'AMT-OLD'CHK'AMT+CHK'AMT) - (DOC2'AMT-USED)
+                DOC2'HDR'LOC'NO = 0
+                DOC2'HDR'NO = 0
+                DOC2'DOC'TYPE = 0
+                DOC2'SHIPMENT = 0
+                DOC2'UGL'NO = ARC'UGL'NO
+                NEW'DOC = 1
+                CALL GET'UNAPPLIED'DOC
+                CALL ADD'UNAPPLIED
+        ENDIF
+RETURN
+!![15] ABOVE
+
+MAP1 GLW'OPEN,B,1
+MAP1 GLW'STRING,S,12
+MAP1 JJ,F
+
+LOAD'GLW:
+        \TCOUNT'START JJ "Loading checks"
+        DO WHILE GLW'OPEN = 0
+                \OPENFL GLW
+                IF GLW'CTL = 0 THEN GLW'OPEN = 1
+        LOOP
+        \CLRFIL GLW APID="GL"
+        DOC'SPACE = SPACE
+        DOC'CUS'NO = HDR'NAM'NO
+        \SETKEY DOCA MODE="KEY"
+        USE DOCA INTO DOC'REC KEY DOCA'KEY
+        DO
+                GETNXT DOCA INTO DOC'REC
+                IF DOCA'CTL # 0 OR DOC'CUS'NO # DOCA'KCUS'NO EXIT
+                \TCOUNT JJ
+                GLW'STRING = STR(DOC'ORG'NO) USING "#ZZZZZZZZZZZ"
+                IF GLW'STRING[1;4] = "1001" AND DOC'HDR'NO = 0 AND DOC'AMT > 0 AND &
+                DOC'TYPE = 2 AND DOC'CKB'NO = BAT'CKB'NO THEN
+                        GLW'SPACE = SPACE
+                        GLW'SPECIAL = LEFT(DOC'CKB'CHECK+SPACE(8),8)+STR(DOCA'RCN)
+                        GLW'AMT = DOCA'RCN
+                        \SETKEY GLW MODE="KEY" APID="GL"
+                        ADD GLW FROM GLW'REC KEY GLW'KEY
+                ENDIF
+        LOOP
+        \TCOUNT'END JJ
+        ?TAB(24,1) ; TAB(-1,9) ;
+RETURN
+
+FORMAT'CHK:
+        IF TABC'FUNCW'FORMAT = 0 THEN
+                TABC'FUNCW'DLEN = 20
+        ELSE
+                CALL DOCC'FROM'GLW
+                \STRDTT DTT="DOC'DTT" DDATE="ENTRY"
+                ENTRY = LEFT(DOC'CKB'CHECK+SPACE(8),8) + " " + ENTRY
+!![32] - below
+                CALL FIND'CHK
+                ENTRY = ENTRY + " " + (CHK'AMT/100 USING "$##,###,###.##-")
+        ENDIF
+RETURN
+
+DOCC'FROM'GLW:
+        USE DOCC GLW'AMT INTO DOC'REC
+        IF DOCC'CTL # 0 THEN
+                ENTRY = "Weird!?  DOC disappeared!: "+GLW'SPECIAL
+                GOTO DO'ERR
+        ENDIF
+RETURN
+
+LOOK'IT'UP:
+
+
+PRE'DO'DDBEDT:
+        IF GLW'AMT = 0 THEN
+                DOC'SPACE = SPACE
+                CHK'SPACE = SPACE
+        ELSE
+                USE DOCC GLW'AMT INTO DOC'REC
+                CALL FIND'CHK
+        ENDIF
+        CALL DO'DDBEDT
+        \TABC'SAVEKID GLW
+RETURN
+
+DO'DDBEDT:
+        \DDBEDT SCREEN="AR1OEU" SINX="Y" PREDDB="PRE'DDB'AR1OEU"
+RETURN

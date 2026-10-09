@@ -1,0 +1,830 @@
+! @#$^&* 14 0 218 0 0 0 0 0 0 0 0 0 0 *&^$#@ 
+!*! Updated on Mon Nov 15 09:58:44 2021 by Cheryl Eberhard  1 times 
+!*! Updated on Tue Sep 15 13:31:10 2020 by Cheryl Eberhard  1 times 
+!*! Updated on Tue Oct 31 09:37:38 2017 by Cheryl Eberhard  1 times 
+!%W% %G% %U% - SCCS
+!* Updated on 06-Jan-95 at 10:28 PM by Eric Eberhard; edit time: 0:00:22
+PROGRAM OEXDOC,8.0(4)           !!Repost Orders to A/R [7-9-B]
+COPY    "LINKER"                !!LINK MAPS AND MACROS
+!!
+!!                        V. I. C. S.
+!!                     of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!Master control program for re-post to A/R:  Eric S. Eberhard, 05/08/86
+!!
+!!      REVISION HISTORY:
+!!
+!!7.2   12/06/88 ASC    New version created
+!!
+!![1] 04/20/89 SLM find order in current or archived A/R and display.
+!!
+!![2] 05/22/89 KJS Added copyf on LOC from IN.
+!!
+!![3] 10/10/89 ESE Lookup correct STX number - would give error "INVALID G/L"
+!!                 if G/L was not by product line.
+!!                 Correct problem of incorrect LST lookup if company control
+!!                 set in MC.  Consequenses unknown.
+!!                 Fix cosmetic errors and displays.
+!!
+!![4] 12/04/89 ESE      New posting changes.
+!!
+!![5] 06/06/90 ESE      Recalculate order totals ...
+!!
+!![6] 09/19/90 ESE      Set SUB'FLAG for lot numbers.
+!!
+!![7] 12/05/90 ESE      New link maps.
+!!
+!![8] 12/12/90 KJS/ESE  Made subs recompute LHS'NET.
+!!
+!![9] 02/05/91 KJS     Fixed potential problem with testing of IN'BGP
+!!
+!![10] 05/07/91 KJS     Corrected FINDYR/FINDPR macros for FUNKY date ranges
+!!
+!![11] 06/27/91 ESE     Serial file changed.  VCR:INC7:SRL*.CPY
+!!
+!![12] 07/02/91 ESE     Cosmetic improvements.
+!!
+!![13] 07/12/91 ESE     Made escape act like F10.
+!!
+!![14] 08/01/91 HLB     Added reprint option.  Also, AFRing of order number
+!!                      was messing up.
+!!
+!!7.3a  03/23/92 ESE    New release.
+!!
+!![15]  04/21/92 ESE    Use COMNET.MAC
+!!
+!![16] 05/06/92 ESE/HLB COMNET.MAC was wrong (invalid invoice/distribution).
+!!
+!![17] 05/13/92 HLB     Not passing right RCN on chaining repost
+!!
+!![18] 05/18/92 ESE     If duplicate invoice # warn them and allow repost
+!!                      but only with a new invoice number.
+!!
+!![19] 07/16/92 HLB     FIX:It is possible to create a situation in order
+!!                      entry where another picking ticket should have been
+!!                      required before invoicing, but where the program was
+!!                      aborted before this fact was saved in the order.
+!!                      This would result in invalid invoices.  Reposting
+!!                      these orders to A/R would produce valid invoices,
+!!                      but the box totals would still be wrong.  The
+!!                      customer would then not be charged the correct amount
+!!                      for CODs on the UPS manifest.  This program now
+!!                      identifies these cases and reports that a cancel &
+!!                      replace is required.
+!!
+!![20] 01/13/93 ESE     NEW: true 7.3 edition.
+!!
+!![21] 02/15/93 ESE     NEW: allow repost of transfers/shop orders.
+!!
+!![22] 06/29/93 ESE     FIX: AFR of use old number Q if posted in A/R.
+!!
+!![23] 08/05/93 ESE     NEW: New PRH caching
+!!                      IH: need VICSIT.SBR 7.3a(7) and a lot of other
+!!                          programs (see ESEPRH.CMD).
+!!
+!![24] 09/09/93 ESE     NEW: allow re-posting of cancel/replace orders.
+!!
+!![7.4] 01/06/95 ESE    NEW: Implement "slip" pricing (see OEC'SLIP'PRICE).
+!!
+!![1]   02/13/95 ESE    FIX: release record before chain syxres.
+!!
+!![2] 01/02/96 ESE      FIX: FINDYR macro incorrect if AR not matching GL.
+!!
+!![3] 07/11/96 ESE      NEW: support new post level (see oerctl!!!).
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![4]  03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!!
+!!
+\\SSRPTMAPS                     !!Standard report maps
+!!
+COPY    "FORMAD"
+!!
+COPYF   "HDRFIL",NOAFR
+COPYF   "HHSFIL",NOAFR
+COPYF   "HHSKEY",=HHS2
+COPYF   "HHSFIL",=HHS2,NOAFR
+COPYF   "HHSKEY"
+COPYF   "LSTFIL[MC]",NOAFR
+COPYF   "LSTKEY[MC]"
+COPYF   "LSTFKY[MC]"
+COPYF   "DOCFIL[AR]",NOAFR
+COPYF   "DOCVKY[AR]"
+COPYF   "DHSFIL[AR]",NOAFR
+COPYF   "DHSVKY[AR]"
+\COPYF  BAT AR
+!!
+COPYF "CMNFIL[SY]",NOAFR
+!!
+\COPYF  VIL IN MODE="PRI"
+COPYF   "WRHFIL"
+
+MAP1    HHS'MAN'FLAG,B,1
+MAP1    HSF,B,1
+MAP1    LSF,B,1
+MAP1    TAX'PERC,B,5
+MAP1    SUB'FLAG,B,1
+MAP1    TST'BAL,B,5
+MAP1    RP,S,6
+MAP1    DSP'01,S,29
+MAP1    CNT,B,5
+MAP1    CNT1,B,5
+MAP1    SUM'VIA,B,5
+MAP1    CALC'HTOTAL,B,5
+MAP1    II,F
+MAP1    QQ,F                    !![8]
+MAP1    TTL'QTY,B,5             !![8]
+MAP1    L'NETP,B,5              !![8]
+MAP1    L'NETD,B,5              !![8]
+
+ON ERROR GOTO ERTRAP
+
+BEGIN:
+        \DOPASS
+        \READCTL APP="GL"
+        \READCTL APP="MC" GL="N"
+        \READCTL APP="OE" GL="N"
+        \READCTL APP="AR" GL="N"
+        \READCTL APP="IN" GL="N"
+
+        INPUT LINE RP
+        IF RP = "1" THEN
+                RP = "  Post"
+                ENTRY = "How did you get this choice, we don't know what it does?!"
+                CALL DO'ERR
+                GOTO ABORT
+        ELSE
+                RP = "Repost"
+        ENDIF
+
+        DSP OEXDOC
+        DDB OEXDOC
+    RE'GDB:
+        IF RP = "  Post" THEN
+                \GAFR OEXDOC AFR="X:WRH'SDTT" EDIT="N"
+                ?TAB(-1,14)
+                CALL DSP'SPACES
+        ENDIF
+        GDB OEXDOC
+        IF INX1 = I'ESC THEN INX1 = I'FUN : INX2 = FN'10        !![13]
+        CALL TST'FUNC : IF TST'FUNC = 1 GOTO ABORT2
+
+        HHS2'KLOC'NO = WRH'LOC'NO
+        IF WRH'HDR'NO # 0 THEN
+                HHS2'KDOC'TYPE = WRH'DOC'TYPE
+                HHS2'KNO = WRH'HDR'NO
+                HHS2'KSHIPMENT = WRH'EDTT
+        ENDIF
+
+        IF WRH'HDR'NO = 0 THEN
+                \TCOUNT'START CNT "Scanning/posting" 1 21       !![14]
+        ENDIF
+        USE HHS2 INTO HHS'REC KEY HHS2'KEY
+        DO
+                GETNXT HHS2 INTO HHS'REC
+                IF HHS2'CTL # 0 EXIT
+                \TCOUNT CNT 3 50 21                             !![14]
+                IF WRH'LOC'NO # 0 AND HHS'LOC'NO # WRH'LOC'NO EXIT
+                IF WRH'SDTT # 0 AND HHS'PSTDT # WRH'SDTT REPEAT
+                IF HHS'PRGNAM # "CHERYL" AND HHS'POST'LEVEL # 255 THEN
+                        ENTRY = HHS'PSTID + " aborted posting - chaining repost!"
+                        \KERROR HHS MODE="D"
+                        CALL DO'ERRL
+                        CMN'SPACE = SPACE
+!![17]                  CMN'SAV'RCN(1) = HHS'RCN
+                        CMN'SAV'RCN(1) = HHS2'RCN               !![17]
+                        CMN'TO'PRGNAM = "OERCTL"
+                        CMN'FRM'PRGNAM = "RPOSTA"
+                        ENTRY = "PASS THRU"
+                        CMN'OTHER = ENTRY
+                        XCALL DB,22,HDR'PKT             !!Release before chain.
+                        SNDCMN CMN'REC
+                        CHAIN "DSK0:SYXRES.RUN[11,0]"
+                ENDIF
+                IF (RP = "Repost" OR HHS'INV'YN # "Y" OR WRH'HDR'NO # 0) AND &
+                                                        HHS'PROC < 5 THEN
+                        HHS2'KEY = HHS2'KEY2
+                        RDLOCK HHS HHS2'RCN INTO HHS'REC
+                        HHS'ACTION = "P"
+                        HHS'PQU'STAT = "Q"
+                        IF HHS'PRGNAM = "CHERYL" OR HHS'POST'LEVEL = 255 THEN
+                                REPOSTING = 2
+                        ELSE
+                                REPOSTING = 1
+                        ENDIF
+                        UPDATE HHS
+                        CALL POST'TO'DOC
+                        IF PRGNAM = "GOOD" THEN
+!!                              HHS'ACTION = SPACE
+                                HHS'INV'YN = "Y"
+                                IF WRH'HDR'NO = 0 THEN
+                                        CNT1 = CNT1 + 1
+                                        PRINT TAB(21,65) CNT1;
+                                ENDIF
+                        ENDIF
+                        HHS'PQU'STAT = SPACE
+                        WRITE HHS
+                        IF WRH'HDR'NO = 0 THEN
+                                USE HHS2 INTO HHS'REC KEY HHS2'KEY
+                                GETNXT HHS2 INTO HHS'REC
+                        ENDIF
+                ENDIF
+        LOOP WHILE WRH'HDR'NO = 0
+
+        IF WRH'HDR'NO = 0 THEN
+                PRINT TAB(21,50) CNT;                   !![14]
+                PRINT TAB(21,65) CNT1;                  !![14]
+        ENDIF
+        CALL CLEAN'UP
+        PRINT TAB(23,79) ; TAB(-1,A'RED) ;              !![21]
+        CALL ANYEXT
+END
+
+CLEAN'UP:
+        HHS'RCN = 0 : REL HHS
+RETURN
+
+ABORT:
+!!      HHS'PQU'STAT = SPACE
+!!      HHS'ACTION = SPACE
+!!      WRITE HHS
+ABORT2:
+        CALL CLEAN'UP
+        IF IN'BGP = 0 THEN                      !![9] changed from # 1
+                \CMNRTN PROGRAM="OEXDOC"
+        ENDIF
+END
+
+POST'TO'DOC:
+
+        \SSGET ARCUS INLOC INVIA INVIL ARTRH SCHEMA="40"        !![3]
+
+        CALL CALC'HHS                                   !![5]
+!![18] - below
+        DOCV'KINV'TYPE = HHS'DOC'TYPE
+        DOCV'KINVOICE  = HHS'INTERNAL
+        USE DOCV INTO DOC'REC KEY DOCV'KEY
+        IF DOCV'CTL = 0 AND DOC'CUS'NO # HHS'NAM'NO THEN
+                HHS'INTERNAL = 0
+        ENDIF
+!![18] - above
+        UPDATE HHS
+        \COPYF STX IN MODE="PRI"
+
+        IF HHS'PROC < 5 THEN
+                   \USELST CUS'LST'NO                                   !![3]
+                   SUM'VIA = 0
+                   FOR I = 1 TO 7
+                        SUM'VIA = SUM'VIA + HHS'SHP'VTTL(I)
+                   NEXT I
+                   CALC'HTOTAL = HHS'SHP'TOTAL - HHS'SHP'DISC        &
+                        - HHS'SHP'ODISC - HHS'SHP'RETRO + HHS'OLD'DR &
+                        - HHS'OLD'CR - HHS'OLD'CASH                  &
+                        + HHS'STX1FINAL + HHS'STX2FINAL + SUM'VIA
+                   TST'BAL = CALC'HTOTAL
+                   IF TST'BAL # 0 OR HHS'OLD'CASH # 0 OR HHS'OLD'CR # 0 THEN
+                        TST'BAL = 1
+                   ENDIF
+                   IF WRH'MISC = "Y" THEN               !!Reprint?  !![14]
+                           I = 0
+                           DO UNTIL I >= 7
+                                I = I + 1
+                                PRGNAM = VIL'PRGNAM(I)
+                                IF PRGNAM = "" REPEAT
+                                PRT'KSEQ = VIL'PRT'NO(I)
+                                IF VIL'PRG'FLAG(I) = 1                          OR &
+                                   (VIL'PRG'FLAG(I) = 2 AND CALC'HTOTAL > 0     AND &
+                                    TRH'COD'STATUS # 1)                         OR &
+                                   (VIL'PRG'FLAG(I) = 3 AND (CALC'HTOTAL  <= 0  OR &
+                                    TRH'COD'STATUS = 1)) CALL PRT'LINK'IT
+                           LOOP
+                   ENDIF                                        !![14]
+        ENDIF
+        I = 0
+        IF HHS'PROC < 5 AND TST'BAL # 0 THEN
+                PRGNAM = "OEPDOC"
+                CALL LINK'IT
+                RDLOCK HHS I INTO HHS'REC
+        ELSE
+                I = HHS'RCN
+        ENDIF
+        PRGNAM = ""
+        IF WRH'MISC = "Y" THEN    !!Reprint?            !![14]
+                IF HHS'DOC'TYPE >= 1 AND HHS'DOC'TYPE <= 9 THEN
+                        PRGNAM = LOC'FORM(HHS'DOC'TYPE)
+                        PRT'KSEQ = LOC'PRT'NO(HHS'DOC'TYPE)
+                ENDIF
+                IF PRGNAM = "" THEN
+                        ENTRY = "Print program blank: "+HHS'LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+HHS'ACTION
+                        CALL DO'ERR
+                        GOTO ABORT
+                ENDIF
+                CALL PRT'LINK'IT
+        ENDIF                                           !![14]
+        IF OEC'BLOW'BOX = "Y" AND HHS'PROC < 5 AND VIA'SHP'FLAG # 1 THEN
+                PRGNAM = "OEPBOX"
+                CALL LINK'IT
+        ENDIF
+RETURN
+
+PRT'LINK'IT:
+        USE PRT INTO PRT'REC KEY PRT'KEY
+        IF PRT'CTL # 0 THEN
+                ENTRY = "Printer number "+PRT'KSEQ+" for "+HHS'DOC'TYPE
+                CALL DO'ERRL
+                ENTRY = PRGNAM + " NOT run as requested"
+                CALL DO'ERRL
+                RETURN
+        ELSE
+LINK'IT:
+                ENTRY = PRGNAM
+                PRGNAM[3;1] = "X"               !!Use archives
+                IF PRGNAM = "OEXDOC" AND WRH'FILL'YN = "Y" THEN
+                        PRGNAM = "OEXDO2"
+                ENDIF
+                IF ENTRY # "NOTHIN" THEN
+                    XCALL LINK,1,ENTRY,CNT'REC,INC'REC,ARC'REC,OEC'REC,HHS'REC,  &
+                        HHS'RCN,LOC'REC,LOC'RCN,VIA'REC,VIA'RCN,CUS'REC,CUS'RCN, &
+                        LST'REC,PRGNAM,PASS'SEL'REC,TRH'REC,TRH'RCN,I, &
+                        STX'REC,PRT'REC,VIL'REC,REPOSTING,SKIP'JNL,CACHE'REC
+                ELSE
+                        PRGNAM = "GOOD"
+                ENDIF
+        ENDIF
+        IF PRGNAM # "GOOD" THEN
+                ENTRY = "Invoicing aborted: "+HHS'LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+HHS'PQU'STAT+"/"+HHS'ACTION+" >"+PRGNAM
+                CALL DO'ERRL
+                GOTO ABORT
+        ENDIF
+RETURN
+
+COPY    "FORMAT"
+COPY    "BASERR"
+
+E'DOC'TYPE:
+        \TSTF
+        IF INX1 # I'TAB THEN
+                IF WRH'DOC'TYPE < 1 OR WRH'DOC'TYPE > 9 THEN
+                        ENTRY = ENTRY + " Invalid Order type - TAB for help"
+                        CALL DO'ERR
+                ELSE
+                        CALL PRE'DSP'DOC'DESC
+                ENDIF
+        ELSE
+                WRH'DOC'TYPE = WRH'DOC'TYPE + 1
+                IF WRH'DOC'TYPE > 9 OR WRH'DOC'TYPE < 1 THEN WRH'DOC'TYPE = 1
+                CALL PRE'DSP'DOC'DESC
+                IER1 = 0
+        ENDIF
+RETURN
+
+PRE'DSP'DOC'DESC:
+        II = WRH'DOC'TYPE
+        IF LOC'TYP'DESC(II) = "" THEN LOC'TYP'DESC(II) = "Invalid?"
+        CALL DSP'DOC'DESC
+RETURN
+
+E'LOC'NO:
+        \TSTF
+        IF WRH'LOC'NO = 0 AND INX1 # I'TAB THEN
+                IF RP # "  Post" THEN
+                        LOC'DESC = "Scanning EVERYTHING"
+                        CALL DSP'LOC'DESC
+                        \GAFR OEXDOC AFR="X:WRH'DOC'TYPE+X:WRH'HDR'NO+X:WRH'EDTT+E:WRH'SDTT"
+                        ENTRY = ""
+                        CALL DSP'FINAL
+                ELSE
+                        ENTRY = "Location required!"
+                        CALL DO'ERR
+                ENDIF
+        ELSE
+\COPYF LOC IN
+!![3] - Fix screen for below ...
+                \TABC FROM="WRH" ON="LOC" APID="IN"
+                IF RP # "  Post" THEN
+                        \GAFR OEXDOC AFR="E:WRH'DOC'TYPE+E:WRH'HDR'NO+E:WRH'EDTT+E:WRH'SDTT"
+                ENDIF
+                IF WRH'HDR'NO # 0 THEN                  !![14]
+                        CALL E'HDR'NO
+                ENDIF                                   !![14]
+        ENDIF
+RETURN
+
+E'HDR'NO:
+        \GETFLD OEXDOC WRH'HDR'NO V''TMP
+        \TSTF
+        IF WRH'HDR'NO = 0 THEN
+                IF RP # "  Post" THEN
+                        ENTRY = "Scanning one Location"
+                        CALL DSP'FINAL
+                        \GAFR OEXDOC AFR="X:WRH'EDTT+E:WRH'SDTT"
+                ELSE
+                        IF ECFLD = |V''TMP| THEN
+                                ENTRY = "Order number required!"
+                                CALL DO'ERR
+                        ENDIF
+                ENDIF
+        ELSE
+                IF RP # "  Post" THEN
+                        ENTRY = "Reposting one Order"
+                        CALL DSP'FINAL
+                        \GAFR OEXDOC AFR="E:WRH'EDTT+X:WRH'SDTT"
+                ENDIF
+                HHS2'KLOC'NO = WRH'LOC'NO
+                HHS2'KDOC'TYPE = WRH'DOC'TYPE
+                HHS2'KNO = WRH'HDR'NO
+                HHS2'KSHIPMENT = -1
+!![1]           RDKEY HHS2
+!![1]           GETPRV HHS2
+                USE HHS2 INTO HHS2'REC KEY HHS2'KEY     !![1]
+                GETPRV HHS2 INTO HHS2'REC               !![1]
+                HHS2'KEY = HHS2'KEY2
+                IF HHS2'KLOC'NO = WRH'LOC'NO AND HHS2'KDOC'TYPE = &
+                                WRH'DOC'TYPE AND HHS2'KNO = WRH'HDR'NO AND &
+                                                        HHS2'CTL = 0 THEN
+                        WRH'EDTT = HHS2'KSHIPMENT
+                        CALL PROC'AR'DOC                !![22]
+                ELSE
+                        DOC'SPACE = SPACE
+                        DSP'01 = "** Order Not Found In O/E ** "
+                        CALL DISPLAY'01
+                        ENTRY = "Order not found!"
+                        CALL DO'ERR
+                ENDIF
+        ENDIF
+RETURN
+
+!![4]    E'SDTT:
+!![4]        \EDTDTE WRH'SDTT ZERO="Y"
+!![4]    RETURN
+
+E'EDTT:
+        \TSTF
+        HHS2'KLOC'NO = WRH'LOC'NO
+        HHS2'KDOC'TYPE = WRH'DOC'TYPE
+        HHS2'KNO = WRH'HDR'NO
+        HHS2'KSHIPMENT = WRH'EDTT
+        USE HHS2 INTO HHS2'REC KEY HHS2'KEY
+        CASE
+        IF HHS2'CTL # 0 THEN
+                ENTRY = "Shipment not found!"
+                CALL DO'ERR
+        ELSE
+        IF HHS2'INV'YN = "Y" AND RP = "  Post" THEN
+                ENTRY = "Invoice already printed!"
+                CALL DO'ERR
+        ELSE
+                IF HHS2'PROC < 5 THEN
+                        NOISE = 1                               !![22]
+                        CALL PROC'AR'DOC                        !![22]
+                        NOISE = 0                               !![22]
+!![22]                  \GAFR OEXDOC AFR="E:WRH'FILL'YN"
+                        CUS'KNO = HHS2'NAM'NO                           !![3]
+                        USE CUS INTO CUS'REC KEY CUS'KEY
+                        \USELST CUS'NO                                  !![3]
+                        IF LSTF'CTL # 0 THEN                            !![3]
+                                LST'COMPANY = "*** NOT FOUND ***"       !![3]
+                        ENDIF                                           !![3]
+                        ENTRY = "For: " + LST'COMPANY
+                        IF RP = "Repost" THEN
+                                IF HHS'INV'YN = "Y" THEN
+                                        ENTRY[24,-1] = ":" + RP
+                                ELSE
+                                        ENTRY[26,-1] = ":" + "Post"
+                                ENDIF
+                        ENDIF
+                ELSE
+                        \GAFR OEXDOC AFR="X:WRH'FILL'YN"
+                        WRH'FILL'YN = "N"
+                        ENTRY = "Recalc only on "
+                        IF HHS2'PROC = 6 THEN
+                                ENTRY = ENTRY + "Transfer"
+                        ELSE
+                                ENTRY = ENTRY + "Shop Order"
+                        ENDIF
+                ENDIF
+                CALL DSP'FINAL
+        ENDCASE
+        CALL VERIFY'TOTALS                                      !![19]
+RETURN
+
+!![19] Below
+MAP1 TBOX'TOTAL,B,5
+MAP1 TLHS'TOTAL,B,5
+
+VERIFY'TOTALS:
+        IF HHS2'DOC'TYPE = OEC'INT'CR RETURN
+        IF HHS2'PROC >= 5 RETURN                                !![21]
+        IF VIA'NO # HHS2'VIA'NO THEN
+                VIA'SPACE = SPACE
+                VIA'KNO = HHS2'VIA'NO
+                USE VIA INTO VIA'REC KEY VIA'KEY
+        ENDIF
+        IF VIA'CTL # 0 OR VIA'SHP'FLAG = 1 RETURN
+        TBOX'TOTAL = 0
+        BOX'KHDR'LOC'NO = HHS2'LOC'NO
+        BOX'KDOC'TYPE = HHS2'DOC'TYPE
+        BOX'KHDR'NO = HHS2'NO
+        BOX'KSHIPMENT = HHS2'SHIPMENT
+        BOX'KNO = 0
+        \LOOPER PRE="BOX" ACTION="BOX'LOOP" LASTFIX="SHIPMENT"
+!![24] below was a repeat not a return!
+        IF TBOX'TOTAL = 0 RETURN  !!I put this here in case boxes are deleted.
+        TLHS'TOTAL = 0
+        LHS'KHDR'LOC'NO = HHS2'LOC'NO
+        LHS'KDOC'TYPE = HHS2'DOC'TYPE
+        LHS'KHDR'NO = HHS2'NO
+        LHS'KSHIPMENT = HHS2'SHIPMENT
+        LHS'KNO = 0
+        \LOOPER PRE="LHS" ACTION="LHS'LOOP" LASTFIX="SHIPMENT"
+        IF ABS(TBOX'TOTAL) # ABS(TLHS'TOTAL) THEN
+                ENTRY = "Boxes not totalling correctly.  You must cancel & replace  this order."
+                CALL DO'ERRL
+                ENTRY = "This order cannot be reposted to A/R"
+                CALL DO'ERR
+        ENDIF
+        LHS'SPACE = SPACE
+        BOX'SPACE = SPACE
+RETURN
+
+BOX'LOOP:
+        TBOX'TOTAL = TBOX'TOTAL + (BOX'SHP'TOTAL-BOX'SHP'DISC)
+RETURN
+
+LHS'LOOP:
+        TLHS'TOTAL = TLHS'TOTAL + LHS'NET
+RETURN
+!![19] Above
+
+!![5] - below
+
+\COPYF CUS AR
+\COPYF PRH IN
+\COPYF BSC AR
+
+CALC'HHS:
+        \FINDYR DTT="HHS'PSTDT"
+        HSF = 0
+        TAX'PERC = 0
+        IF CUS'CTL # 0 THEN
+                ENTRY = "Warning - invalid CUSTOMER on:"
+                \HDRERR APID="OE" PRE="HHS"
+                CALL DO'ERRL
+                HSF = 1                         !!DON'T WRITE
+        ELSE
+                TAX'PERC = 0
+                CALL GET'SF'TAXABLE
+                IF CUS'TAXABLE = "Y" OR CUS'TAXABLE = "S" OR SF = 0 THEN
+                        STX'KLOC'NO = HHS'LOC'NO
+                        STX'KNO = CUS'STX'NO
+                        CALL GET'STX
+                        IF STX'CTL # 0 THEN
+                                ENTRY = "WARNING:  Invalid CUSTOMER tax code"
+                                CALL DO'ERR
+                        ELSE
+                                TAX'PERC = TTL'STX'PERC
+                        ENDIF
+                ENDIF
+        ENDIF
+        CALL ZTOTAL
+
+        LHS'KHDR'LOC'NO = HHS'LOC'NO
+        LHS'KDOC'TYPE = HHS'DOC'TYPE
+        LHS'KHDR'NO = HHS'NO
+        LHS'KSHIPMENT = HHS'SHIPMENT
+        LHS'KNO = 0
+        LSF = 0
+        \LOOPER PRE="LHS" APID="OE" ACTION="CALC'LHS"   !![3]
+        SF = HSF MAX LSF                !!DON'T WRITE ERRORS
+RETURN
+
+CALC'LHS:
+        CALL FIND'PRH
+        SUB'FLAG = 0
+        IF PRH'CUTS'YN # "N" OR PRH'USE'SRL'YN # "N" THEN SUB'FLAG = 1
+        IF PRH'LOT'YN # "N" THEN SUB'FLAG = 1           !![6]
+        IF PRH'CTL = 0 AND SUB'FLAG = 0 THEN
+                FOR I = 1 TO 4
+                        IF PRH'ATH'NO(I) # 0 THEN SUB'FLAG = 1
+                NEXT I
+        ENDIF
+        IF LHS'SUB'COUNT # 0 AND SUB'FLAG = 0 THEN
+                ENTRY = "Sub flag has problems on:"
+                \LINERR PRE="LHS"
+                CALL DO'ERR
+                SUB'FLAG = 1
+        ENDIF
+        IF SUB'FLAG = 1 THEN
+                LHS'ORDER'QTY = 0
+                LHS'BO'QTY = 0
+                LHS'COM'QTY = 0
+                LHS'USR'OQTY = 0
+                LHS'USR'CQTY = 0
+                LHS'USR'BQTY = 0
+!![15]          LHS'NET = 0                     !![8]
+        ELSE
+                LHS'BO'QTY = LHS'ORDER'QTY - LHS'COM'QTY
+                LHS'USR'BQTY = LHS'USR'OQTY - LHS'USR'CQTY
+        ENDIF
+        LHS'SUB'COUNT = 0
+MAP1 SS,F
+        IF PRH'CTL = 0 THEN
+                CASE
+                IF INC'INTERFACE = 5 THEN
+                        FOR SS = 1 TO 6
+                                SHS'KNO = SS
+                                CALL SET'SHS'REC
+                                IF SHS'CTL = 0 CALL CALC'SUB
+                        NEXT SS
+                ELSE
+                IF SUB'FLAG = 1 THEN
+                        SHS'HDR'LOC'NO = HHS'LOC'NO
+                        SHS'DOC'TYPE = HHS'DOC'TYPE
+                        SHS'HDR'NO = HHS'NO
+                        SHS'SHIPMENT = LHS'SHIPMENT
+                        SHS'LIN'NO = LHS'NO
+                        SHS'NO = 0
+                        \SETKEY PRE="SHS" MODE="KEY" APID="OE"
+                        \LOOPER PRE="SHS" ACTION="CALC'SUB" APID="OE"
+                ENDCASE
+                CALL TOTAL'HHS
+        ELSE
+                ENTRY = "INVALID part:"
+                \LINERR APID="OE" PRE="LHS"
+                CALL DO'ERRL
+                SF = 1                  !!DON'T WRITE TO LHS
+        ENDIF
+        \COMNET                                         !![15]
+CIF OLD AND NOT OLD THEN
+!![15] 04/21/92 ESE     SAVE OLD CODE A WHILE
+!![8] Below
+        IF PRH'INTERFACE # 5 THEN
+                \FACTORQTY MODE="Q" PRE="LHS" MASKSET="2"
+                \FACTORQTY MODE="P" PRE="LHS" MASKSET="2"
+                IF PRH'INTERFACE # 4 THEN
+                        \FROUND ((LHS'PRICE-LHS'DISC)*LHS'ORDER'QTY*100)/QFACTOR/PFACTOR LHS'NET
+                ELSE
+                        \FROUND ((LHS'CALC'PRICE-LHS'CALC'DISC)*LHS'SQ'FEET*100)/QFACTOR/9/PFACTOR LHS'NET
+                ENDIF
+        ENDIF
+!![8] Above
+ENDCIF
+        LSF = SF MAX LSF                !!DON'T WRITE ERRORS TO HEADER
+RETURN
+
+CALC'SUB:
+        LHS'SUB'COUNT = LHS'SUB'COUNT + 1
+        LHS'ORDER'QTY = LHS'ORDER'QTY + SHS'ORDER'QTY
+        LHS'COM'QTY = LHS'COM'QTY + SHS'COM'QTY
+        LHS'BO'QTY = LHS'ORDER'QTY - LHS'COM'QTY
+        LHS'USR'CQTY = LHS'USR'CQTY + SHS'USR'CQTY
+        LHS'USR'OQTY = LHS'USR'OQTY + SHS'USR'OQTY
+        LHS'USR'BQTY = LHS'USR'OQTY - LHS'USR'CQTY
+        SHS'BO'QTY = SHS'ORDER'QTY - SHS'COM'QTY
+        SHS'USR'BQTY = SHS'USR'OQTY - SHS'USR'CQTY
+CIF OLD AND NOT OLD THEN
+!![8] Below
+!![15] 04/21/92 ESE     SAVE OLD CODE A WHILE
+        IF PRH'INTERFACE = 5 THEN
+            L'NETP = 0
+            L'NETD = 0
+            TTL'QTY = SHS'ORDER'QTY
+            FOR QQ = 3 TO 1 STEP -1
+                IF LHS'UOM'FACTOR(QQ) # 0 THEN
+                        II = FIX(TTL'QTY/LHS'UOM'FACTOR(QQ))
+                        L'NETP = L'NETP + (II * LHS'TPRICE(QQ))
+                        TTL'QTY = TTL'QTY - (II * LHS'UOM'FACTOR(QQ))
+                        IF TTL'QTY = 0 THEN QQ = 1
+                ENDIF
+            NEXT QQ
+            LHS'NET = LHS'NET + L'NETP - L'NETD
+        ENDIF
+!![8] Above
+ENDCIF
+RETURN
+
+GET'STX:
+        IF STX'NO # STX'KNO OR STX'CTL # 0 THEN
+                USE STX INTO STX'REC KEY STX'KEY
+                IF STX'CTL # 0 THEN
+                        STX'KLOC'NO = 0
+                        USE STX INTO STX'REC KEY STX'KEY
+                ENDIF
+        ENDIF
+        IF STX'CTL = 0 CALL COMPUTE'TTL'STX'PERC
+RETURN
+
+MAP1 TSTSTX,S,1,"S"
+
+COPY "TTLSTX[OE]",HDRPRE="HHS" TST'TAXABLE="TSTSTX" !!COMPUTE'TTL'STX'PERC:
+                                        !!GET'SF'TAXABLE
+
+COPY "FNDUOM[SA]",APID="OE",PRE="LHS"
+
+TOTAL'HHS:
+        COPY    "TTLHDR[SA]",LIN'PRE="LHS",HDR'PRE="HHS",ZTOTAL="Y",APID="AR"
+RETURN
+
+FIND'PRH:
+        \VUSEPRH FLDNAM="LHS'TRK'NO" SKIP'MAP="Y" ACTION="FIND'PRH2"
+RETURN
+
+FIND'PRH2:
+        \FACTORQTY MODE="Q" PRE="PRH"
+        \FACTORQTY MODE="P" PRE="PRH"
+        CALL FIND'UOM
+RETURN
+
+!![5] - above
+
+SET'SHS'REC:
+        SHS'SPACE = SPACE
+        SHS'HDR'LOC'NO = HHS'LOC'NO
+        SHS'DOC'TYPE = HHS'DOC'TYPE
+        SHS'HDR'NO = HHS'NO
+        SHS'SHIPMENT = LHS'SHIPMENT
+        SHS'LIN'NO = LHS'NO
+        \SETSUB SHS LHS
+RETURN
+
+MAP1 NOISE,B,1
+
+PROC'AR'DOC: !![22] - made subroutine (only edit routines)
+        IF HHS2'PROC < 5 THEN           !![1]
+                DOC'SPACE = SPACE
+                DOCV'KINV'TYPE = HHS2'DOC'TYPE
+                DOCV'KINVOICE  = HHS2'INTERNAL
+                USE DOCV INTO DOC'REC KEY DOCV'KEY
+                IF DOCV'CTL = 0 THEN
+                        DSP'01 = "Invoice current: "+STR(DOCV'KINV'TYPE)+"-"+DOCV'KINVOICE+" st="+DOC'STAT
+                        IF DOC'STAT = "U" THEN
+                                \GAFR OEXDOC AFR="E:WRH'FILL'YN"
+                                WRH'FILL'YN = "Y"
+                        ELSE
+                                \GAFR OEXDOC AFR="X:WRH'FILL'YN"
+                                WRH'FILL'YN = "N"
+!![22] - add warning below.
+                                IF NOISE = 1 THEN
+                                        ENTRY = "WARNING:  will create duplicate invoice for this order number:"
+                                        \KERROR HHS ALTPRE="HHS2" CNO="N" MODE="D"
+                                        CALL DO'ERRL
+                                        IER1 = 1
+                                ENDIF
+                        ENDIF
+                        CALL DISPLAY'01
+                        IF DOC'CUS'NO # HHS2'NAM'NO THEN
+                                ENTRY = "DANGER: Customer numbers do not match!"
+                                \KERROR HHS MODE="D" ALTPRE="HHS2" CNO="N"
+                                ENTRY = ENTRY + "|"
+                                \KERROR DOCV MODE="D" CNO="N" APID="AR"
+                                CALL DO'ERRL
+                                IER1 = 1        !![18]
+                                \GAFR OEXDOC AFR="X:WRH'FILL'YN" !![18]
+                                WRH'FILL'YN = "N" !![18]
+                        ENDIF
+                ELSE
+                        DHSV'KINV'TYPE = HHS2'DOC'TYPE
+                        DHSV'KINVOICE  = HHS2'INTERNAL
+                        USE DHSV INTO DHS'REC KEY DHSV'KEY
+                        IF DHSV'CTL = 0 THEN
+                                DOC'TYPE  = DHS'TYPE
+                                DOC'YEAR  = DHS'YEAR
+                                DOC'BATCH = DHS'BATCH
+                                DOC'TRN   = DHS'TRN
+                                DOC'AMT   = DHS'AMT
+                                DSP'01    = "Invoice archived: "+STR(DHSV'KINV'TYPE)+"-"+STR(DHSV'KINVOICE)
+                                WRH'FILL'YN = "N"
+                                \GAFR OEXDOC AFR="X:WRH'FILL'YN"
+                                CALL DISPLAY'01
+                                IF DHS'CUS'NO # HHS2'NAM'NO THEN
+                                        ENTRY = "DANGER: Customer numbers do not match!"
+                                        CALL DO'ERR
+                                        \KERROR HHS MODE="D" ALTPRE="HHS2" CNO="N"
+                                        ENTRY = ENTRY + "|"
+                                        \KERROR DHSV MODE="D" CNO="N" APID="AR"
+                                        IER1 = 1        !![18]
+                                        \GAFR OEXDOC AFR="X:WRH'FILL'YN" !![18]
+                                        WRH'FILL'YN = "N" !![18]
+                                ENDIF
+                        ELSE
+                                DSP'01 = "** Order Not Found In A/R ** "
+                                CALL DISPLAY'01
+                        ENDIF
+                ENDIF
+        ENDIF
+RETURN

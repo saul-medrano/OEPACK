@@ -1,0 +1,479 @@
+! @#$^&* 400 18 444 0 0 0 0 0 0 0 0 0 174 *&^$#@ 
+!*! Updated on Fri Jun  7 18:29:47 2024 by Saul Medrano 1 times 
+!*! Updated on Mon Oct  4 10:54:36 2021 by Cheryl Eberhard  1 times 
+!*! Updated on Fri Oct  1 11:24:25 2021 by Cheryl Eberhard  1 times 
+!%W% %G% %U% - SCCS
+!* Updated on 13-Feb-95 at 12:21 PM by Eric Eberhard; edit time: 0:00:26
+PROGRAM OERPRT,8.0(10)          !! Reprint any invoice [6-3]
+!!
+COPY    "LINKER"
+COPY    "ABSELL"
+!!
+!!                        V. I. C. S.
+!!                     of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!OERPRT - Reprint any invoice
+!!
+!!
+!!
+!!      PROGRAMMER:
+!!              Eric S. Eberhard
+!!
+!!      DATE:
+!!              08/11/85
+!!
+!!      UPDATE History:
+!!
+!!7.2   12/06/88 ASC    New version created
+!!
+!![1]   05/26/89 ASC    Added 3 More COPYFs to get rid of Missing CopyF message.
+!!
+!![2]   12/04/89 ESE    New posting.
+!!
+!![3] 04/20/91 ESE      Func-R in to read changes broken.
+!!
+!![4] 07/17/91 ESE      Do not try to run NOTHIN.RUN.
+!!
+!![5] 08/30/91 ESE      Was not reading MC control record.
+!!
+!!7.3a 03/17/92 ESE     New WGP, SUB, & LIN stuff.
+!!
+!![6] 01/12/93 ESE      NEW: true 7.3 edition.
+!!
+!![7] 08/05/93 ESE      NEW: New PRH caching
+!!                      IH: need VICSIT.SBR 7.3a(7) and a lot of other
+!!                          programs (see ESEPRH.CMD).
+!!
+!![8] 08/24/94 CAE      NEW: Added security for reprinting an invoice
+!!
+!![7.4]   02/13/95 ESE  FIX: release record before chain syxres.
+!!
+!![9] 07/11/96 ESE      NEW: support new post level (see oerctl!!!).
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![10] 03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!!
+!!
+        COPYF   "CMNFIL[SY]",NOAFR
+        COPYF   "WRHFIL",NOAFR
+        COPYF   "LSTFKY[MC]",NOAFR
+        COPYF   "LOCDKY[IN]",NOAFR
+!!      COPYF   "OERPRT[OE]",NOAFR
+        \COPYF MSG SY
+
+        MAP1    WL'MODE,B,1
+        MAP1    SUM'VIA,B,5
+        MAP1    CALC'HTOTAL,B,5
+        MAP1    II,F
+
+        COPY    "CVTMAP"
+        COPY    "FORMAD"
+
+        ON ERROR GOTO ERTRAP
+        GETCMN CMN'REC
+        \ABTAB
+
+        \DOPASS
+        \READCTL APP="OE" GL="N"
+        USE OC2 OEC'RCN INTO OC2'REC
+        IF OC2'CTL # 0 THEN
+            ENTRY = "No OC2!?"
+            CALL DO'ERRL
+            GOTO ABORT
+        ENDIF
+        \READCTL APP="IN" GL="N"
+        USE IN2 INC'RCN INTO IN2'REC
+        IF IN2'CTL # 0 THEN
+            ENTRY = "No IN2!?"
+            CALL DO'ERRL
+            GOTO ABORT
+        ENDIF
+        \READCTL APP="MC" GL="N"
+
+        \COPYF DOC AR
+
+        IF CMN'FRM'PRGNAM = "WLSORT" THEN
+            WL'MODE = 1
+            RDLOCK HHS CMN'SAV'RCN(1) INTO HHS'REC
+            IF HHS'CTL # 0 THEN
+                ENTRY = "oerprt cannot lock header: "+HHS'RCN
+                CALL DO'ERR
+                GOTO ABORT
+            ENDIF
+            GOTO GOT'HHS
+        ELSE
+        IF CMN'FRM'PRGNAM = "WL1VFD" THEN
+            WL'MODE = 2
+            RDLOCK HHS CMN'SAV'RCN(1) INTO HHS'REC
+            IF HHS'CTL # 0 THEN
+                ENTRY = "oerprt cannot lock header: "+HHS'RCN
+                CALL DO'ERR
+                GOTO ABORT
+            ENDIF
+            GOTO GOT'HHS
+        ENDIF
+        ENDIF
+        IF PWASTR[2;1] # "Y" THEN
+            ENTRY = "You do not have security to reprint - see manager!"
+            CALL DO'ERR
+        ELSE
+            IF CMN'FRM'PRGNAM # "NA2RPT" AND CMN'FRM'PRGNAM # "CRTSUB" THEN
+                DSP OERPRT
+                DDB OERPRT
+    RE'GDB:
+                GDB OERPRT
+            ENDIF
+
+            CALL TST'FUNC : IF TST'FUNC = 1 GOTO ABORT
+
+            IF CMN'FRM'PRGNAM # "NA2RPT" AND CMN'FRM'PRGNAM # "CRTSUB" THEN
+                HHS'KLOC'NO = WRH'LOC'NO
+                HHS'KDOC'TYPE = WRH'DOC'TYPE
+                HHS'KNO = WRH'HDR'NO
+                HHS'KSHIPMENT = WRH'EDTT
+
+                MAP1 FNAME,S,30
+                MAP1 SHRS,S,2
+                MAP1 SMNS,S,2
+                MAP1 SSEC,S,2
+                MAP1 TRANS'DATE,S,12
+                MAP1 PLINE,S,80
+                MAP1 QT,S,1
+                MAP1 DLM,S,1
+                MAP1 MY'TIME,S,20
+                MAP1 FND,F
+                QT = CHR(34)
+                DLM = CHR(44)
+
+                \S'TO'HMS
+                SHRS = HRS USING "#Z"
+                SMNS = MNS USING "#Z"
+                SSEC = SEC USING "#Z"
+                \STRDTT DTT="DATE" YYMMDD="Y" CDATE="TRANS'DATE"
+                TRANS'DATE = "20" + TRANS'DATE
+                TRANS'DATE = TRANS'DATE[5;2]+"/"+TRANS'DATE[7;2]+"/"+TRANS'DATE[1;4]
+
+                MY'TIME = SHRS + ":" + SMNS + ":" + SSEC
+
+                ENTRY = HHS'KLOC'NO+"-"+HHS'KDOC'TYPE+"-"+HHS'KNO+"-"+HHS'KSHIPMENT
+                PLINE = QT+ENTRY+QT+DLM+QT+TRANS'DATE+QT+DLM+QT+MY'TIME+QT+DLM+QT+UB'UID+QT
+
+                FNAME = "/tmp/reprint.DAILY"
+                XCALL ABUTIL,46,FNAME,FNAME
+                LOOKUP FNAME,FND
+                IF FND # 0 THEN
+                    OPEN #6666,FNAME,APPEND
+                    PRINT #6666,PLINE
+                    CLOSE #6666
+                ELSE
+                    OPEN #6666,FNAME,OUTPUT
+                    PRINT #6666,PLINE
+                    CLOSE #6666
+                ENDIF
+
+                PLINE = ""
+            ELSE
+                HHS'KLOC'NO   = VAL(CMN'OTHER[1;4])
+                HHS'KDOC'TYPE = VAL(CMN'OTHER[5;1])
+                HHS'KNO       = VAL(CMN'OTHER[7;9])
+                HHS'KSHIPMENT = VAL(CMN'OTHER[17;3])
+            ENDIF
+            RDKEY HHS
+            IF HHS'CTL = 0 THEN
+                READ HHS
+            ENDIF
+            IF HHS'CTL # 0 THEN
+                IF HHS'CTL = 4 THEN
+                    ENTRY = "Record locked ... try later!"
+                    CALL DO'ERR
+                ELSE
+                    ENTRY = "Cannot find archived order"
+                    CALL DO'ERR
+                ENDIF
+                IF CMN'FRM'PRGNAM # "NA2RPT" AND CMN'FRM'PRGNAM # "CRTSUB" THEN
+                    GOTO RE'GDB
+                ELSE
+                    GOTO ABORT
+                ENDIF
+            ELSE
+        GOT'HHS:
+                IF HHS'PRGNAM # "CHERYL" AND HHS'POST'LEVEL # 255 THEN
+                    ENTRY = HHS'PSTID + " aborted posting - chaining repost!"
+                    \KERROR HHS MODE="D"
+                    CALL DO'ERRL
+                    CMN'SPACE = SPACE
+                    CMN'SAV'RCN(1) = HHS'RCN
+                    CMN'TO'PRGNAM = "OERCTL"
+                    CMN'FRM'PRGNAM = "RPOSTA"
+                    ENTRY = "PASS THRU"
+                    CMN'OTHER = ENTRY
+                    XCALL DB,22,HDR'PKT             !!Release before chain.
+                    SNDCMN CMN'REC
+                    CHAIN "DSK0:SYXRES.RUN[11,0]"
+                ENDIF
+                HDR'REC = HHS'REC
+                HHS'PQU'STAT = "Q"
+            ENDIF
+            \SSGET ARCUS ARTRH INLOC INVIA INVIL SCHEMA="40"
+            \COPYF STX IN MODE="PRI"
+            IF CUS'TAXABLE # "Y" AND CUS'TAXABLE # "S" THEN
+                STX'DESC = "N/A"
+            ELSE
+                STX'KLOC'NO = HDR'LOC'NO
+                USE STX INTO STX'REC KEY STX'KEY
+                IF STX'CTL # 0 THEN
+                    STX'KLOC'NO = 0
+                    \LOOKUP FROM="HHS" ON="STX" APID="IN"
+                ENDIF
+            ENDIF
+            LSTF'KNO = CUS'LST'NO
+            USE LSTF INTO LST'REC KEY LSTF'KEY
+!!CLEAR I PRIOR TO PROCESSING
+            I = 0
+            PRGNAM = ""
+            IF HHS'DOC'TYPE >= 1 AND HHS'DOC'TYPE <= 9 THEN
+                PRGNAM = LOC'FORM(HHS'DOC'TYPE)
+                IF WL'MODE = 1 THEN
+                    XCALL GETENV,"WL_IPRT_SEQ",ENTRY
+                    PRT'KSEQ = VAL(ENTRY)
+                    IF PRT'KSEQ = 0 THEN
+                        PRT'KSEQ = LOC'PRT'NO(HHS'DOC'TYPE)
+                    ENDIF
+                ELSE
+                    PRT'KSEQ = LOC'PRT'NO(HHS'DOC'TYPE)
+                ENDIF
+                I = HHS'RCN
+            ENDIF
+            IF PRGNAM = "" THEN
+                ENTRY = "Print program blank: "
+                \HDRERR PRE="HHS" APID="OE"
+                ENTRY = ENTRY + ": reprint again"
+                CALL DO'ERR
+                GOTO ABORT
+            ENDIF
+            CALL PRT'LINK'IT
+            PRINT TAB(24,1) ; TAB(-1,A'RED) ; TAB(-1,9) ; "Invoice printed";
+
+            IF HHS'PROC < 5 THEN
+                SUM'VIA = 0
+                FOR I = 1 TO 7
+                    SUM'VIA = SUM'VIA + HHS'SHP'VTTL(I)
+                NEXT I
+                CALC'HTOTAL = HHS'SHP'TOTAL - HHS'SHP'DISC        &
+                        - HHS'SHP'ODISC - HHS'SHP'RETRO + HHS'OLD'DR &
+                        - HHS'OLD'CR - HHS'OLD'CASH                  &
+                        + HHS'STX1FINAL + HHS'STX2FINAL + SUM'VIA
+                I = 0
+                DO UNTIL I >= 7
+                    I = I + 1
+                    PRGNAM = VIL'PRGNAM(I)
+                    IF PRGNAM = "" REPEAT
+                    PRT'KSEQ = VIL'PRT'NO(I)
+                    IF VIL'PRG'FLAG(I) = 1                          OR &
+                        (VIL'PRG'FLAG(I) = 2 AND CALC'HTOTAL > 0     AND &
+                        TRH'COD'STATUS # 1)                         OR &
+                        (VIL'PRG'FLAG(I) = 3 AND (CALC'HTOTAL  <= 0  OR &
+                        TRH'COD'STATUS = 1)) CALL PRT'LINK'IT
+                LOOP
+            ENDIF
+
+        ENDIF
+        IF WL'MODE # 0 THEN
+            CMN'FRM'PRGNAM = "GOOD"
+        ENDIF
+ABORT:
+        HHS'RCN = 0 : REL HHS
+        IF WL'MODE # 0 THEN
+            IF CMN'FRM'PRGNAM # "GOOD" THEN
+                CMN'FRM'PRGNAM = "ABORT"
+                CMN'OTHER = ENTRY
+            ENDIF
+            SNDCMN CMN'REC
+        ELSE
+            IF CMN'FRM'PRGNAM # "NA2RPT" AND CMN'FRM'PRGNAM # "CRTSUB" THEN
+                PRINT TAB(23,1) ; TAB(-1,A'RED) ;
+                CALL ANYEXT
+            ENDIF
+        ENDIF
+END
+
+COPY    "FORMAT"
+COPY    "BASERR"
+
+PRT'LINK'IT:
+        IF PRGNAM = "NOTHIN" RETURN                     !![4] !!KLUDGE
+        USE PRT INTO PRT'REC KEY PRT'KEY
+        IF PRT'CTL # 0 THEN
+            ENTRY = "Printer number "+PRT'KSEQ+" for "+HHS'VIA'NO+"-"+HHS'LOC'NO
+            CALL DO'ERRL
+            ENTRY = PRGNAM + " NOT run as requested"
+            CALL DO'ERRL
+            RETURN
+        ENDIF
+!!MODIFY LINKER.CPY TO MATCH
+        ENTRY = PRGNAM
+        PRGNAM[3;1] = "X"                               !!Use archives
+        XCALL LINK,1,ENTRY,CNT'REC,INC'REC,ARC'REC,OEC'REC,HHS'REC,      &
+                HHS'RCN,LOC'REC,LOC'RCN,VIA'REC,VIA'RCN,CUS'REC,CUS'RCN, &
+                LST'REC,PRGNAM,PASS'SEL'REC,TRH'REC,TRH'RCN,I,STX'REC,   &
+                PRT'REC,VIL'REC,REPOSTING,SKIP'JNL,CACHE'REC
+        IF PRGNAM = "ABORT" THEN
+            ENTRY = "Reprint aborted: "
+            \HDRERR
+            ENTRY = ENTRY + ": reprint again"
+            CALL DO'ERRL
+            GOTO ABORT
+        ENDIF
+MAP1 PRINT'LABELS,S,1
+MAP1 PRINT'INVOICE,S,1
+        PASS'PRT'NO = 0
+        IF PRGNAM[1,4] = "GOOD" THEN
+            PRINT'LABELS = PRGNAM[5;1]
+            PRGNAM = "GOOD"
+            PRINT'INVOICE = "Y"
+        ELSE
+        IF PRGNAM[1,2] = "G!" THEN
+            PRINT'LABELS = PRGNAM[3;1]
+            IF PRGNAM[4;2] = "NO" THEN
+                PASS'PRT'NO = 0
+                PRINT'INVOICE = "N"
+            ELSE
+                PASS'PRT'NO = VAL(PRGNAM[4,-1])
+                PRINT'INVOICE = "Y"
+            ENDIF
+            PRGNAM = "GOOD"
+        ENDIF
+        ENDIF
+        HDR'REC = HHS'REC
+        CALL PRE'DO'EMAIL
+        IF PRINT'LABELS = "N"
+            GOTO ABORT
+        ENDIF
+RETURN
+
+MAP1 PASS'PRT'NO,B,1
+
+E'DOC'TYPE:
+        CALL TST'FUNC : IF TST'FUNC = 1 OR INX1 = I'UA RETURN
+        IF INX1 # I'TAB THEN
+            IF WRH'DOC'TYPE < 1 OR WRH'DOC'TYPE > 9 THEN
+                ENTRY = ENTRY + " Invalid Order type - TAB for help"
+                CALL DO'ERR
+            ELSE
+                CALL PRE'DSP'DOC'DESC
+            ENDIF
+        ELSE
+            WRH'DOC'TYPE = WRH'DOC'TYPE + 1
+            IF WRH'DOC'TYPE > 9 OR WRH'DOC'TYPE < 1 THEN WRH'DOC'TYPE = 1
+            CALL PRE'DSP'DOC'DESC
+            IER1 = 0
+        ENDIF
+RETURN
+
+PRE'DSP'DOC'DESC:
+        II = WRH'DOC'TYPE
+        IF LOC'TYP'DESC(II) = "" THEN LOC'TYP'DESC(II) = "Invalid?"
+        CALL DSP'DOC'DESC
+RETURN
+
+E'LOC'NO:
+        \TABC FROM="WRH" ON="LOC" APID="IN"
+RETURN
+
+\COPYF WCS WB
+COPYF "IN2FIL[IN]",NOAFR
+MAP1 PRTCOD,B,1
+MAP1 VIAPTR,X,30
+MAP1 EMAIL'RCN,B,4
+MAP1 NO'EMAIL,S,1
+
+
+PRE'DO'EMAIL:
+        XCALL GETENV,"OERPRT_NO_EMAIL",NO'EMAIL
+        IF NO'EMAIL = "Y" RETURN                !!KLUDGE
+        \DG GETVALUE _OESETUP oerprt_no_email NO'EMAIL
+        IF DG'CTL = 0 AND NO'EMAIL = "Y" RETURN    !!KLUDGE
+        IF EMAIL'RCN = HHS'RCN THEN
+            RETURN
+        ENDIF
+
+        EMAIL'RCN = HHS'RCN
+        \COPYF PRT SY
+        IF PRINT'INVOICE # "N" THEN
+            IF PASS'PRT'NO # 0 THEN
+                PRT'KSEQ = PASS'PRT'NO
+            ELSE
+            IF HDR'VIA'NO >= OEC'SCUS'VIA AND HDR'VIA'NO <= &
+                        OEC'ECUS'VIA AND LOC'PRT'NOP(HDR'DOC'TYPE) # 0 THEN
+                PRT'KSEQ = LOC'PRT'NOP(HDR'DOC'TYPE)
+            ELSE
+                PRT'KSEQ = LOC'PRT'NO(HDR'DOC'TYPE)
+            ENDIF
+            ENDIF
+            IF PRT'KSEQ # PRT'SEQ THEN
+                \VUSE PRT - V''PTR2
+                IF PRT'CTL # 0 THEN
+                    ENTRY = "Printer number "+PRT'KSEQ+" for: "+HDR'VIA'NO+"-"+HDR'LOC'NO
+                    CALL DO'ERR
+                    ENTRY = "Queue invoice NOT run as requested"
+                    CALL DO'ERRL
+                    PRT'SPACE = SPACE
+                ENDIF
+            ENDIF
+        ELSE
+            PRT'SPACE = SPACE
+        ENDIF
+        MAP1 IS'COPY'FLAG,B,1
+        IF WL'MODE # 0 THEN
+            IS'COPY'FLAG = 0
+        ELSE
+            IS'COPY'FLAG = 1
+        ENDIF
+        \SEND'EMAIL IS'COPY="IS'COPY'FLAG"            !!qmail.mac
+        \DG GETVALUE _OESETUP oerprt_no_error ENTRY
+        IF DG'CTL = 0 AND ENTRY = "Y" RETURN            !!KLUDGE
+        IF HDR'CRID = "WBWHAP" AND EVER'EMAIL # 1 THEN !!EZID not found
+            ENTRY = "Invoice Email not sent for order; check reprint flag on ezid for customer!"
+!           \KERROR HDR CNO="N" MODE="D"
+            CALL DO'ERR
+        ENDIF
+RETURN
+
+MAP1 SKIP'HTOTAL,B,5                    !![30]
+
+SET'TOTALS:
+        \HDRSUM BALANCE="CALC'HTOTAL" INVOICE="SKIP'HTOTAL"
+RETURN
+
+!COPY "EMAIL",OERCTL="Y",USE'QMAIL="Y"  !!DO'EMAIL:
+COPY "EMAIL",OERCTL="Y" USE'TAD="Y" USE'QMAIL="Y" !!DO'EMAIL:
+
+MAP1 PRHPTR,X,30
+\COPYF PRH IN MODE="PRI"
+
+FIND'PRH:
+    PRH'KTRK'NO = LHS'TRK'NO
+    \VUSE PRH
+RETURN
+
+E'SHIPMENT:
+    IF WRH'EDTT = 0 THEN
+        ENTRY = "Must enter a shipment number!"
+        CALL DO'ERR
+        WRH'EDTT = 1
+    ENDIF
+RETURN
