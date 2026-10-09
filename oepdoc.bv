@@ -1,0 +1,2891 @@
+! @#$^&* 373 0 363 0 0 0 0 0 0 0 0 0 1960 *&^$#@ 
+!*! Updated on Mon Mar  2 18:03:03 2026 by Saul Medrano 2 times 
+!*! Updated on Fri Feb 27 17:43:42 2026 by Saul Medrano 21 times 
+!*! Updated on Thu Feb 26 16:14:13 2026 by Saul Medrano 11 times 
+!%W% %G% %U% - SCCS
+!* Updated on 02-Jan-96 at 12:17 PM by Eric Eberhard; edit time: 0:00:32
+GLOBAL V''LINKEE="Y"
+GLOBAL SKIP'DAYS="N"            !!Enable MAPping of days in CVTMAP.CPY
+PROGRAM OEPDOC,8.0(12)
+!!
+!!                        V. I. C. S.
+!!                     of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!            2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!
+COPY    "LINKER"                !!LINK MAPS AND MACROS
+!!
+!!Post Invoices:  Eric S. Eberhard, 03/19/86
+!!
+!!
+!!IF I # 0 DO STUFF W/BAT'RCN = I
+!!CLEAR BAT'TRY'POST WHEN DONE ..., RELEASE RECORD ...
+!!
+!!      REVISION HISTORY:
+!!
+!!7.2   12/06/88 ASC    New version created
+!!
+!![1] 06/13/89 KJS/ESE  Fixed rounding bug in last WOE record
+!!
+!![2] 08/03/89 KJS      Fixed carpet interface distribution.
+!!
+!![3] 10/10/89 ESE      Use old number only if requested.
+!!
+!![4] 01/26/90 ESE      Use UKY for P.O. number if desired.
+!!
+!![5] 07/05/90 ESE      Deal with missing WPA (wholesale garment only).
+!!
+!![6] 07/23/90 ESE      Allow for items that include tax in sales price.
+!!
+!![7] 07/31/90 ESE      Speed it up by memory basing the DST posting.
+!!
+!![8] 08/14/90 ESE/HEIDI Fix (?) VAT combined with included tax.
+!!
+!![9] 09/14/90 HEIDI    Added error checking for WOE file access
+!!
+!![10] 11/28/90 ESE     Speed up T-Shirt area.
+!!
+!![11] 12/03/90 ESE     Caching to speed it up.
+!!
+!![12] 12/06/90 MCT     Allow creation of invoice and inventory batch by
+!!                      Promise Date.
+!!
+!![13] 12/12/90 KJS/HLB Repaired totalling problem cause by [10]
+!!
+!![14] 12/13/90 KJS     Fixed [12] to send correct date.
+!!
+!![15] 03/14/91 ESE     Cache WOE records.
+!!
+!![16] 03/18/91 BAP     Fixed invlaid GL/PLN error message
+!!
+!![17] 03/20/91 ESE     Allow posting during end-of-day.
+!!
+!![18] 04/04/91 HLB     Was sending ship-to alt. address to A/R.
+!!
+!![19] 05/07/91 KJS     Corrected FINDYR/FINDPR macros for FUNKY date ranges.
+!!
+!![20] 05/15/91 ESE/HLB More VAT tax stuff.
+!!
+!![21] 05/29/91 HLB     Problem with changing unapplied PO from OE info
+!!                      to ORG'NO
+!![22] 06/27/91 ESE     Add setting of terms from APA file:
+!!                      MUST modify data on A/R terms!!!
+!!                      VCR:ARC7:TRHFIL.CPY
+!![23] 07/03/91 ESE     Set DOC date from header post date.
+!!
+!![24] 07/18/91 HLB     Expanded the "Sorry, ..." aging error message
+!!
+!![25] 08/02/91 HLB     If deleting the original DOC, use the same
+!!                      batch and transaction as before.
+!!
+!![26] 08/02/91 HLB     VAT still not quite right
+!!
+!![27] 09/03/91 ESE     Make work with new credit checking.
+!!
+!![28] 10/22/91 ESE      Compute sales tax different for pickups (TTLSTX[5]).
+!!
+!![29] 10/30/91 MCT/HLB Commission group defaulting incorrect.
+!!
+!![30] 11/05/91 ESE     Post applied credit to A/R.
+!!
+!![31] 11/20/91 HLB     When generating/validating invoice numbers, needed
+!!                      to check archives as well as current DOC's.
+!!
+!![32] 11/26/91 ESE     For setting of APA'NO make customer APA number
+!!                      secondary to terms APA number.
+!!
+!!
+!![33] 12/02/91 HLB     Modified [25] to use original DOC trn when deleting
+!!                      even if batch came from OE.
+!!
+!![34] 12/10/91 ESE/HLB Put a message on duplicate posted invoices.
+!!
+!![35] 02/18/92 ESE     Try to make cash applications nicer.
+!!
+!![36] 02/20/92 ESE     Support task manager printing.
+!!
+!![37] 02/25/92 ESE     Little rounding problem  fixed.
+!!
+!![38] 02/27/92 ESE     Post freight correctly to multiple product lines.
+!!
+!![39] 03/11/92 ESE     Still trying to post freight for multi prod lines.
+!!
+!!7.3a 03/17/92 ESE     New WGP, SUB, & LIN stuff.
+!!
+!![40] 04/21/92 ESE     Use macro to compute net line item.
+!!
+!![41] 05/06/92 ESE     Attempt to stop duplicate invoices when not posting
+!!                      to A/R. MUST INCLUDE OERCTL 7.3A(75) WITH THIS!
+!!
+!![42] 05/06/92 ESE/HLB COMNET.MAC was wrong (invalid invoice/distribution).
+!!
+!![43] 05/14/92 HLB/ESE When doing in EOD, would assign new invoice number
+!!                      instead of use original
+!!
+!![44] 05/18/92 HLB/ESE Only delete document from A/R if the customers
+!!                      match.
+!!
+!![45] 06/17/92 ESE/HLB Fix: so that when multiple pay/cr memos are applied
+!!                      they don't disappear.
+!!
+!![46] 07/27/92 ESE     Unix fix.
+!!
+!![47] 10/13/92 ESE/HLB NEW:  check more carefully for old DOC records on a
+!!                            repost, don't add DOCL key, try to use old
+!!                            DOC record if no changes.
+!!
+!![48] 12/29/92 ESE     FIX:  Set DOCA properly so that DOCP will be handled
+!!                            properly in A/R post if cash applied to order.
+!!
+!![49] 01/04/93 ESE     FIX:  Problems when cash and credit memos applied
+!!                            to the order.
+!!
+!![50] 01/15/93 ESE     FIX:  More problems when cash & cr memos applied.
+!!
+!![51] 03/03/93 ESE     NEW:  Release BSC record.
+!!
+!![52] 05/18/93 ESE     NEW:  opens on journals and work files.
+!!
+!![53] 05/20/93 ESE     NEW: remove AFR file.
+!!                      IH: must accomany OEPEOD, OERCTL, AR1AR3, AR1BAT
+!!
+!![54] 05/20/93 ESE/HLB NEW: update CAP file here.
+!!                      IH: must accompany OEPQTY
+!!
+!![55] 06/29/93 ESE     NEW: auto determine if old invoice number to be
+!!                      used if posted.
+!!
+!![56] 08/05/93 ESE     NEW: New PRH caching
+!!                      IH: need VICSIT.SBR 7.3a(7) and a lot of other
+!!                          programs (see ESEPRH.CMD).
+!!
+!![57] 08/25/93 ESE     NEW: SRLC key added.
+!!
+!![58] 09/14/93 HLB     FIX: Change to BATBSC macro to better verify that
+!!                      nothing can be added to the current file that is
+!!                      already in the archive file.
+!!
+!![59] 10/28/93 ESE     NEW: new error trapping for gracefull ctrl-c.
+!!
+!![60] 11/23/93 HLB     NEW: Allow more than one unapplied batch.
+!!
+!![61] 04/01/94 ESE/HLB NEW: differentiate between blank and zero on location
+!!                      setting of ptc & cst.
+!!
+!![62] 05/13/94 HLB     NEW: Delete unapplied record if entirely applied.
+!!
+!![63] 07/06/94 HLB     FIX: Corrected application problem causing
+!!                      DOCA key corruption.
+!!
+!![64] 08/18/94 ESE/HLB NEW: Credit card handling
+!!
+!![65] 09/28/94 ESE     NEW: If customer not taxable and tax was charged
+!!                      use A/R control record to get G/L account.
+!!
+!!7.4 01/06/95 ESE      NEW: Implement "slip" pricing (see OEC'SLIP'PRICE).
+!!
+!![1] 03/02/95 HLB      FIX: Undocumented improvements to credit card
+!!                      handling.  Send with OERCTL, OE1WGA, and OE2CRE
+!!
+!![2] 02/16/95 HLB      FIX: Corrected a MC credit card credit transaction
+!!                      problem (see [66] in 12/oe).
+!!
+!![3] 12/04/95 HLB      FIX: Problems with applying cash to split credit
+!!                      card orders.
+!!
+!![4] 12/27/95 ESE      NEW: attemp to fix link problem using xcall system.
+!!
+!![5] 01/02/96 ESE      FIX: FINDYR macro incorrect if AR not matching GL.
+!!
+!![6] 06/26/96 ESE      NEW: Inform AR1OEU who we are - MUST have matching
+!!                      AR1OEU.RUN!!!
+!!
+!![7] 10/11/96 CAE      FIX: Mapped unmapped variable
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![8]  03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!![9]  05/14/97  ESE    NEW: Used ADDL
+!!
+!![10] 05/20/97  ESE   FIX: linker.cpy preserves PRT and LOC records.
+!!
+!!
+!![11] 06/10/97  ESE   FIX: write/nolock error fixed in vics.mac
+!!
+!![12] 09/22/97 SLM     NEW: Recompile with new BATBSC.MAC  This macro has
+!!                           been modified to search for gaps in AR batch
+!!                           numbers when the customer reaches 9999 batch.
+!!                           Requires environment variables ARGAP = "Y" and
+!!                           you can set a start batch with ARGAPBCH = ????
+!!                           or whatever start batch you want.
+!!
+
+\\SSRPTMAPS                     !!Standard report module maps
+GLOBAL SS'REPORT = "N"
+!!
+COPY    "FORMAD"
+!!
+\COPYF  LHS MODE="PRI"
+!!\COPYF  HHS OE HHS2 MODE="DTA"
+\COPYF  TRM AR MODE="PRI"
+\COPYF  DOC AR
+\COPYF  DOC AR DOC2
+\COPYF  DOC AR DOC3
+\COPYF  DOC AR DOC4                                             !![62]
+\COPYF  DHS AR                                                  !![31]
+\COPYF  BSC AR
+\COPYF  BAT AR
+\COPYF  BHS AR
+\COPYF  CHK AR
+\COPYF  BAT AR BAT2
+\COPYF  DST AR
+\COPYF  DST AR DST2
+\COPYF  AGE AR
+\COPYF  AGE AR AGE2 MODE="KEY"
+!!
+\COPYF  PRH IN MODE="PRI"
+\COPYF  APA IN MODE="PRI"
+\COPYF  CGL IN MODE="PRI"
+\COPYF  TBL IN MODE="PRI"
+\COPYF  STX IN STX2 MODE="PRI"
+\COPYF  MSG SY                                          !![7]
+!!
+MAP1 CNETP,B,5
+MAP1 CNETD,B,5
+MAP1 QQ,F
+MAP1 ZZ,F
+MAP1 LAST'SEQ,B,2
+MAP1 TTL'QTY,B,5
+!!
+COPY    "CVTMAP"
+!!
+!!MISC MAPS
+
+MAP1    LAST'TRN,B,2
+MAP1    LAST'TRN2,B,2
+MAP1    LAST'CHK'SEQ,B,2
+MAP1    APPLY'AMT,F
+MAP1    SAV'BO,B,5
+MAP1    SAV'PRICE,B,5
+MAP1    SAV'DISC,B,5
+MAP1    SHP'PRICE,B,5
+MAP1    SHP'DISC,B,5
+MAP1    SAV'STX1ABLE,B,5
+MAP1    SAV'STX2TOTAL,B,5
+MAP1    CAT'NO,B,2
+MAP1    APA'NO,B,2
+MAP1    TAX'PERC,F
+MAP1    SAV'RCN,B,4
+MAP1    APPLY'ERROR,B,1
+MAP1    LAST'PLN'NO,B,2
+MAP1    LAST'STX'NO,B,2
+MAP1    LAST'CMG'NO,B,3
+MAP1    NEW'INTERNAL,B,3
+MAP1    TQTY,B,5
+MAP1    SQTY,B,5
+MAP1    QFACTOR,F
+MAP1    PFACTOR,F
+MAP1    DFACTOR,F
+MAP1    BFACTOR,F
+MAP1    WORK'NET,B,5
+MAP1    BY'PLN(7),S,7
+MAP1    BOX'ORDER(7),S,1
+LCL1    BS'STX1,B,5                                             !![6]
+LCL1    BS'TOTAL,B,5                                            !![8]
+LCL1    SAV'BAT'RCN,B,4
+LCL1    SAV'BAT2'RCN,B,4
+
+MAP1    ACT
+        MAP2    MACT,B,2
+        MAP2    PTC,B,2
+        MAP2    CST,B,2
+
+MAP1    LAST'ACT
+        MAP2    LMACT,B,2
+        MAP2    LPTC,B,2
+        MAP2    LCST,B,2
+
+MAP1 TWOE'TOTALS,S
+        MAP2 OVR'STX
+                MAP3    TSTX1FINAL,B,5
+                MAP3    TSTX2FINAL,B,5
+        MAP2 OVR'STX2,@OVR'STX
+                MAP3    TSTX(2),B,5
+
+        MAP2 OVR'DISC
+                MAP3    TDISC,B,5
+                MAP3    TODISC,B,5
+                MAP3    TRETRO,B,5
+        MAP2 OVR'DISC2,@OVR'DISC
+                MAP3    TDISCS(3),B,5
+
+        MAP2    TSTX1'TAXABLE,B,5               !![20]
+
+        MAP2    TCD(6),B,5
+        MAP2    TVIA'SUM(2),B,5
+        MAP2    TOLD'DR,B,5
+        MAP2    TOLD'CR,B,5
+        MAP2    TOLD'CASH,B,5
+        MAP2    TTOTAL,B,5
+        MAP2    TTBL'AMT(7),B,5
+        MAP2    TWOE'COUNT,B,2
+
+!!BELOW USED IN AGING.CPY[SR]
+
+MAP1    II,F
+!![7]   MAP1    LAST'SEQ,B,2
+MAP1    LAST'RCN,B,4
+MAP1    LAST'DUE'RCN,B,4
+MAP1    OCCUR,F
+MAP1    AMT,B,5
+MAP1    WRH'FILL'YN,S,1,"N"
+MAP1    BALANCE,B,5
+MAP1    PAID,B,5
+MAP1    J,F
+
+ON ERROR GOTO PRE'ERTRAP
+
+OEPDOC:
+BEGIN:
+        \LNKIN
+
+                                !!MODIFY:  below if program name changed ...
+        IF PRGNAM = "OEXDO2" THEN
+                WRH'FILL'YN = "Y"
+                PRGNAM = "OEXDOC"
+        ENDIF
+
+MAP1 FROM'OE2CRE,S,1
+        XCALL GETENV,"FROM_OE2CRE",FROM'OE2CRE
+
+        IF FROM'OE2CRE # "Y" THEN FROM'OE2CRE = "N"
+        MAP1 FNAME,S,100
+        XCALL GETENV,"BAGGER_DEBUG",FNAME
+        IF LEN(FNAME) <= 1 OR FNAME = "N" THEN
+            FNAME = "/logs/oepdoc.DAILY"
+        ELSE
+            XCALL VICSIT,-107,FNAME
+        ENDIF
+
+        IF PRGNAM = "OEPEO2" THEN               !![17]
+                WRH'FILL'YN = "Y"               !![17]
+                PRGNAM = "OEPDOC"               !![17]
+        ENDIF                                   !![17]
+
+        IF PRGNAM # "OEPDOC" AND PRGNAM # "OEXDOC" THEN
+                ENTRY = "Cannot run program directly"
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                CALL DO'ERR
+                GOTO ABORT
+        ENDIF
+
+        LDUSR                   !!DO NOT NOT NOT USE SECURITY IN THIS PROGRAM
+        IF V''SYSTEM = "AMOS" THEN
+                IF V''JOBNAM[1;4] = "TASK" THEN IN'TB = 1
+        ELSE
+                IF UB'UID[1;4] = "TASK" THEN IN'TB = 1
+        ENDIF
+        IF V''JOBNAM[1;3] = "BGP" THEN IN'TB = 1
+        \READCTL APP="AR"
+        USE OC2 UB'CNO INTO OC2'REC
+        MAP1 BAGGER'BQUEUE,S,1
+        XCALL GETENV,"BQUEUE",BAGGER'BQUEUE
+        IF BAGGER'BQUEUE >= "1" AND BAGGER'BQUEUE <= "9" THEN
+            ENTRY = ""
+            \ADDPATH OUTPUT="ENTRY" APID="WL" MODE="P"
+            ENTRY = ENTRY + "x/bagger"+BAGGER'BQUEUE+".xml"
+            \DG LOADFILE BAGGER ENTRY ENTRY
+            IF DG'CTL = 0 THEN
+                \DG GETCHILD BAGGER monitor MONITOR
+                IF DG'CTL # 0 THEN
+                    ENTRY = "Must set up monitor in "+ENTRY
+                    \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                    CALL DO'ERRL
+                    GOTO ABORT
+                ENDIF
+
+                \DG GETVALUE MONITOR ipc_mqid MON'MQID
+                IF DG'CTL # 0 THEN
+                    ENTRY = "Must set up ipc_mqid in monitor in "+ENTRY
+                    \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                    CALL DO'ERRL
+                    GOTO ABORT
+                ENDIF
+            ENDIF
+        ENDIF
+
+!!NOTE:  HDR is already locked ... leave that way
+
+        IF HDR'PQU'STAT # "Q" OR HDR'ACTION = SPACE THEN
+                ENTRY = "Invalid HDR: "
+                \HDRERR APID="OE"
+                ENTRY = "Invalid HDR: PQU'STAT= "+HDR'PQU'STAT+" ACTION "+HDR'ACTION
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                CALL DO'ERRL
+                GOTO ABORT
+        ENDIF
+        CALL SET'VICS'PTRS
+        IF REPOSTING # 2 THEN
+                HHS'RCN = I
+                HHS'REC = HDR'REC
+        ELSE
+                RDLOCK HHS HDR'RCN INTO HHS'REC
+        ENDIF
+        IF WRH'FILL'YN = "Y" THEN                       !![17]
+                NEW'INTERNAL = HHS'INTERNAL             !![17]
+        ENDIF                                           !![17]
+
+        IF HHS'PROC = 5 THEN
+                CALL CLEAN'UP
+                END                     !!NO DOC FOR SHOP ORDER
+        ENDIF
+
+        IF HHS'CTL # 0 THEN
+                ENTRY = "Cannot read archived header: "
+                IF REPOSTING # 2 THEN
+                        \HDRERR APID="OE"
+                ELSE
+                        ENTRY = ENTRY + ":" + REPOSTING + " RCN="+HDR'RCN
+                ENDIF
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                CALL DO'ERRL
+                GOTO ABORT
+        ENDIF
+
+!!      HHS2'REC = HHS'REC
+
+MAP1 ORG'YEAR,B,1,0                                     !![25]
+MAP1 ORG'PERIOD,B,1,0                                   !![25]
+MAP1 ORG'BATCH,B,2,0                                    !![25]
+MAP1 ORG'TRN,B,2,0                                      !![25]
+MAP1 ORG'DTT,B,3,0                                      !![25]
+MAP1 CCAMT,B,5
+
+        IF REPOSTING # 0 CALL DEL'OLD'DOC
+!![54] - below
+        COPYF "CAPFIL",=CAP2,NOAFR
+        IF OEC'LOG'CRM = "Y" THEN
+                CALL DO'HDRSUM
+                IF DOC'AMT > 0 THEN
+                        CAP'SPACE = SPACE
+                        CAP'HDR'LOC'NO = HHS'LOC'NO
+                        CAP'DOC'TYPE = HHS'DOC'TYPE
+                        CAP'HDR'NO = HHS'NO
+                        CAP'SHIPMENT = HHS'SHIPMENT
+                        CAP'DTT = DATE
+                        CAP'IDTT = DATE
+                        IF HHS'HOLD'YN = "O" THEN
+                                CAP'UID = "~ERROR"
+                        ELSE
+                                CAP'UID = "~AUTO"
+                        ENDIF
+                        \SETKEY CAP MODE="KEY"
+                        ADD CAP FROM CAP'REC KEY CAP'KEY
+                        IF CAP'CTL = 0 THEN
+                                \SETKEY CAP MODE="KY2"
+                                \ADDKEY CAP MODE="KY2"
+                        ELSE
+                                CAP2'REC = CAP'REC
+                                RDLOCK CAP INTO CAP'REC KEY CAP'KEY
+                                IF HHS'HOLD'YN = "O" THEN
+                                        CAP2'DTT = CAP'DTT
+                                        CAP2'UID = CAP'UID
+                                ELSE
+                                        CAP'UID = "~AUTO"
+                                ENDIF
+                                IF CAP'REC # CAP2'REC THEN
+                                        \SETKEY CAP MODE="KY2"
+                                        CAP'REC = CAP2'REC
+                                        \UPDKEY CAP MODE="KY2"
+                                        WRITE CAP FROM CAP'REC
+                                ELSE
+                                        REL CAP
+                                ENDIF
+                        ENDIF
+                ENDIF
+        ENDIF
+!![54] - above
+
+        FOR I = 1 TO 7
+                IF VIA'TBL'NO(I) # 0 THEN
+                        TBL'KNO = VIA'TBL'NO(I)
+                        \VUSE TBL - V''PTR1
+                        IF TBL'CTL = 0 THEN
+                                IF VIA'SHP'FLAG = 1 AND TBL'BOX'ORDER = "B" THEN
+                                        TBL'BOX'ORDER = "O"
+                                ENDIF
+                                BY'PLN(I) = TBL'BY'PLN'YN
+                                BOX'ORDER(I) = TBL'BOX'ORDER
+                        ELSE
+                                ENTRY = "Invalid TBL: "+VIA'TBL'NO(I)+ "/ HHS="
+                                \LINERR PRE="LHS" APID="OE"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                CALL DO'ERRL
+                                GOTO ABORT
+                        ENDIF
+                ELSE
+                        BY'PLN(I) = "?"
+                        BOX'ORDER(I) = "?"
+                ENDIF
+        NEXT I
+
+        CALL GET'SF'TAXABLE
+        IF CUS'TAXABLE = "Y" OR CUS'TAXABLE = "S" OR SF = 0 THEN
+            TSTSTX = "S"
+            CALL COMPUTE'TTL'STX'PERC
+            TAX'PERC = TTL'STX'PERC
+        ELSE
+            TAX'PERC = 0
+        ENDIF
+        LHS'KHDR'LOC'NO = HHS'LOC'NO
+        LHS'KDOC'TYPE = HHS'DOC'TYPE
+        LHS'KHDR'NO = HHS'NO
+        LHS'KSHIPMENT = HHS'SHIPMENT
+        LHS'KNO = -1
+        USE LHS INTO LHS'REC KEY LHS'KEY
+        GETPRV LHS INTO LHS'REC
+        \CHKKEY PRE="LHS"
+        CCAMT = 0
+        IF LHS'CTL = 0 AND LHS'TRK'NO = OC2'TRK'NO THEN
+                                    !!Get credit card amount in LAST LHS
+            CCAMT = LHS'NET
+        ENDIF
+
+!!      CALL ZTOTAL
+
+        CALL FIND'BAT'DOC                       !!Must always do this
+                                                !!Even if reposting
+        BS'STX1 = 0                             !![6]
+        BS'TOTAL = 0                            !![8]
+!![11] - all of below
+        LWOE'RCN = 0
+        LWOE'II = 0
+        IF CACHE'TEST = "YES" AND CACHE'LHS'CNT <= CACHE'MAX1 THEN
+                FOR LHS'II = 1 TO CACHE'LHS'CNT
+                        LHS'REC = CACHE'LHS'REC(LHS'II)
+                        PRH'KTRK'NO = LHS'TRK'NO                !![20]
+                        CALL FIND'PRH
+                        IF PRH'CTL # 0 THEN
+!!SHOULD NEVER EVER HAPPEN ... BUT JUST IN CASE ...
+                                ENTRY  = "Part not found: "
+                                \KERROR PRE="LHS" APID="OE"
+                                CALL DO'ERRL
+                                ENTRY  = "Part not found in LHS: "+LHS'TRK'NO
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                        ELSE
+                                IF LHS'COM'QTY # 0 THEN
+                                    CALL ADD'WOE
+                                ENDIF
+                        ENDIF
+                NEXT LHS'II
+                LHS'CTL = 3
+        ELSE
+                LHS'KHDR'LOC'NO = HHS'LOC'NO
+                LHS'KDOC'TYPE = HHS'DOC'TYPE
+                LHS'KHDR'NO = HHS'NO
+                LHS'KSHIPMENT = HHS'SHIPMENT
+                LHS'KNO = 0
+                USE LHS INTO LHS'REC KEY LHS'KEY
+                DO
+                        GETNXT LHS INTO LHS'REC
+                        \CHKKEY PRE="LHS"
+                        IF LHS'CTL # 0 EXIT
+                        PRH'KTRK'NO = LHS'TRK'NO        !![20]
+                        CALL FIND'PRH                   !![11]
+                        IF PRH'CTL # 0 THEN
+!!SHOULD NEVER EVER HAPPEN ... BUT JUST IN CASE ...
+                                ENTRY  = "Part not found: "
+                                \HDRERR PRE="HHS" APID="OE"
+                                CALL DO'ERRL
+                                ENTRY  = "Part not found: TRK'NO = "+PRH'KTRK'NO
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+!!Invalid Distribution?
+                                ENTRY  = "Part not found: TRK'NO="+PRH'KTRK'NO+" LHS'KEY="
+                                \KERROR LHS MODE="D" CNO="N" APID="OE"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+                                REPEAT
+                        ENDIF
+                        IF LHS'COM'QTY = 0 THEN
+!!Invalid Distribution?
+                                ENTRY  = "LHS'COM'QTY=0 TRK'NO="+PRH'KTRK'NO+" LHS'KEY="
+                                \KERROR LHS MODE="D" CNO="N" APID="OE"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+                                REPEAT
+                        ENDIF
+                        CALL ADD'WOE
+                LOOP
+        ENDIF
+        CALL ROUND'WOE
+        CALL ADD'DST
+        CALL ADD'AGE
+        UPDATE DOC FROM DOC'REC
+        BAT'TRY'POST = SPACE
+        UPDATE BAT SAV'BAT'RCN FROM BAT'REC
+!!      IF HHS2'REC # HHS'REC THEN
+!!              UPDATE HHS FROM HHS'REC
+!!      ENDIF
+        IF OLD'DOC'RCN # 0 THEN
+                CALL CHECK'OLD'DOC
+        ENDIF
+        CALL CLEAN'UP
+END
+
+ABORT:                          !!Used for abnormal exit of program
+                                !!such as error conditions or user
+                                !!voluntary exit.
+        ENTRY = "PROGRAM ABORTED BY "+UB'UID+" OR ABNORMAL ERROR CONDITION"
+        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+        ENTRY = "ABORTED!!!!!"
+        \HDRERR
+        CALL SNDMON
+        PRGNAM="ABORT"
+        CALL CLEAN'UP
+END
+
+MAP1 WOE'OPEN,B,1                               !![15]
+
+CLEAN'UP:
+        I = HHS'RCN
+        IF WOE'OPEN = 1 THEN                    !![15]
+                UNLOCK WOE
+                WOE'RCN = 0 : REL WOE
+        ENDIF
+        LHS'RCN = 0 : REL LHS
+        BAT'RCN = 0 : REL BAT
+        DOC'RCN = 0 : REL DOC
+        DST'RCN = 0 : REL DST
+        AGE'RCN = 0 : REL AGE
+        BSC'RCN = 0 : REL BSC                   !![51]
+        IF PRGNAM # "ABORT" THEN PRGNAM = "GOOD"
+        HDR'REC = HHS'REC                       !!NEW
+        IF PRGNAM="GOOD" AND CTC > 0 AND CTC <= 200 THEN
+                PRGNAM="CTRLC"
+        ENDIF
+        \LNKOUT
+RETURN
+
+COPY    "FORMAT"
+COPY    "BASERR"
+!!!COPY "SETBAT",OEPDOC="Y"
+
+ADD'AGE:
+        CALL RECOMPUTE'AGING
+        DOC'AGE'TTL = DOC'AMT                           !Sum Of Aging Records
+RETURN
+
+COPY    "AGING[SR]",OEPOST="Y",APID="AR"                !!RECOMPUTE'AGING:
+
+PRE'UPDATE2:
+        UPDATE DOC FROM DOC'REC
+RETURN
+
+MAP1 WOE,F                              !![15]
+
+ADD'DST:
+        TWOE'TOTALS = SPACE
+        DOC'DST'COUNT = 0
+        IF MEM'WOE'CNT > 50 THEN
+                WOE'KPLN'NO = 0
+                WOE'KLIN'NO = 0
+                USE WOE INTO WOE'REC KEY WOE'KEY
+                GETNXT WOE INTO WOE'REC
+                LAST'PLN'NO = WOE'PLN'NO
+                LAST'STX'NO = WOE'STX'NO
+                LAST'CMG'NO = WOE'CMG'NO
+                DO UNTIL WOE'CTL # 0
+                    CALL PROC'WOE                   !![15]
+                    GETNXT WOE INTO WOE'REC
+                LOOP
+        ELSE
+                                                        !![15] - below
+                WOE'REC = MEM'WOE'REC(1)
+                LAST'PLN'NO = WOE'PLN'NO
+                LAST'STX'NO = WOE'STX'NO
+                LAST'CMG'NO = WOE'CMG'NO
+                CALL PROC'WOE
+                IF MEM'WOE'CNT > 1 THEN                 !![16]
+                    FOR WOE = 2 TO MEM'WOE'CNT
+                        WOE'REC = MEM'WOE'REC(WOE)
+                        CALL PROC'WOE
+                    NEXT WOE
+                ENDIF                                   !![16]
+        ENDIF
+        CALL BUILD'DST'RECORDS
+RETURN
+
+MAP1 SAV'CMG'NO,B,3
+
+PROC'WOE:
+        IF WOE'PLN'NO # LAST'PLN'NO     OR      &
+           WOE'CMG'NO # LAST'CMG'NO     OR      &
+           WOE'STX'NO # LAST'STX'NO CALL BUILD'DST'RECORDS
+        SAV'CMG'NO = WOE'CMG'NO
+        TTOTAL = TTOTAL + WOE'SHP'TOTAL
+        TDISC = TDISC + WOE'SHP'DISC
+        TSTX1FINAL = TSTX1FINAL + WOE'SHP'STX1
+        TSTX2FINAL = TSTX2FINAL + WOE'SHP'STX2
+        IF PRH'TAXABLE = "Y" THEN
+                TSTX1'TAXABLE = TSTX1'TAXABLE + WOE'SHP'STX1
+        ENDIF
+        IF OEC'PPRGNAM="OEPACK" THEN
+                FOR I = 1 TO 6
+                        TCD(I) = TCD(I) + WOE'CD(I)
+                NEXT I
+                TVIA'SUM(1) = TVIA'SUM(1) + WOE'VIA'SUM(1)
+                TVIA'SUM(2) = TVIA'SUM(2) + WOE'VIA'SUM(2)
+        ELSE
+                FOR I = 1 TO 7
+                        TTBL'AMT(I) = TTBL'AMT(I) + WOE'SHP'VTTL(I)
+                NEXT I
+                TODISC = TODISC + WOE'SHP'ODISC
+                TRETRO = TRETRO + WOE'SHP'RETRO
+        ENDIF
+RETURN
+
+MAP1 NEW'APA'NO,B,2                             !![32]
+
+BUILD'DST'RECORDS:
+        IF LAST'PLN'NO # APA'PLN'NO OR HHS'GL'CNO # APA'GL'CNO THEN
+                APA'KPLN'NO = LAST'PLN'NO
+                APA'KGL'CNO = HHS'GL'CNO
+                USE APA INTO APA'REC KEY APA'KEY
+        ENDIF
+        IF APA'CTL # 0 THEN
+                ENTRY = "Invalid G/L PLN: "+" HDR="+LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+WOE'LIN'NO+"/"+APA'KPLN'NO+"-"+APA'KGL'CNO
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                CALL DO'ERRL
+!!IF NOT FOUND USE FIRST LEGIT APA NUMBER
+                APA'KPLN'NO = 0
+                USE APA INTO APA'REC KEY APA'KEY
+                GETNXT APA INTO APA'REC
+                DO UNTIL APA'CTL # 0 OR APA'GL'CNO = HHS'GL'CNO
+                        GETNXT APA INTO APA'REC
+                LOOP
+                IF APA'CTL # 0 THEN
+                        ENTRY = "G/L distribution posting aborted "+V''JOBNAM[1,4]+" USER "+UB'UID+" PROGRAM "+PRGNAM
+                        CALL DO'ERRL
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                        GOTO BUILD'DST'DONE
+                ELSE
+                        ENTRY = "USED PLN: "+APA'PLN'NO+"/"+APA'GL'CNO
+                        CALL DO'ERRL
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                ENDIF
+        ENDIF
+        IF HHS'PROC < 1 OR HHS'PROC > 4 THEN HHS'PROC = 1
+        CALL CONVERT'APA
+
+        AMT = TTOTAL                            !Sales
+        CAT'NO = CAT'NO(HHS'PROC,1)             !Sales Cat
+        NEW'APA'NO = APA'NO(HHS'PROC)           !![32]
+        CALL SET'APA'NO                         !![32]
+        ACT = SALES'ACT(HHS'PROC,1)             !Sales account
+        IF PTC'BY'LOC(HHS'PROC,1) = "Y" THEN
+                IF LOC'PTC # "" THEN
+                        PTC = LOC'PTC
+                ENDIF
+        ENDIF
+        IF CST'BY'LOC(HHS'PROC,1) = "Y" THEN
+                IF LOC'CST # "" THEN
+                        CST = LOC'CST
+                ENDIF
+        ENDIF
+        CALL ADD'TO'DST
+
+        FOR I = 1 TO 7
+                CAT'NO = CAT'NO(HHS'PROC,2)     !Disc Cat
+                IF OEC'PPRGNAM="OEPACK" THEN
+                        IF I <= 6 THEN
+                                AMT = TCD(I)
+                                CAT'NO = OC2'CAT'NO(I)
+                        ELSE
+                                AMT = -TDISCS(1)
+                        ENDIF
+                ELSE
+                        IF I > 3 THEN
+                                I = 99
+                                GOTO NXT'I
+                        ENDIF
+                        AMT = -TDISCS(I)                !Discounts
+                        IF I = 2 AND OC2'CAT'NO(1) # 0 THEN
+                                CAT'NO = OC2'CAT'NO(1)
+                        ENDIF
+                        IF I = 3 AND OC2'CAT'NO(2) # 0 THEN
+                                CAT'NO = OC2'CAT'NO(2)
+                        ENDIF
+                ENDIF
+
+                NEW'APA'NO = APA'NO(HHS'PROC)           !![32]
+                CALL SET'APA'NO                         !![32]
+                ACT = SALES'ACT(HHS'PROC,2)     !Disc account
+                IF PTC'BY'LOC(HHS'PROC,2) = "Y" THEN
+                        IF LOC'PTC # "" THEN
+                                PTC = LOC'PTC
+                        ENDIF
+                ENDIF
+                IF CST'BY'LOC(HHS'PROC,2) = "Y" THEN
+                        IF LOC'CST # "" THEN
+                                CST = LOC'CST
+                        ENDIF
+                ENDIF
+                IF OEC'PPRGNAM="OEPACK" THEN
+                        IF I <= 6 THEN
+                          IF OC2'MACT(I) # 0 THEN
+                                ACT = OC2'ACT(I)
+                                IF LOC'PTC # "" THEN
+                                        IF OC2'LOC'P(I) = "Y" THEN PTC = LOC'PTC
+                                ENDIF
+                                IF LOC'CST # "" THEN
+                                        IF OC2'LOC'C(I) = "Y" THEN CST = LOC'CST
+                                ENDIF
+                          ENDIF
+                        ENDIF
+                ELSE
+                        IF I = 2 AND OC2'MACT(1) # 0 THEN
+                                ACT = OC2'ACT(1)
+                                IF LOC'PTC # "" THEN
+                                        IF OC2'LOC'P(1) = "Y" THEN PTC = LOC'PTC
+                                ENDIF
+                                IF LOC'CST # "" THEN
+                                        IF OC2'LOC'C(1) = "Y" THEN CST = LOC'CST
+                                ENDIF
+                        ENDIF
+                        IF I = 3 AND OC2'MACT(2) # 0 THEN
+                                ACT = OC2'ACT(2)
+                                IF LOC'PTC # "" THEN
+                                        IF OC2'LOC'P(2) = "Y" THEN PTC = LOC'PTC
+                                ENDIF
+                                IF LOC'CST # "" THEN
+                                        IF OC2'LOC'C(2) = "Y" THEN CST = LOC'CST
+                                ENDIF
+                        ENDIF
+                ENDIF
+                CALL ADD'TO'DST
+          NXT'I:
+        NEXT I
+        SAV'CMG'NO = WOE'CMG'NO
+        WOE'CMG'NO = 0                  !!Clear This!!!!
+                                        !!Unless you want it to look like
+                                        !!Tax and freight are getting comm.
+                                        !!NOTE: What's on the DST records
+                                        !!Really doesn't do any thing to
+                                        !!Commissions.  See ARCOM1 for
+                                        !!more info.
+CIF COMMENTS AND NOT COMMENTS THEN
+        Commission groups are put only on DST records that are comissionable,
+        not tax and freight, etc.  The DOC record MUST not have a CMG'NO
+        because this will cause those DST records that have no CMG'NO
+        to use the one on DOC.
+ENDCIF
+
+        FOR I = 1 TO 2
+                AMT = TSTX(I)
+                IF AMT # 0 THEN
+                        CGL'KTYPE = 1           !TAX
+                        IF I = 1 THEN
+                                CGL'KMAIN'NO = CUS'STX'NO
+                                        !![65] - if none, use control rec
+                                IF CGL'KMAIN'NO = 0 THEN
+                                        CGL'KMAIN'NO = ARC'STX'NO
+                                ENDIF
+                        ELSE
+!!Wrong                         CGL'KMAIN'NO = WOE'STX'NO
+                                CGL'KMAIN'NO = LAST'STX'NO
+
+                        ENDIF
+                        CGL'KGL'CNO = HHS'GL'CNO
+                        IF STX'BY'PLN'YN = "Y" THEN
+!![39]                          CGL'KPLN'NO = WOE'PLN'NO
+                                CGL'KPLN'NO = APA'PLN'NO        !![39]
+                        ELSE
+                                CGL'KPLN'NO = 0
+                        ENDIF
+                        CALL GET'CGL
+                        IF CGL'CTL # 0 THEN
+                                ENTRY = "INVALID G/L on STX/PLN "+CGL'KMAIN'NO+"/"+CGL'KPLN'NO+" ("+STX'BY'PLN'YN+"):"
+                                \LINERR PRE="LHS" APID="OE"
+                                CALL DO'ERRL
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                MACT = 9999
+                                PTC = 9999
+                                CST = 9999
+                                CAT'NO = 9999
+                                APA'NO = 9999
+                        ELSE
+                                ACT = CGL'ACT
+                                CAT'NO = CGL'CAT'NO
+                                NEW'APA'NO = CGL'AR'APA'NO              !![32]
+                                CALL SET'APA'NO                         !![32]
+                        ENDIF
+                        IF CGL'PTC'BY'LOC = "Y" THEN
+                                IF LOC'PTC # "" THEN
+                                        PTC = LOC'PTC
+                                ENDIF
+                        ENDIF
+                        IF CGL'CST'BY'LOC = "Y" THEN
+                                IF LOC'CST # "" THEN
+                                        CST = LOC'CST
+                                ENDIF
+                        ENDIF
+                        CALL ADD'TO'DST
+                ENDIF
+        NEXT I
+
+        IF OEC'PPRGNAM="OEPACK" THEN
+          MAP1 QQQ,F
+          FOR I = 1 TO 2
+            IF TVIA'SUM(I) # 0 THEN
+                CGL'KTYPE = 2           !FREIGHT
+                CGL'KMAIN'NO = 0
+                CGL'KGL'CNO = HHS'GL'CNO
+                FOR QQQ = 7 TO 1 STEP -1
+                        IF I = 1 THEN
+                                IF BOX'ORDER(QQQ) = "O" THEN
+                                        CGL'KMAIN'NO = VIA'TBL'NO(QQQ)
+                                ENDIF
+                        ELSE
+                                IF BOX'ORDER(QQQ) = "B" THEN
+                                        CGL'KMAIN'NO = VIA'TBL'NO(QQQ)
+                                ENDIF
+                        ENDIF
+                        IF BY'PLN(QQQ) = "Y" THEN
+                                CGL'KPLN'NO = APA'PLN'NO
+                        ELSE
+                                CGL'KPLN'NO = 0
+                        ENDIF
+                        IF (CGL'KMAIN'NO > 0) THEN
+                            QQQ = 0
+                        ENDIF
+                NEXT QQQ
+                IF CGL'KMAIN'NO = 0 THEN
+!!Should never happen
+                        CGL'KMAIN'NO = VIA'TBL'NO(1)
+                        IF BY'PLN(1) = "Y" THEN
+                                CGL'KPLN'NO = APA'PLN'NO
+                        ELSE
+                                CGL'KPLN'NO = 0
+                        ENDIF
+                ENDIF
+                AMT = TVIA'SUM(I)
+                CALL GET'CGL
+
+                IF CGL'CTL # 0 THEN
+                        ENTRY = "INVALID G/L on TBL/PLN "+CGL'KMAIN'NO+"/"+CGL'KPLN'NO+"/"+BY'PLN(I)+" HDR="+LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+WOE'LIN'NO
+                        CALL DO'ERRL
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                        MACT = 9999
+                        PTC = 9999
+                        CST = 9999
+                        CAT'NO = 9999
+                        APA'NO = 9999
+                ENDIF
+                ACT = CGL'ACT
+                CAT'NO = CGL'CAT'NO
+                NEW'APA'NO = CGL'AR'APA'NO
+                CALL SET'APA'NO
+                IF CGL'PTC'BY'LOC = "Y" THEN
+                        IF LOC'PTC # "" THEN
+                                PTC = LOC'PTC
+                        ENDIF
+                ENDIF
+                IF CGL'CST'BY'LOC = "Y" THEN
+                        IF LOC'CST # "" THEN
+                                CST = LOC'CST
+                        ENDIF
+                ENDIF
+                CALL ADD'TO'DST
+            ENDIF
+          NEXT I
+        ELSE
+          FOR I = 1 TO 7
+                AMT = TTBL'AMT(I)
+                IF AMT # 0 THEN
+                        IF I <= INC'MAX'VIA THEN
+                                CGL'KTYPE = 2           !FREIGHT
+                                CGL'KMAIN'NO = VIA'TBL'NO(I)
+                                CGL'KGL'CNO = HHS'GL'CNO
+                                IF BY'PLN(I) = "Y" THEN
+!![39]                                  CGL'KPLN'NO = WOE'PLN'NO
+                                        CGL'KPLN'NO = APA'PLN'NO        !![39]
+                                ELSE
+                                        CGL'KPLN'NO = 0
+                                ENDIF
+                                CALL GET'CGL
+                        ELSE
+                                CGL'CTL = 0
+                        ENDIF
+                        CASE
+                        IF CGL'CTL # 0 THEN
+                                ENTRY = "INVALID G/L on TBL/PLN "+CGL'KMAIN'NO+"/"+CGL'KPLN'NO+"/"+BY'PLN(I)+" HDR="+LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+WOE'LIN'NO
+                                CALL DO'ERRL
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                MACT = 9999
+                                PTC = 9999
+                                CST = 9999
+                                CAT'NO = 9999
+                                APA'NO = 9999
+                        ELSE
+                        IF I > INC'MAX'VIA THEN
+                                IF OC2'MACT(I-INC'MAX'VIA+2) # 0 THEN
+!!From Control record
+                                        ACT = OC2'ACT(I-INC'MAX'VIA+2)
+                                        IF LOC'PTC # "" THEN
+                                                IF OC2'LOC'P(I-INC'MAX'VIA+2) = "Y" THEN PTC = LOC'PTC
+                                        ENDIF
+                                        IF LOC'CST # "" THEN
+                                                IF OC2'LOC'C(I-INC'MAX'VIA+2) = "Y" THEN CST = LOC'CST
+                                        ENDIF
+                                ELSE
+!!Discount account
+                                        ACT = SALES'ACT(HHS'PROC,2)
+                                        IF PTC'BY'LOC(HHS'PROC,2) = "Y" THEN
+                                                IF LOC'PTC # "" THEN
+                                                        PTC = LOC'PTC
+                                                ENDIF
+                                        ENDIF
+                                        IF CST'BY'LOC(HHS'PROC,2) = "Y" THEN
+                                                IF LOC'CST # "" THEN
+                                                        CST = LOC'CST
+                                                ENDIF
+                                        ENDIF
+                                ENDIF
+                                IF OC2'CAT'NO(I-INC'MAX'VIA+2) # 0 THEN
+                                        CAT'NO = OC2'CAT'NO(I-INC'MAX'VIA+2)
+                                ELSE
+                                        CAT'NO = CAT'NO(HHS'PROC,2)     !Disc Cat
+                                ENDIF
+                                NEW'APA'NO = APA'NO(HHS'PROC)           !![32]
+                                CALL SET'APA'NO                         !![32]
+                        ELSE
+                                ACT = CGL'ACT
+                                CAT'NO = CGL'CAT'NO
+                                NEW'APA'NO = CGL'AR'APA'NO              !![32]
+                                CALL SET'APA'NO                         !![32]
+                                IF CGL'PTC'BY'LOC = "Y" THEN
+                                        IF LOC'PTC # "" THEN
+                                                PTC = LOC'PTC
+                                        ENDIF
+                                ENDIF
+                                IF CGL'CST'BY'LOC = "Y" THEN
+                                        IF LOC'CST # "" THEN
+                                                CST = LOC'CST
+                                        ENDIF
+                                ENDIF
+                        ENDCASE
+                        CALL ADD'TO'DST
+                ENDIF
+           NEXT I
+        ENDIF
+BUILD'DST'DONE:
+        WOE'CMG'NO = SAV'CMG'NO
+        TWOE'TOTALS = SPACE
+        LAST'PLN'NO = WOE'PLN'NO
+        LAST'STX'NO = WOE'STX'NO
+        LAST'CMG'NO = WOE'CMG'NO
+RETURN
+
+MAP1 MEM'DST                                    !![7]
+        MAP2 MEM'APA'NO(50),B,2
+        MAP2 MEM'CAT'NO(50),B,2
+        MAP2 MEM'CMG'NO(50),B,3
+        MAP2 MEM'ACT(50)
+                MAP3 MEM'MACT,B,2
+                MAP3 MEM'PTC,B,2
+                MAP3 MEM'CST,B,2
+        MAP2 MEM'DST'RCN(50),B,4
+        MAP2 MEM'CNT,B,1
+
+ADD'TO'DST:
+        IF AMT = 0 THEN
+!!Invalid Distribution?
+            ENTRY  = "ADD'TO'DST: AMT=0 RETURN. TRK'NO="+PRH'KTRK'NO+" LHS'KEY="
+            \KERROR LHS MODE="D" CNO="N" APID="OE"
+            \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+            RETURN                                       !!KLUDGE
+        ENDIF
+!![32]  IF CUS'APA'NO # 0 THEN
+!!              APA'NO = CUS'APA'NO
+!![32]  ENDIF
+        IF ARC'MULTI'APA = "N" THEN
+                APA'NO = 1
+        ENDIF
+!![7]   LAST'SEQ = 0
+        CASE
+        IF MEM'CNT = 0 THEN                                     !![7]
+                CALL NEW'DST
+        ELSE
+        IF MEM'CNT <= 50 THEN                                   !![7]
+                DST'RCN = 0
+                FOR II = 1 TO MEM'CNT
+                        IF APA'NO = MEM'APA'NO(II)              AND &
+                           CAT'NO = MEM'CAT'NO(II)              AND &
+                           WOE'CMG'NO = MEM'CMG'NO(II)          AND &
+                           ACT = MEM'ACT(II)                    THEN
+                                DST'RCN = MEM'DST'RCN(II)
+                                II = MEM'CNT + 1
+                        ENDIF
+                NEXT II
+                IF DST'RCN = 0 THEN
+                        CALL NEW'DST
+                ELSE
+                        CALL UPDATE'DST
+                ENDIF
+        ELSE
+                DST'KDOC'NO = DOC'ORG'NO
+                DST'KSEQ = 0
+                USE DST INTO DST'REC KEY DST'KEY
+                DO
+                        GETNXT DST INTO DST'REC
+                        CASE
+                        IF DST'CTL # 0 OR DST'DOC'NO # DOC'ORG'NO THEN
+                                CALL NEW'DST
+                                EXIT
+                        ELSE
+                        IF DST'CAT'NO = CAT'NO AND DST'ACT = ACT                AND &
+                                  DST'APA'NO = APA'NO AND DST'CMG'NO = WOE'CMG'NO THEN
+                                CALL UPDATE'DST
+                                EXIT
+                        ENDCASE
+!![7]                   LAST'SEQ = DST'SEQ
+                LOOP
+        ENDCASE
+RETURN
+
+UPDATE'DST:
+        RDLOCK DST
+        DST'AMT = DST'AMT + AMT
+        WRITE DST
+RETURN
+
+NEW'DST:
+        DST'SPACE = SPACE
+        DST'DOC'NO = DOC'ORG'NO
+!![7]   DST'SEQ = LAST'SEQ + 5
+        DST'SEQ = (MEM'CNT+1)*5                                 !![7]
+        DST'AMT = AMT
+        DST'CAT'NO = CAT'NO
+        DST'APA'NO = APA'NO
+        DST'GL'CNO = APA'GL'CNO
+        DST'ACT = ACT
+        DST'CMG'NO = WOE'CMG'NO
+        \SETKEY PRE="DST" MODE="KEY" APP="AR"
+        USE DST INTO DST'REC KEY DST'KEY
+!!Invalid Distribution log
+        IF DST'CTL = 0 THEN                !!WHY DOES IT EXIST?
+            ENTRY = "OEPDOC: Already exists?  DST'AMT="+DST'AMT+ &
+                " DOC'ORG'NO="+(DOC'ORG'NO USING "############")+" DST'KEY="
+            \KERROR DST MODE="D" CNO="N" APID="AR"
+            \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+        ENDIF
+
+        ADD DST FROM DST'REC KEY DST'KEY
+        IF DST'CTL = 0 THEN
+                \SETKEY PRE="DST" MODE="KY2" APP="AR"
+                \ADDKEY PRE="DST" MODE="KY2" APP="AR"
+                DOC'DST'COUNT = DOC'DST'COUNT + 1
+!!Invalid Distribution log
+                IF DST'AMT = 0 OR DST'MACT = 0 THEN
+                    ENTRY = "OEPDOC: DST'AMT="+DST'AMT+" DST'MACT="+DST'MACT+ &
+                    " DOC'ORG'NO="+(DOC'ORG'NO USING "############")+" DST'KEY="
+                    \KERROR DST MODE="D" CNO="N" APID="AR"
+                    \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+                ENDIF
+        ELSE
+                ENTRY = "Bad DST add:"
+                \KERROR DST APID="AR"
+                ENTRY = "Bad DST add: DOC'NO "+DST'DOC'NO+" SEQ "+DST'SEQ+" AMT "+DST'AMT+&
+                    " CAT'NO "+DST'CAT'NO+" APA NO "+DST'APA'NO+" GL'CNO "+DST'GL'CNO+&
+                        " ACT "+DST'ACT+" CMG'NO "+DST'CMG'NO
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+!!Invalid Distribution log
+                IF DST'AMT = 0 OR DST'MACT THEN
+                    ENTRY = "OEPDOC: Bad DST add: DST'AMT="+DST'AMT+" DST'KEY="
+                    \KERROR DST MODE="D" CNO="N" APID="AR"
+                    \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+                ENDIF
+                GOTO DO'ERRL                            !!KLUDGE [7]
+        ENDIF
+!![7] - below
+        MEM'CNT = MEM'CNT + 1
+        IF MEM'CNT <= 50 THEN
+                MEM'APA'NO(MEM'CNT) = DST'APA'NO
+                MEM'CAT'NO(MEM'CNT) = DST'CAT'NO
+                MEM'CMG'NO(MEM'CNT) = DST'CMG'NO
+                MEM'ACT(MEM'CNT) = DST'ACT
+                MEM'DST'RCN(MEM'CNT) = DST'RCN
+        ENDIF
+RETURN
+
+SET'APA'NO:                                     !![32] - made subroutine.
+!!Note: three APA number OVERRIDES with precedence in order
+!!      1) Terms, 2) Customer, 3) Location
+!!      If no override, then it is set from wherever (product line or
+!!              CGL or other source.
+        CASE
+        IF TRH'APA'NO # 0 THEN
+                APA'NO = TRH'APA'NO             !![22] - add this case
+        ELSE
+        IF CUS'APA'NO # 0 THEN                  !![32]
+                APA'NO = CUS'APA'NO             !![32]
+        ELSE                                    !![32]
+        IF LOC'AR'APA'NO(HHS'DOC'TYPE) # 0 THEN
+                APA'NO = LOC'AR'APA'NO(HHS'DOC'TYPE)
+        ELSE
+                APA'NO = NEW'APA'NO             !![32]
+        ENDCASE
+RETURN
+        TWOE'TOTALS = SPACE
+
+MAP1 MEM'WOE
+        MAP2 MEM'WOE'REC(51),X,102
+        MAP2 MEM'WOE'CNT,B,2
+
+MAP1 SHPFACTOR,F
+MAP1 LWOE'RCN,B,4
+MAP1 LWOE'II,B,1
+
+ADD'WOE:
+!!STX1 contains taxable amount at this point ...
+!!     factor in order discount throughout
+        WOE'SPACE = SPACE
+        WOE'LIN'NO = LHS'NO
+        WOE'PLN'NO = PRH'PLN'NO
+        WOE'TRK'NO = PRH'TRK'NO                 !![20]
+
+        QFACTOR = 10^LHS'QFRACTION
+        PFACTOR = 10^LHS'PFRACTION
+        IF (HHS'SHP'TOTAL-HHS'SHP'DISC) # 0 AND OEC'PPRGNAM # "OEPACK" THEN
+                DFACTOR = 1 - (HHS'SHP'ODISC+HHS'SHP'RETRO)/(HHS'SHP'TOTAL-HHS'SHP'DISC)
+        ELSE
+                DFACTOR = 1
+        ENDIF
+
+!![40] - replaced all net computations by macro.
+                                !!COMPUTE'NETS:
+        \COMNET NET'PRICE="WOE'SHP'TOTAL" NET'DISC="WOE'SHP'DISC"
+
+MAP1 MOD'BASE,B,5
+
+        IF PRH'QTD'COUNT # 0 THEN
+            MOD'BASE = WOE'SHP'TOTAL
+            \FROUND MOD'BASE/10 WOE'SHP'TOTAL
+        ENDIF
+
+        WORK'NET = WOE'SHP'TOTAL - WOE'SHP'DISC
+
+!!BFACTOR IS FRACTION OF INVOICE CHARGES THAT GO TO THIS WOE RECORD
+!!                      (E.G. THIS LINE ITEM)
+!!
+        IF (HHS'SHP'TOTAL-HHS'SHP'DISC) # 0 THEN
+            BFACTOR = WORK'NET / (HHS'SHP'TOTAL-HHS'SHP'DISC)
+!!SHPFACTOR is percentage of freight per WOE (and if no CCAMT same as BFACTOR)
+            IF CCAMT = 0 THEN
+                SHPFACTOR = BFACTOR
+            ELSE
+                IF LHS'TRK'NO = OC2'TRK'NO THEN
+                    SHPFACTOR = 0
+                ELSE
+!!Computed amount based on total less CCAMT
+                    SHPFACTOR = WORK'NET / (HHS'SHP'TOTAL-HHS'SHP'DISC-CCAMT)
+                ENDIF
+            ENDIF
+        ELSE
+            BFACTOR = 1
+            SHPFACTOR = 1
+        ENDIF
+        CASE
+        IF PRH'TAXABLE = "Y" AND TAX'PERC # 0 THEN
+                IF OEC'UK'VAT'YN # "Y" THEN
+                        \FROUND (DFACTOR*WORK'NET*TAX'PERC)/10000 WOE'SHP'STX1
+                ELSE
+                                CIF COMMENTS AND NOT COMMENTS THEN
+                                        IGNORE DECIMALS AND USE BELOW
+                                                EXAMPLE:
+                                        WORK'NET = 100.00 (LINE ITEM NET)
+                                        TAX'PERC = 10.00
+                                        TRH'MPERC = 5.00
+                                        DFACTOR = 1 (NO ORDER DISCOUNT)
+                                ENDCIF
+                        \FROUND DFACTOR*WORK'NET*TAX'PERC/10000 II
+!!                              II = 10.00
+                        \FROUND II+((DFACTOR*WORK'NET)*(1-(TRH'MPERC/10000))) II
+!!                              II = 10.00 + ((100.00 X .95) = 105.00
+                        \FROUND II-(II/(1+(TAX'PERC/10000))) WOE'SHP'STX1
+!!                              105.00-(105.00/(1.1) = 9.55 = REALLY THE TAX
+                        \FROUND (DFACTOR*WORK'NET*TAX'PERC)/10000 II
+!!                              100.00 * .1 = 10.00 = II
+                        WOE'SHP'TOTAL = WOE'SHP'TOTAL - WOE'SHP'STX1 + II
+!!                              SHP'TOTAL = 100.45, SHP'STX1 = 9.55
+                ENDIF
+        ELSE
+        IF PRH'TAXABLE = "I" AND TAX'PERC # 0 THEN
+!![6] - this case
+                IF OEC'UK'VAT'YN # "Y" THEN
+                        II = WOE'SHP'TOTAL
+                        \FROUND WOE'SHP'TOTAL/(1+(TAX'PERC/10000)) WOE'SHP'TOTAL
+                        \FROUND (II-WOE'SHP'TOTAL)*DFACTOR WOE'SHP'STX1
+                ELSE
+                                CIF COMMENTS AND NOT COMMENTS THEN
+                                        110.00 = WORK'NET
+                                         10.00% TAX'PERC
+                                          5.00% TRH'MPERC
+                                        NOTE:  same example as above!
+                                               used 110.00 because tax
+                                               included.
+                                ENDCIF
+                        QQ = WORK'NET
+                        \FROUND WORK'NET/(1+(TAX'PERC/10000)) WORK'NET
+                        II = QQ - WORK'NET              !![26]
+                        \FROUND II+((DFACTOR*WORK'NET)*(1-(TRH'MPERC/10000))) II
+                        \FROUND II-(II/(1+(TAX'PERC/10000))) WOE'SHP'STX1
+                        II = QQ - WORK'NET              !![26]
+                        WOE'SHP'TOTAL = WORK'NET - WOE'SHP'STX1 + II
+                        WORK'NET = QQ                   !!Got it back
+
+
+                ENDIF
+                BS'STX1 = BS'STX1 + WOE'SHP'STX1
+                BS'TOTAL = BS'TOTAL + WOE'SHP'TOTAL             !![8]
+        ELSE
+                WOE'SHP'STX1 = 0
+        ENDCASE
+        TSTX1FINAL = TSTX1FINAL + WOE'SHP'STX1
+!![20] Below
+        IF PRH'TAXABLE = "Y" THEN
+                TSTX1'TAXABLE = TSTX1'TAXABLE + WOE'SHP'STX1
+        ENDIF
+!![20] Above
+
+        IF PRH'STX'NO # 0 AND (CUS'TAXABLE = "Y" OR CUS'TAXABLE = "E") THEN
+                STX2'KLOC'NO = LHS'LOC'NO
+                STX2'KNO = PRH'STX'NO
+                CALL GET'STX2
+                IF STX2'CTL # 0 THEN
+                    ENTRY = "Warning:  part tax bad:  HDR="+LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+LHS'NO
+                    CALL DO'ERRL
+                    \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                    TTL'STX2'PERC = 0
+                ELSE
+                    TSTSTX = "E"
+                    CALL COMPUTE'TTL'STX2'PERC
+                ENDIF
+                \FROUND WORK'NET*TTL'STX2'PERC/10000 WOE'SHP'STX2
+                WOE'STX'NO = STX2'NO
+        ELSE
+                WOE'SHP'STX2 = 0
+        ENDIF
+        TSTX2FINAL = TSTX2FINAL + WOE'SHP'STX2
+
+        IF OEC'PPRGNAM="OEPACK" THEN
+                FOR II = 1 TO 6
+                        \FROUND (HHS'CD(II)*SHPFACTOR) WOE'CD(II)
+                        TCD(II) = TCD(II) + WOE'CD(II)
+                NEXT II
+                \FROUND HHS'VIA'SUM(1)*SHPFACTOR WOE'VIA'SUM(1)
+                TVIA'SUM(1) = TVIA'SUM(1) + WOE'VIA'SUM(1)
+                \FROUND HHS'VIA'SUM(2)*SHPFACTOR WOE'VIA'SUM(2)
+                TVIA'SUM(2) = TVIA'SUM(2) + WOE'VIA'SUM(2)
+        ELSE
+                FOR II = 1 TO 7
+                        \FROUND (HHS'SHP'VTTL(II)*SHPFACTOR) WOE'SHP'VTTL(II)
+                        TTBL'AMT(II) = TTBL'AMT(II) + WOE'SHP'VTTL(II)
+                NEXT II
+                \FROUND HHS'SHP'ODISC*SHPFACTOR WOE'SHP'ODISC
+                TODISC = TODISC + WOE'SHP'ODISC
+                \FROUND HHS'SHP'RETRO*SHPFACTOR WOE'SHP'RETRO
+                TRETRO = TRETRO + WOE'SHP'RETRO
+        ENDIF
+
+        \FROUND HHS'OLD'CR*BFACTOR WOE'OLD'CR
+        TOLD'CR = TOLD'CR + WOE'OLD'CR
+
+        \FROUND HHS'OLD'DR*BFACTOR WOE'OLD'DR
+        TOLD'DR = TOLD'DR + WOE'OLD'DR
+
+        \FROUND HHS'OLD'CASH*BFACTOR WOE'OLD'CASH
+        TOLD'CASH = TOLD'CASH + WOE'OLD'CASH
+
+        WOE'PLN'NO = PRH'PLN'NO
+        IF INC'INTERFACE = 5 THEN
+            WOE'CMG'NO = HHS'CMG'NO
+        ELSE
+            WOE'CMG'NO = LHS'CMG'NO
+        ENDIF
+        TWOE'COUNT = TWOE'COUNT + 1
+
+        IF MEM'WOE'CNT <= 50 THEN                               !![15]
+                MEM'WOE'CNT = MEM'WOE'CNT + 1
+                MEM'WOE'REC(MEM'WOE'CNT) = WOE'REC
+                IF LHS'TRK'NO # OC2'TRK'NO THEN
+                    LWOE'II = MEM'WOE'CNT
+                    LWOE'RCN = 0
+                ENDIF
+                IF MEM'WOE'CNT = 51 THEN
+                        DO
+                                \CLRWOE
+                                IF WOE'CTL # 0 THEN
+                                        ENTRY = "All work files currently in use, please try again later"
+                                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                        CALL DO'ERRL
+                                        IF IN'BGP # 0 GOTO ABORT
+                                        \SLEEP 5
+                                ENDIF
+                        LOOP UNTIL WOE'CTL = 0
+                        WOE'OPEN = 1
+                        FOR WOE = 1 TO 51
+                                WOE'REC = MEM'WOE'REC(WOE)
+                                \SETKEY PRE="WOE" MODE="KEY"
+                                ADD WOE FROM WOE'REC KEY WOE'KEY
+                                IF WOE'CTL # 0 THEN
+                                        ENTRY = "ERROR - MEM Unable to add work file record "+WOE'PLN'NO+" "+WOE'CMG'NO+" "+WOE'LIN'NO
+                                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                        CALL DO'ERRL            !!09/19/90 ESE  (add L not compiled)
+                                ENDIF
+                        NEXT WOE
+                ENDIF
+        ELSE
+                \SETKEY PRE="WOE" MODE="KEY"
+                ADD WOE FROM WOE'REC KEY WOE'KEY
+!![9] Below
+                IF WOE'CTL # 0 THEN
+                        ENTRY = "ERROR - Unable to add work file record "+WOE'PLN'NO+" "+WOE'CMG'NO+" "+WOE'LIN'NO
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                        CALL DO'ERRL            !!09/19/90 ESE  (add L not compiled)
+                ENDIF
+                IF LHS'TRK'NO # OC2'TRK'NO THEN
+                    LWOE'II = 0
+                    LWOE'RCN = WOE'RCN
+                ENDIF
+        ENDIF
+!![9] Above
+RETURN
+
+ROUND'WOE:
+!!
+!!This fixes round-off on last WOE for ship via charges charged by the
+!!order and distributed over each box
+!!
+        IF TWOE'COUNT = 0 THEN
+                ENTRY = "Cannot ship - no line items to ship: "+" HDR="+LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+HHS'SHIPMENT
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                CALL DO'ERRL
+                RETURN
+        ENDIF
+        IF MEM'WOE'CNT > 50 THEN                        !![15]
+                RDLOCK WOE
+                IF WOE'CTL # 0 THEN
+                        ENTRY = "ERROR - Unable to read work file record "+WOE'PLN'NO+" "+WOE'CMG'NO+" "+WOE'LIN'NO
+                        CALL DO'ERR
+                        RETURN
+                ENDIF
+        ENDIF
+        SF = 0
+        IF CCAMT # 0 AND (LWOE'II # 0 OR LWOE'RCN # 0) THEN
+            IF MEM'WOE'CNT <= 50 AND MEM'WOE'CNT = LWOE'II  THEN SF = 1
+            IF MEM'WOE'CNT > 50 AND WOE'RCN = LWOE'RCN THEN SF = 1
+        ENDIF
+        IF SF = 0 THEN
+            IF OEC'PPRGNAM = "OEPACK" THEN
+                FOR II = 1 TO 6
+                    WOE'CD(II) = HHS'CD(II) -       &
+                                        TCD(II) + WOE'CD(II)
+                NEXT II
+                WOE'VIA'SUM(1) = HHS'VIA'SUM(1) - TVIA'SUM(1) + WOE'VIA'SUM(1)
+                WOE'VIA'SUM(2) = HHS'VIA'SUM(2) - TVIA'SUM(2) + WOE'VIA'SUM(2)
+            ELSE
+                FOR II = 1 TO 7
+                    WOE'SHP'VTTL(II) = HHS'SHP'VTTL(II) -   &
+                                        TTBL'AMT(II) + WOE'SHP'VTTL(II)
+                NEXT II
+                WOE'SHP'ODISC = HHS'SHP'ODISC - TODISC + WOE'SHP'ODISC
+                WOE'SHP'RETRO = HHS'SHP'RETRO - TRETRO + WOE'SHP'RETRO
+            ENDIF
+        ENDIF
+!![6] - below added BS'STX1
+        IF OEC'UK'VAT'YN = "Y" THEN
+!![8]           WORK'NET = HHS'SHP'TOTAL-HHS'SHP'DISC
+!![8] Below
+                WORK'NET = HHS'SHP'TOTAL-HHS'SHP'DISC - BS'STX1 - BS'TOTAL
+!![8] Above
+                \FROUND DFACTOR*WORK'NET*TAX'PERC/10000 II
+                \FROUND II+((DFACTOR*WORK'NET)*(1-(TRH'MPERC/10000))) II
+                \FROUND II-(II/(1+(TAX'PERC/10000))) II
+                II = HHS'STX1FINAL - II         !![8]
+!![8]           II = (HHS'STX1FINAL - II) - (TSTX1FINAL - BS'STX1)
+!!
+                WOE'SHP'STX1 = WOE'SHP'STX1 + II
+                TSTX1'TAXABLE = TSTX1'TAXABLE + II              !![20]
+                WOE'SHP'STX1 = HHS'STX1FINAL - TSTX1'TAXABLE + WOE'SHP'STX1 !![20]
+                WOE'SHP'TOTAL = WOE'SHP'TOTAL - II
+        ELSE
+                WOE'SHP'STX1 = HHS'STX1FINAL - (TSTX1FINAL - BS'STX1) + WOE'SHP'STX1
+        ENDIF
+        WOE'SHP'STX2 = HHS'STX2FINAL - TSTX2FINAL + WOE'SHP'STX2
+        WOE'OLD'CR = HHS'OLD'CR - TOLD'CR + WOE'OLD'CR
+        WOE'OLD'DR = HHS'OLD'DR - TOLD'DR + WOE'OLD'DR
+        WOE'OLD'CASH = HHS'OLD'CASH - TOLD'CASH + WOE'OLD'CASH
+        IF MEM'WOE'CNT > 50 THEN                        !![15]
+            WRITE WOE
+        ELSE
+            MEM'WOE'REC(MEM'WOE'CNT) = WOE'REC
+        ENDIF
+        SF = 0
+        IF CCAMT # 0 AND (LWOE'II # 0 OR LWOE'RCN # 0) THEN
+            IF MEM'WOE'CNT <= 50 AND MEM'WOE'CNT = LWOE'II THEN SF = 1
+            IF MEM'WOE'CNT > 50 AND WOE'RCN = LWOE'RCN THEN SF = 1
+        ENDIF
+        IF SF # 0 THEN
+            IF LWOE'II # 0 THEN
+                WOE'REC = MEM'WOE'REC(LWOE'II)
+            ELSE
+                RDLOCK WOE LWOE'RCN INTO WOE'REC
+            ENDIF
+            IF OEC'PPRGNAM = "OEPACK" THEN
+                FOR II = 1 TO 6
+                    WOE'CD(II) = HHS'CD(II) -       &
+                                        TCD(II) + WOE'CD(II)
+                NEXT II
+                WOE'VIA'SUM(1) = HHS'VIA'SUM(1) - TVIA'SUM(1) + WOE'VIA'SUM(1)
+                WOE'VIA'SUM(2) = HHS'VIA'SUM(2) - TVIA'SUM(2) + WOE'VIA'SUM(2)
+            ELSE
+                FOR II = 1 TO 7
+                    WOE'SHP'VTTL(II) = HHS'SHP'VTTL(II) -   &
+                                        TTBL'AMT(II) + WOE'SHP'VTTL(II)
+                NEXT II
+                WOE'SHP'ODISC = HHS'SHP'ODISC - TODISC + WOE'SHP'ODISC
+                WOE'SHP'RETRO = HHS'SHP'RETRO - TRETRO + WOE'SHP'RETRO
+            ENDIF
+            IF LWOE'II # 0 THEN
+                MEM'WOE'REC(LWOE'II) = WOE'REC
+            ELSE
+                WRITE WOE FROM WOE'REC
+            ENDIF
+        ENDIF
+RETURN
+
+GET'CGL:                !![38] - test PLN'NO below.
+        IF CGL'KTYPE # CGL'TYPE OR CGL'KMAIN'NO # CGL'MAIN'NO   &
+                                OR CGL'KGL'CNO # CGL'GL'CNO OR  &
+                                  CGL'KPLN'NO # CGL'PLN'NO THEN
+                USE CGL INTO CGL'REC KEY CGL'KEY
+        ENDIF
+RETURN
+
+FIND'BAT'DOC:
+!![12] - Below
+!!      IF OEC'IDTTO # "Y" THEN
+!!              DTT = DATE
+!!      ELSE
+!!              DTT = HHS'ORDER'DTT
+!!      ENDIF
+!![25] Below
+        CASE
+        IF ORG'DTT # 0 THEN
+                DTT = ORG'DTT
+        ELSE
+!![25] Above
+        IF OEC'IDTTO = "Y" THEN
+                DTT = HHS'ORDER'DTT
+        ELSE
+        IF OEC'IDTTO = "P" THEN
+                DTT = HHS'PROM'DTT
+        ELSE
+                DTT = DATE
+        ENDCASE
+!![12] - Above
+        \READCTL APID="AR" GL="N"
+!![25] Below
+        IF ORG'BATCH # 0 THEN
+                BAT'KTYPE = 1
+                BAT'KYEAR = ORG'YEAR
+                BAT'KBATCH = ORG'BATCH
+                RDLOCK BAT INTO BAT'REC KEY BAT'KEY
+                IF BAT'CTL = 0 THEN
+                        IF BAT'PQU'STAT = "Q" CALL CHECK'PQU
+                        IF BAT'STAT # "U" OR                             &
+                        BAT'PERIOD # ORG'PERIOD OR                       &
+                        BAT'PQU'STAT = "Q" OR                            &
+                        (BAT'TRY'POST # "" AND BAT'TRY'POST # "OEPDOC")&
+                                                                        THEN
+                                REL BAT
+                                BAT'CTL = 3  !!FAKE IT OUT TO GET NEW BATCH
+                        ENDIF
+                ENDIF
+        ENDIF
+        IF ORG'BATCH = 0 OR BAT'CTL # 0 THEN
+!![25] Above
+                MAP1 VOCC,B,1
+                MAP1 VD,S,10
+                MAP1 OE1WGA'TYP'APA,B,2
+
+                XCALL GETENV,"OE1WGA_TYP_FORMAT",ENTRY
+                I = INSTR(1,ENTRY,"_")
+                IF I # 0 THEN
+                    OE1WGA'TYP'APA = VAL(ENTRY[1,I-1])
+                    IF TRH'APA'NO # OE1WGA'TYP'APA THEN
+                        I = 0
+                    ENDIF
+                ENDIF
+                IF I # 0 THEN
+                    VOCC = 8
+                    VD = "POS"
+                ELSE
+                    VOCC = 1
+                    VD = "Invoice"
+                ENDIF
+                \BATBSC VDESC="VD" APID="AR" PRGNAM="OEPDOC"        &
+                        DTT="DTT" SOURCE="OE" OCCUR="VOCC" BTYPE="1"       &
+                        LAST'TRN="LAST'TRN" MODE="MOD'MODE" FIND'MODE="""A"""
+        ENDIF                                                   !![25]
+        SAV'BAT'RCN = BAT'RCN
+        BAT'TRY'POST = "OEPDOC"
+        UPDATE BAT
+        CALL ADD'DOC
+RETURN
+
+!![25] Below
+COPYF "WK4FIL[AR]"
+
+CHECK'PQU:
+        \CHKPQU PRGNAM="ARRELP" PASREC="WK4'REC"      &
+                                       SF'TEST=CHECK'BATCHES
+        IF SF = 1 THEN
+                BAT'PQU'STAT = "N"
+                UPDATE BAT FROM BAT'REC
+        ENDIF
+RETURN
+
+CHECK'BATCHES:
+        IF WK4'YEAR = BAT'YEAR AND                              &
+           BAT'BATCH >= WK4'START'BCH AND                       &
+           BAT'BATCH <= WK4'END'BCH AND                 &
+                  ((WK4'PRINT'CODE = "P" AND BAT'STAT = "U")    &
+                                        OR                              &
+                   (WK4'PRINT'CODE = "G" AND BAT'STAT = "P")    &
+                                        OR                              &
+                   (WK4'PRINT'CODE = "R" AND BAT'STAT = "G")) THEN
+                SF = 0
+        ENDIF
+RETURN
+!![25] Above
+
+COPYF "CMNFIL[SY]"
+MAP1 CMN'EXTRA
+        MAP2 XCR'INV'TYPE,B,1
+        MAP2 XCR'INVOICE,B,3
+        MAP2 XDR'INV'TYPE,B,1
+        MAP2 XDR'INVOICE,B,3
+        MAP2 XAPL'AMT,B,5
+        MAP2 XAPL'DTT,B,3
+        MAP2 XAPL'CUS'NO,B,3
+        MAP2 APL'SOURCE,S,2
+MAP1 FLAG,B,1
+
+
+!!Add DOC record
+ADD'DOC:
+        CALL SET'DOC'FIELDS
+        CALL ADD'DOC'RECORD
+        !!We don't allow cash to drive positive invoice to a negative
+        IF HHS'OLD'CASH > 0 AND DOC'AMT > 0 THEN
+                HHS'OLD'CASH = HHS'OLD'CASH MIN DOC'AMT
+        ENDIF
+        IF OEC'CR'PO = "Y" AND DOC'AMT < 0 AND &
+                        (HHS'PO[2;1] = "-" OR UCS(HHS'PO[-1,-1]) = "R") THEN
+                CALL CREATE'CREDIT'APPLY'TOS
+        ENDIF
+        IF HHS'OLD'CASH # 0 THEN
+                CALL CREATE'CASH'APPLICATIONS
+        ENDIF
+        !!Send FLiP alarm
+        IF CUS'FLPALM'UID # "" THEN
+                IF CUS'FLPALM'UID = "SELF" THEN CUS'FLPALM'UID = UB'UID
+                DTT = DOC'ORG'DDTT
+                CALL CNV'DTT
+                YDAYS = YDAYS - (CUS'FLPALM MAX 1)
+                CALL UCNV'DTT
+                \STRDTT DTT="DOC'ORG'DDTT" DDATE="ENTRY"
+                ENTRY = "Due from "+LST'COMPANY+" on "+ENTRY+" for "+((DOC'AMT/100) USING "$$###,###.##-")+" inv: "+STR(DOC'INV'TYPE)+"-"+STR(DOC'INVOICE)
+                \FLPALM ENTRY TO="CUS'FLPALM'UID" FROM="UB'UID" &
+                                        DATE="DTT" TIME="28800" RPT="2"
+        ENDIF
+RETURN
+
+SET'DOC'FIELDS:
+        DOC'SPACE = SPACE
+        DOC'CUS'NO = HHS'NAM'NO                         !Customer Number
+        IF OEC'IDTTO = "Y" THEN
+                DOC'DTT = HHS'ORDER'DTT
+        ELSE
+        IF OEC'IDTTO = "P" THEN
+                DOC'DTT = HHS'PROM'DTT
+        ELSE
+                DOC'DTT = HHS'PSTDT                             !![23]
+        ENDIF
+        ENDIF
+        DOC'ORG'DTT = DOC'DTT                           !Date Of Original Document
+        DOC'INV'TYPE = HHS'DOC'TYPE                     !Invoice Type
+        CALL SET'NEW'INTERNAL
+        DOC'INVOICE = NEW'INTERNAL
+        DOC'HDR'LOC'NO = HHS'LOC'NO                     !OE Location
+        DOC'DOC'TYPE = HHS'DOC'TYPE                     !OE Doc Type
+        DOC'HDR'NO = HHS'NO                             !OE Order Number
+        DOC'SHIPMENT = HHS'SHIPMENT                     !OE Shipment
+        CASE
+        IF HHS'PO # "" THEN
+                DOC'PO = HHS'PO                                 !Purchase Order #
+        ELSE
+        IF OEC'PO'UKY # 0 THEN
+                UKY'KKY = OEC'PO'UKY + 10
+                UKY'KHDR'LOC'NO = HHS'LOC'NO
+                UKY'KDOC'TYPE = HHS'DOC'TYPE
+                UKY'KHDR'NO = HHS'NO
+                UKY'KSHIPMENT = HHS'SHIPMENT
+                USE UKY INTO UKY'REC KEY UKY'KEY
+                IF UKY'CTL = 0 THEN
+                        DOC'PO = UKY'NO
+                ENDIF
+        ENDCASE
+        DOC'STAT = "U"                                  !Posting Status
+        CALL DO'HDRSUM
+        CASE
+        IF HHS'PROC = 1 THEN
+                DOC'GRP'NO = OEC'GRP'NO1(HHS'DOC'TYPE)  !Distribution Group Number
+        ELSE
+        IF HHS'PROC = 2 THEN
+                DOC'GRP'NO = OEC'GRP'NO2(HHS'DOC'TYPE)  !Distribution Group Number
+        ELSE
+        IF HHS'PROC = 3 THEN
+                DOC'GRP'NO = OEC'GRP'NO3(HHS'DOC'TYPE)  !Distribution Group Number
+        ELSE
+        IF HHS'PROC = 4 THEN
+                DOC'GRP'NO = OEC'GRP'NO4(HHS'DOC'TYPE)  !Distribution Group Number
+        ELSE
+                DOC'GRP'NO = 9999       !!FIX LATER
+        ENDCASE
+        DOC'TRH'NO = HHS'TRH'NO                         !Payment Terms
+        DOC'PRINT'YN = "N"                              !Print Deposit slip Y/N
+        IF OEC'CRL'FLAG = 5 THEN DOC'INTERUPT = "X"     !![27]
+RETURN
+
+ADD'DOC'RECORD:
+        DOC'TYPE = 1                                    !Batch type (1,2,3)
+        DOC'YEAR = BAT'YEAR                             !Year
+        DOC'BATCH = BAT'BATCH                           !Batch Number
+        DOC'PERIOD = BAT'PERIOD                         !Period
+
+!!UPDATE HHS WITH NEW INVOICE NUMBER BEFORE ADDING INVOICE!!!!!!!
+        HHS'INV'YN = "N"                !!CLEAR FLAG
+        HHS'INTERNAL = DOC'INVOICE      !!SET INVOICE NUMBER
+        HHS'YEAR = BAT'YEAR
+        HHS'PERIOD = BAT'PERIOD
+
+!!Malvern - After Malvern we do not run an end of day manifest rpt
+MAP1 THIS'UDT,B,4
+        CALL UPDATE'MANIFEST    !!Verify that every BOX'REC has a tracking #
+        HHS'MAN'DTT = DATE
+        HHS'MAN'YN = "U"
+        \S'TO'U THIS'UDT
+        HHS'MAN'UDT = THIS'UDT
+
+        UPDATE HHS FROM HHS'REC         !!UPDATE BEFORE ADDING DOC
+                                        !!SO DEL'OLD'DOC BEHAVES ...
+!!ADD NEW INVOICE
+        DOC'TRN = LAST'TRN                              !Transaction Number
+        DO
+                IF ORG'TRN = 0 THEN                     !![25]
+                        DOC'TRN = DOC'TRN + 1
+                ELSE
+                        DOC'TRN = ORG'TRN
+                ENDIF
+                \CNVDOC NPRE="DOC'ORG" DPRE="DOC"       !Orginal Document Number
+                \SETKEY PRE="DOC" MODE="KEY" APP="AR"
+!![9]          ADD DOC FROM DOC'REC KEY DOC'KEY
+                ADDL DOC FROM DOC'REC KEY DOC'KEY           !![9]
+        LOOP UNTIL DOC'CTL = 0 OR DOC'TRN > 9999
+        IF DOC'CTL # 0 THEN
+                REL BAT
+                CALL GET'BATCH
+                GOTO ADD'DOC'RECORD
+        ENDIF
+        LAST'TRN = DOC'TRN
+!![9]  RDLOCK DOC INTO DOC'REC KEY DOC'KEY
+!!DO THIS ASAP
+        BAT'COUNT = BAT'COUNT + 1
+        BAT'TOTAL = BAT'TOTAL + DOC'AMT
+        UPDATE BAT SAV'BAT'RCN FROM BAT'REC
+!!AND THIS ASAP
+!!      CALL ADD'AGE
+!![8]   IF DOC'PO = "" THEN DOC'PO = DOC'ORG'NO USING "###########"
+        IF DOC'PO = "" THEN DOC'PO = DOC'ORG'NO USING "############"    !![8]
+        \SETKEY PRE="DOC" MODE="KY2" BAD1="DOCD" BAD2="DOCC" BAD3="DOCP" BAD4="DOCL" APP="AR"
+        ADDKEY DOCA
+        ADDKEY DOCO
+        ADDKEY DOCI
+        ADDKEY DOCV
+        DO UNTIL DOCV'CTL = 0 OR NEW'INTERNAL = 0
+                NEW'INTERNAL = 0
+                CALL SET'NEW'INTERNAL
+                DOC'INVOICE = NEW'INTERNAL
+                \SETKEY PRE="DOCV" MODE="KEY" APID="AR"
+                ADDKEY DOCV
+                IF DOCV'CTL = 0 THEN
+                        HHS'INTERNAL = DOC'INVOICE      !!SET INVOICE NUMBER
+                        UPDATE HHS FROM HHS'REC
+                ENDIF
+        LOOP
+!!      DOC'CMG'NO = HHS'CMG'NO         !![29]
+        UPDATE DOC FROM DOC'REC
+        CALL ADD'ALWAYS'TAD
+RETURN
+
+\COPYF ATQ CV
+\COPYF ATQ CV ATQ2
+
+!!EDIT ROUTINES FOR INVOICE IN WGA AND OE1SHP AND CANCEL/REPLACE
+!!
+!!
+
+CREATE'CREDIT'APPLY'TOS:
+        IF UCS(HHS'PO[-1,-1]) = "R" THEN
+            DOCI'KCUS'NO = HHS'NAM'NO
+            DOCI'KPO = HHS'PO[1,-2]
+            USE DOCI INTO DOC'REC KEY DOCI'KEY
+            DOCV'CTL = DOCI'CTL
+        ELSE
+            DOCV'KINV'TYPE = HHS'PO[1;1]
+            DOCV'KINVOICE = HHS'PO[3,-1]
+            USE DOCV INTO DOC2'REC KEY DOCV'KEY
+        ENDIF
+        IF DOCV'CTL = 0 AND DOC'CUS'NO = DOC2'CUS'NO THEN
+!![64] - credit card stuff
+CIF COMMENTS AND NOT COMMENTS THEN
+        if both are credit card authorized or settled we return with no noise
+a)              ACTUALLY - we should process if both settled ... like
+                when we did a "59" authorize and we have marked them
+                both settled we need to do this apply.
+
+b)              ACTUALLY - if debit is settled and this is "A" then
+                we need to skip (this means that oe2cre should not
+                squeak either about debit being paid). F8 INDICATING APPLY?
+
+LEGAL CASES:
+
+        DEBIT           CREDIT
+STATUS    P               A             VISA OR MC (MARK CREDIT AUTHORIZED,
+                                              SETTLE CREDIT)
+STATUS    P               P             VISA (AUTHORIZED CREDIT, MARKED BOTH
+                                              SETTLED)
+STATUS    A               A             MC (MARKED CREDIT AUTHORIZED,
+                                              SETTLE BOTH)
+
+!!ABOVE ONLY VALID CASES??????  REMEMBER THIS AFTER OERCTL \VAUTH!!!!
+
+        if mismatched ... what to do ... one choice is that the
+                original was a credit card and this is not or
+                vice-versa - we should scream ... and not apply?
+
+        it is not possible for this to be settled unless it is case "a)"
+                above because cv1atb won't settle until doc exists and
+                we have yet to create doc for the credit (or are doing
+                so now)!
+ENDCIF
+                IF TRH'CTP'NO # 0 THEN
+MAP1 DOC2'SOURCE,S,2
+                        DOC2'SOURCE = HHS'SOURCE
+                        \UCNVATQ AKEY="Y" PRE="DOC2"
+                        ATQT2'KEY = ATQT'KEY
+                        ATQ2'STATUS = "U"
+                        USE ATQT2 INTO ATQ2'REC KEY ATQT2'KEY   !!debit (apply to)
+                        \UCNVATQ AKEY="Y" VIN="A"
+                        ATQ'STATUS = "U"
+                        USE ATQT INTO ATQ'REC KEY ATQT'KEY      !!credit (us)
+!!case a)
+                        IF ATQ'STATUS = "P" THEN
+                                IF ATQ2'STATUS # "P" THEN
+!!"P" and "U"
+!!"P" and "A"
+                                        ENTRY = "Very weird status mismatch!"
+                                        \HDRERR
+                                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                        CALL DO'ERRL
+                                        ENTRY = "Application skipped!"
+                                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                        GOTO DO'ERRL
+                                ENDIF
+!!"P" and "P"
+                                IF ATQ'ELECTRONIC # "N" THEN
+                                        GOTO APPLY'IT   !!Both settled - do apply.
+                                ELSE
+                                        MSG'DID = "ARMSG"
+                                        MSG'SPACE = SPACE
+                                        MSG'DATA = "Applied to invoice "+HHS'PO
+                                        ADD MSG FROM MSG'REC
+                                        DOC'MSGNO = MSG'RCN
+                                        UPDATE DOC FROM DOC'REC
+                                        RETURN
+                                ENDIF
+                        ENDIF
+!!case b)
+                        IF ATQ'STATUS = "A" AND ATQ2'STATUS = "P" THEN
+!!"A" and "P"
+                                MSG'DID = "ARMSG"
+                                MSG'SPACE = SPACE
+                                MSG'DATA = "Applied to invoice "+HHS'PO
+                                ADD MSG FROM MSG'REC
+                                DOC'MSGNO = MSG'RCN
+                                UPDATE DOC FROM DOC'REC
+                                RETURN
+                        ENDIF
+                        IF ATQ'STATUS = "A" AND ATQ2'STATUS = "A" THEN
+!!"A" and "A"
+                                MSG'DID = "ARMSG"
+                                MSG'SPACE = SPACE
+                                MSG'DATA = "Applied to invoice "+HHS'PO
+                                ADD MSG FROM MSG'REC
+                                DOC'MSGNO = MSG'RCN
+                                UPDATE DOC FROM DOC'REC
+                                IF FROM'OE2CRE # "Y" THEN
+                                    RETURN
+                                ENDIF
+                        ENDIF
+
+                        IF ATQ'STATUS = "U" AND (ATQ2'STATUS = "A" OR &
+                                                 ATQ2'STATUS = "P") THEN
+!!"U" and "A"
+!!"U" and "P"
+!!"U" and "U"
+!!It should not be possible for the credit to be status "U" at this point.
+                                ENTRY = "Credit should not have unprocessed status!"
+                                \HDRERR
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                CALL DO'ERRL
+                                ENTRY = "Application skipped!"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                GOTO DO'ERRL
+                        ENDIF
+                        IF ATQ2'STATUS = "U" THEN
+!!"A" and "U"
+!!It should not be possible for the debit to be status "U" at this point.
+                                ENTRY = "Debit should not have unprocessed status!"
+                                \HDRERR
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""            !![blm]
+                                CALL DO'ERRL
+                                ENTRY = "Application skipped!"
+                                GOTO DO'ERRL
+                        ENDIF
+!![2] NO - This will be the case for MC transactions, since credit
+!!     authorization is not allowed.
+!![2]                   IF ATQ'STATUS = "A" AND ATQ2'STATUS = "A" THEN
+!!"A" and "A"
+!!In this case OERCTL should have settled both
+!!                              ENTRY = "Status error - Debit and Credit should be P and are A"
+!!                              \HDRERR
+!!                              CALL DO'ERRL
+!!                              ENTRY = "Application skipped on this trash!"
+!!                              GOTO DO'ERRL
+!![2]                   ENDIF
+                ENDIF
+        APPLY'IT:
+                CMN'SPACE = SPACE
+                CMN'TO'PRGNAM = "AR1OEU"
+                CMN'FRM'PRGNAM = "APLTWP"               !![6]
+                XCR'INV'TYPE = DOC'INV'TYPE
+                XCR'INVOICE = DOC'INVOICE
+                XDR'INV'TYPE = HHS'PO[1;1]
+                XDR'INVOICE = HHS'PO[3,-1]
+                BALANCE = 0
+                \SETKEY DOCA APID="AR" ALTPRE="DOC2"
+                USE DOCA INTO DOC2'REC KEY DOCA'KEY
+                DO
+                        GETNXT DOCA INTO DOC2'REC
+                        \CHKKEY DOCA APID="AR" ALTPRE="DOC2"
+                        IF DOCA'CTL # 0 EXIT
+                        IF DOC2'TYPE = 2 THEN
+                                DOC2'AMT = -DOC2'AMT
+                        ENDIF
+                        BALANCE = BALANCE + DOC2'AMT
+                LOOP
+                XAPL'AMT = (-DOC'AMT) MIN BALANCE
+                IF XAPL'AMT = 0 THEN
+                        ENTRY = "Cannot apply credit"
+                        \KERROR HDR MODE="D" CNO="N" APID="OE"
+                        ENTRY = ENTRY + " - no balance on "+HHS'PO
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                        CALL DO'ERRL
+                ELSE
+                        XAPL'DTT = DOC'DTT
+                        XAPL'CUS'NO = DOC'CUS'NO
+                        APL'SOURCE = "OE"
+                        CMN'OTHER = CMN'EXTRA
+                        XCALL ABUTIL,6,"AR",UB'SYS,"",FLAG
+                        IF FLAG # 0 THEN
+                                ENTRY = "Error logging to A/R!"
+                                CALL DO'ERR
+                        ELSE
+!!This program - AR1OEU - actually does application give CMN'EXTRA data.
+                                SNDCMN CMN'REC
+                                IF V''SYSTEM="UNIX" THEN
+                                        XCALL SYSTEM,"run ar1oeu"
+                                ELSE
+                                        XCALL LINK,1,"AR1OEU"
+                                ENDIF
+                                GETCMN CMN'REC
+                                XCALL ABUTIL,6,"OE",UB'SYS,"",FLAG
+                                IF CMN'TO'PRGNAM # "GOOD" THEN
+                                        ENTRY = "Bad link to AR1OEU: "+CMN'TO'PRGNAM+" Applying: "
+                                        \KERROR HHS CNO="N" MODE="D" APID="OE"
+                                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                                        CALL DO'ERRL
+                                ENDIF
+                                RDLOCK BAT SAV'BAT'RCN INTO BAT'REC
+                                RDLOCK DOC INTO DOC'REC
+                        ENDIF
+                ENDIF
+       ENDIF
+RETURN
+
+CREATE'CASH'APPLICATIONS:
+        UPDATE BAT SAV'BAT'RCN FROM BAT'REC
+!!ADD PAYMENT RECORDS
+        DOCO'RCN = 0
+        DOCO'KSHIPMENT = 0
+        USE DOCO INTO DOC2'REC KEY DOCO'KEY
+        DO
+                GETNXT DOCO INTO DOC2'REC
+                \CHKKEY PRE="DOCO" ALTPRE="DOC2" APP="AR"
+                IF DOCO'CTL # 0 OR                                   &
+                           (DOC2'TYPE = 1 AND DOC2'YEAR = 1) EXIT       !![60]
+        LOOP
+        !!GOT THE UNAPPLIED
+        IF DOCO'CTL = 0 THEN
+                SAV'RCN = DOCO'RCN
+                APPLY'AMT = HHS'OLD'CASH
+MAP1 NUKED'IT,B,1                               !![3]
+                NUKED'IT = 0                    !![3]
+                CALL ATTEMPT'TO'USEIT           !![35]
+                IF APPLY'AMT # 0 THEN           !![35]
+                        CALL FIND'OR'ADD'BAT2
+!![3]                   IF APPLY'ERROR # 1 THEN
+                        IF APPLY'ERROR # 1 AND NUKED'IT = 0 THEN !![3]
+                                DOC2'RCN = SAV'RCN      !!FOR SETKEY MACRO
+                                \SETKEY PRE="DOCA" MODE="KEY" ALTPRE="DOC2" &
+                                                APP="AR" ALTKEY="DOCA3"
+                                USE DOCA3 INTO DOC2'REC KEY DOCA3'KEY
+                                IF DOCA3'CTL # 0 THEN
+                                        ENTRY = "Internal key error, DOCA3 key not found"
+                                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                                        CALL DO'ERRL
+                                        APPLY'ERROR = 1
+                                ENDIF
+                        ENDIF
+                        IF APPLY'ERROR # 1 CALL ADD'CHK'RECORD
+                        SAPPLY'AMT = 0                  !![50]
+                        IF APPLY'ERROR # 1 CALL ADD'UNAPPLIED'PAIDS
+                        IF APPLY'ERROR # 1 CALL ADD'FINAL'PAYMENT
+                        REL CHK
+                        IF HHS'HDR'GONE = 1 CALL UNDO'APPLIED
+                        CASE
+                        IF APPLY'ERROR = 1 THEN
+                                ENTRY = "Could not apply cash to invoice: "
+                                \HDRERR PRE="HHS" APID="OE"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                                CALL DO'ERRL
+                        ELSE
+                        IF APPLY'ERROR = 2 THEN
+                                ENTRY = "Cash not correctly applied: "
+                                \HDRERR PRE="HHS" APID="OE"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                                CALL DO'ERRL
+                                HHS'OLD'CASH = HHS'OLD'CASH - APPLY'AMT !![3]
+                        ENDCASE
+                ENDIF
+        ELSE
+                ENTRY = "Cash not found to apply: "
+                \HDRERR PRE="HHS" APID="OE"
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                CALL DO'ERRL
+        ENDIF
+        RDLOCK BAT SAV'BAT'RCN INTO BAT'REC
+RETURN
+
+UNDO'APPLIED:
+        RDLOCK DOC3 SAV'RCN INTO DOC3'REC
+        \SETKEY PRE="DOCO" MODE="KEY" APP="AR" ALTPRE="DOC3" ALTKEY="DOCO3"
+        DELKEY DOCO3
+        DOC3'HDR'LOC'NO = 0
+        DOC3'HDR'NO = 0
+        DOC3'DOC'TYPE  = 0
+        DOC3'SHIPMENT = 0
+        \SETKEY PRE="DOCI" MODE="KEY" APP="AR" ALTPRE="DOC3" ALTKEY="DOCI3"
+        DELKEY DOCI3
+!![21]  DOC3'PO = STR(DOC3'ORG'NO)
+        \SETKEY PRE="DOCI" MODE="KEY" APP="AR" ALTPRE="DOC3" ALTKEY="DOCI3"
+        ADDKEY DOCI3
+        WRITE DOC3 FROM DOC3'REC
+!!      REL DOC3
+RETURN
+
+ADD'CHK'RECORD:
+        CHK'SPACE = SPACE
+        CHK'YEAR = BAT2'YEAR
+        CHK'BATCH = BAT2'BATCH
+        CHK'TRN = LAST'TRN2 + 1
+        LAST'TRN2 = CHK'TRN
+        CHK'CUS'NO = HHS'NAM'NO                 !Customer Number
+        RDLOCK ARC
+        ARC'ZERO'CNT = ARC'ZERO'CNT + 1
+        WRITE ARC
+        CHK'CHECK'NO = "Ap:"+(ARC'ZERO'CNT USING "#####")
+!![12] - Below
+!!      IF OEC'IDTTO # "Y" THEN
+!!              CHK'CR'DTT = DATE                       !Credit Date
+!!      ELSE
+!!              CHK'CR'DTT = HHS'ORDER'DTT              !Credit Date
+!!      ENDIF
+!![14] CHK'CR'DTT BELOW WAS DTT
+        IF OEC'IDTTO = "Y" THEN
+                CHK'CR'DTT = HHS'ORDER'DTT
+        ELSE
+        IF OEC'IDTTO = "P" THEN
+                CHK'CR'DTT = HHS'PROM'DTT
+        ELSE
+                CHK'CR'DTT = DATE
+        ENDIF
+        ENDIF
+!![12] - Above
+!!      CHK'AMT = 0                             !Check Amount
+        ENTRY = "Order:"                        !Bank Number
+        \HDRERR PRE="HHS" APID="OE"
+        CHK'ABA'NO = ENTRY+"-"+HHS'SHIPMENT
+        CHK'CHECK'DTT = CHK'CR'DTT              !Check Date
+        CHK'DOC'AMT = 0                         !Total Distributed
+        CHK'DOC'DISC = 0                        !Total Dist. Discounts
+        CHK'STAT = "U"                          !Status flag
+        \SETKEY PRE="CHK" MODE="KEY" APP="AR"
+!![9]  ADD CHK FROM CHK'REC KEY CHK'KEY
+        ADDL CHK FROM CHK'REC KEY CHK'KEY       !![9]
+        IF CHK'CTL # 0 THEN
+                ENTRY = "CANNOT ADD CHECK: "+CHK'KYEAR+"-"+CHK'KBATCH+"-"+CHK'KTRN
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                CALL DO'ERRL
+                APPLY'ERROR = 1
+                RETURN
+        ENDIF
+        \SETKEY PRE="CHK" MODE="KY2" APP="AR"
+        \ADDKEY PRE="CHK" MODE="KY2" APP="AR"
+!![9]  RDLOCK CHK INTO CHK'REC KEY CHK'KEY
+        BAT2'COUNT = BAT2'COUNT + 1
+        UPDATE BAT2 SAV'BAT2'RCN FROM BAT2'REC
+RETURN
+
+MAP1 SAPPLY'AMT,B,5                             !![50]
+
+ADD'FINAL'PAYMENT:
+        \SETKEY PRE="DOCA" MODE="KEY" APP="AR" ALTKEY="DOCA3"
+        DOCA'KSEQ = -1
+        RDKEY DOCA
+        GETPRV DOCA
+        DOCA'KEY = DOCA'KEY2
+        LAST'SEQ = DOCA'KSEQ + 1
+        DOC3'REC = DOC'REC                      !!THE ONE WE ADDED
+!!NEW
+!![50]  IF HHS'OLD'CASH > 0 AND DOC3'AMT > 0 THEN
+!!              DOC3'AMT = DOC3'AMT MIN (HHS'OLD'CASH - APPLY'AMT) !!E.G. ALL
+!!                                                                 !!THAT WE
+!!                                                                 !!REVERSED
+!!      ELSE
+!!              DOC3'AMT = HHS'OLD'CASH - APPLY'AMT
+!![50]  ENDIF
+        DOC3'AMT = -SAPPLY'AMT                          !![50]
+        IF DOC3'AMT = 0 RETURN                          !!KLUDGE
+        DOC3'TYPE = 2
+        DOC3'SEQ = LAST'SEQ
+        DOC3'CHK'SEQ = LAST'CHK'SEQ + 1
+        DOC3'CKB'NO = 0
+        DOC3'CKB'CHECK = CHK'CHECK'NO
+        DOC3'YEAR = BAT2'YEAR
+        DOC3'BATCH = BAT2'BATCH
+        DOC3'TRN = CHK'TRN
+        \SETKEY PRE="DOC" MODE="KEY" ALTPRE="DOC3" APP="AR" ALTKEY="DOC3"
+        ADD DOC3 FROM DOC3'REC KEY DOC3'KEY
+        \SETKEY PRE="DOCA" MODE="KEY" ALTPRE="DOC3" APP="AR" ALTKEY="DOCA2"
+        ADDKEY DOCA2
+RETURN
+
+MAP1 OAPPLY'AMT,B,5
+
+ADD'UNAPPLIED'PAIDS:
+!![49]  APPLY'AMT = HHS'OLD'CASH
+        OAPPLY'AMT = APPLY'AMT
+        GETNXT DOCA3 INTO DOC3'REC      !!BURN TYPE 1 RECORD
+        DOCA'KEY = DOCA3'KEY2
+        DOCA'KSEQ = -1
+        RDKEY DOCA
+        GETPRV DOCA
+        DOCA'KEY = DOCA'KEY2
+        LAST'SEQ = DOCA'KSEQ + 1
+        DO
+                GETNXT DOCA3 INTO DOC3'REC
+                IF DOCA3'CTL # 0 OR DOCA3'KORG'NO # DOC3'ORG'NO EXIT
+!!              IF DOC3'AMT <= 0 REPEAT
+!!NEW
+                IF SGN(DOC3'AMT) # SGN(APPLY'AMT) REPEAT
+                IF DOC3'AMT > 0 THEN
+                        DOC3'AMT = DOC3'AMT MIN APPLY'AMT
+                ELSE
+                        DOC3'AMT = DOC3'AMT MAX APPLY'AMT
+                ENDIF
+                DOC3'AMT = -DOC3'AMT
+                DOC3'SEQ = LAST'SEQ
+                LAST'SEQ = LAST'SEQ + 1
+                DOC3'CKB'NO = 0
+                DOC3'CKB'CHECK = CHK'CHECK'NO
+                DOC3'YEAR = BAT2'YEAR
+                DOC3'BATCH = BAT2'BATCH
+                DOC3'TRN = CHK'TRN
+                DOC3'CHK'SEQ = LAST'CHK'SEQ + 1
+                LAST'CHK'SEQ = DOC3'CHK'SEQ
+                \SETKEY PRE="DOC" MODE="KEY" ALTPRE="DOC3" APP="AR" ALTKEY="DOC3"
+                ADD DOC3 FROM DOC3'REC KEY DOC3'KEY
+                IF DOC3'CTL # 0 THEN
+                        ENTRY = "CANNOT ADD PAYMENT: "
+                        \DOCERR PRE="DOC3" BATCH'ERR="Y" APID="AR"
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                        CALL DO'ERRL
+                        APPLY'ERROR = 2
+                        REPEAT
+                ENDIF
+                \SETKEY PRE="DOCA" MODE="KEY" ALTPRE="DOC3" APP="AR" ALTKEY="DOCA2"
+                ADDKEY DOCA2
+                APPLY'AMT = APPLY'AMT + DOC3'AMT
+                SAPPLY'AMT = SAPPLY'AMT + DOC3'AMT              !![50]
+        LOOP UNTIL APPLY'AMT = 0
+        IF APPLY'AMT # 0 THEN
+                IF APPLY'ERROR # 2 THEN
+                        ENTRY = "COULD NOT FIND ENOUGH CASH TO APPLY: "+ &
+                                OAPPLY'AMT+" LEFT: "+APPLY'AMT
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                        CALL DO'ERRL
+                        ENTRY = "CHECK SHIPPING ON: "
+                        \HDRERR PRE="HHS"
+                        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                        CALL DO'ERRL
+                ENDIF
+                APPLY'ERROR = 2
+        ENDIF
+RETURN
+
+MAP1 USEIT,B,1                                                  !![35]
+
+!!If possible, change the ORG'NO on the existing payment to apply it
+!!to the invoice instead of creating a new type1/type2 pair to
+!!accomplish the application.
+ATTEMPT'TO'USEIT:                                               !![35]
+        DOC2'RCN = SAV'RCN              !!FOR SETKEY MACRO
+        \SETKEY PRE="DOCA" MODE="KEY" ALTPRE="DOC2" &
+                                                APP="AR" ALTKEY="DOCA3"
+        DOCA3'KSEQ = 1                  !!BURN TYPE 1 RECORD
+        DOCA4'KEY = DOCA3'KEY                           !![62]
+        USE DOCA3 INTO DOC3'REC KEY DOCA3'KEY
+        DO
+                GETNXT DOCA3 INTO DOC3'REC
+                IF DOCA3'CTL # 0 OR DOCA3'KORG'NO # DOC3'ORG'NO EXIT
+                IF SGN(DOC3'AMT) # SGN(APPLY'AMT) REPEAT
+                IF DOC3'STAT = "" THEN DOC3'STAT = "U"  !![50]
+                IF DOC3'STAT # "U" REPEAT
+                USEIT = 0
+                IF DOC3'AMT > 0 THEN
+                        IF APPLY'AMT >= DOC3'AMT USEIT = 1
+                ELSE
+                        IF APPLY'AMT <= DOC3'AMT USEIT = 1
+                ENDIF
+                IF USEIT = 1 THEN
+                        RDLOCK DOC3 DOCA3'RCN INTO DOC3'REC
+                        \SETKEY PRE="DOCA" MODE="KEY" ALTPRE="DOC3" APP="AR" ALTKEY="DOCA2"
+                        DELKEY DOCA2                    !![63]
+                        DOC3'ORG'DTT = DOC'ORG'DTT
+                        DOC3'ORG'DDTT = DOC'ORG'DDTT    !![48]
+                        DOC3'ORG'NO = DOC'ORG'NO
+!![45]                  DOC3'SEQ = LAST'SEQ
+                        DOC3'INV'TYPE = DOC'INV'TYPE
+                        DOC3'INVOICE = DOC'INVOICE
+                        DOC3'PO = DOC'PO
+                        DOC3'UGL'NO = 0                 !![63]
+!![45] - below
+                        \SETKEY PRE="DOCA" MODE="KEY" ALTPRE="DOC3" APP="AR"
+                        DOCA'KSEQ = -1
+                        RDKEY DOCA
+                        GETPRV DOCA
+                        DOCA'KEY = DOCA'KEY2
+                        DOC3'SEQ = DOCA'KSEQ + 1
+!![45] - above
+                        \SETKEY PRE="DOCA" MODE="KEY" ALTPRE="DOC3" APP="AR" ALTKEY="DOCA2"
+                        ADDKEY DOCA2
+                        APPLY'AMT = APPLY'AMT - DOC3'AMT
+                        WRITE DOC3 FROM DOC3'REC
+                ENDIF
+        LOOP UNTIL APPLY'AMT = 0
+!![62] Below
+        USE DOCA4 INTO DOC3'REC KEY DOCA4'KEY
+        GETNXT DOCA4 INTO DOC3'REC
+        \CHKKEY DOCA ALTPRE="DOC3" ALTKEY="DOCA4" LASTFIX="ORG'NO" APID="AR"
+        !!If there are not remaining type 2's, delete the 1-1 unapplied
+        IF DOCA4'CTL # 0 THEN
+                DOCA4'KSEQ = 0
+                RDLOCK DOCA4 INTO DOC3'REC KEY DOCA4'KEY
+                IF DOCA4'CTL = 0 THEN
+                        IF DOC3'YEAR # 1 THEN
+                                ENTRY = "Error - This should be an unapplied.  Report to VICS. "
+                                \KERROR DOCA MODE="K" APID="AR"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                                CALL DO'ERRL
+                                RETURN                  !!KLUDGE!!
+                        ENDIF
+                        DOC4'RCN = DOCA4'RCN
+                        \SETKEY PRE="DOC" MODE="ALL" BAD1="DOCA" ALTPRE="DOC3" ALTKEY="DOC4" APID="AR"
+                        \DELKEY PRE="DOC" MODE="ALL" BAD1="DOCA" ALTPRE="DOC3" ALTKEY="DOC4" APID="AR"
+                        DELETE DOCA4 FROM DOC3'REC KEY DOCA4'KEY
+                        IF DOCA4'CTL # 0 THEN
+                                ENTRY = "Unable to delete unapplied "
+                                \KERROR DOCA ALTPRE="DOC3" ALTKEY="DOCA4" MODE="K" APID="AR"
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                                CALL DO'ERRL
+                        ELSE
+                                NUKED'IT = 1                    !![3]
+                                DST'KDOC'NO = DOC3'ORG'NO
+                                DST'KSEQ = 0
+                                \DELOOP PRE="DST" APID="AR"
+                        ENDIF
+                ENDIF
+        ENDIF
+!![62] Above
+RETURN
+
+SET'NEW'INTERNAL:                       !![53] - re-wrote it all.
+        IF NEW'INTERNAL = 0 THEN
+!!WE NEED TO GENERATE NEW NUMBER FOR NEW POSTING
+                DO
+                        RDLOCK ARC INTO ARC'REC
+                        ARC'COUNTER(ARC'INV'CNT'NO(DOC'INV'TYPE)) =             &
+                                ARC'COUNTER(ARC'INV'CNT'NO(DOC'INV'TYPE)) + 1
+                        WRITE ARC FROM ARC'REC
+                        IF ARC'COUNTER(ARC'INV'CNT'NO(DOC'INV'TYPE)) > 9999999 THEN
+                                NEW'INTERNAL = 0
+                                ENTRY = "Cannot generate invoice number: "+" HDR="+LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO
+                                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                                CALL DO'ERRL
+                                GOTO ABORT
+                        ENDIF
+                        NEW'INTERNAL = ARC'COUNTER(ARC'INV'CNT'NO(DOC'INV'TYPE))
+                        DOCV'KINV'TYPE = DOC'INV'TYPE
+                        DOCV'KINVOICE = NEW'INTERNAL
+                        RDKEY DOCV
+                        IF DOCV'CTL # 0 THEN            !![41]
+                                DHSV'KINV'TYPE = DOC'INV'TYPE
+                                DHSV'KINVOICE = NEW'INTERNAL
+                                RDKEY DHSV
+                        ENDIF
+                LOOP UNTIL DOCV'CTL # 0 AND DHSV'CTL # 0
+        ELSE
+!!WE NEED TO CHECK NEW NUMBER SET BY REPOST FOR VALIDITY
+                DOCV'KINV'TYPE = DOC'INV'TYPE
+                DOCV'KINVOICE = NEW'INTERNAL
+                RDKEY DOCV
+
+                DHSV'KINV'TYPE = DOC'INV'TYPE
+                DHSV'KINVOICE = NEW'INTERNAL
+                RDKEY DHSV
+                IF DOCV'CTL = 0 OR DHSV'CTL = 0 THEN
+                        NEW'INTERNAL = 0
+                        GOTO SET'NEW'INTERNAL           !!NOT VALID
+                ENDIF
+                USE ARC INTO ARC'REC
+                IF NEW'INTERNAL > ARC'COUNTER(ARC'INV'CNT'NO(DOC'INV'TYPE)) THEN
+                        RDLOCK ARC INTO ARC'REC
+                        IF NEW'INTERNAL > ARC'COUNTER(ARC'INV'CNT'NO(DOC'INV'TYPE)) THEN
+                                ARC'COUNTER(ARC'INV'CNT'NO(DOC'INV'TYPE)) = NEW'INTERNAL
+                                WRITE ARC FROM ARC'REC
+                        ELSE
+                                REL ARC
+                        ENDIF
+                ENDIF
+        ENDIF
+RETURN
+
+MAP1 OLD'DOC'RCN,B,4
+
+DEL'OLD'DOC:
+!![47] - look hard for invoice even if keys afu.
+        IF REPOSTING # 0 THEN
+                DOCV'CTL = 1
+                IF HHS'INTERNAL # 0 THEN
+                        DOCV'KINV'TYPE = HHS'DOC'TYPE
+                        DOCV'KINVOICE = HHS'INTERNAL
+                        RDKEY DOCV
+                ENDIF
+                IF DOCV'CTL # 0 THEN
+                        DOCO'RCN = -1
+                        DOCO'KHDR'LOC'NO = HHS'LOC'NO
+                        DOCO'KDOC'TYPE = HHS'DOC'TYPE
+                        DOCO'KHDR'NO = HHS'NO
+                        DOCO'KSHIPMENT = HHS'SHIPMENT
+                        USE DOCO INTO DOC'REC KEY DOCO'KEY
+                        DO
+                                GETPRV DOCO INTO DOC'REC
+                                \CHKKEY DOCO LASTFIX="SHIPMENT" APID="AR"
+                                IF DOCO'CTL # 0 EXIT
+                                IF HHS'INTERNAL = 0 THEN
+                                        HHS'INTERNAL = DOC'INVOICE
+                                ENDIF
+                                \SETKEY DOCV RCN="DOCO'RCN"
+                                RDKEY DOCV
+                                IF DOCV'CTL # 0 THEN
+                                        ADDKEY DOCV
+                                ENDIF
+                        LOOP UNTIL DOCV'CTL = 0
+                ENDIF
+        ENDIF
+!![47] - above
+        IF HHS'INTERNAL # 0 THEN
+                DOCV'KINV'TYPE = HHS'DOC'TYPE
+                DOCV'KINVOICE = HHS'INTERNAL
+                USE DOCV INTO DOC'REC KEY DOCV'KEY
+                !![44] Added CUS'NO = NAM'NO test
+                CASE
+                IF DOCV'CTL = 0 AND DOC'STAT = "U" AND DOC'CUS'NO = HHS'NAM'NO THEN
+                        ORG'YEAR = DOC'YEAR             !![25]
+                        ORG'PERIOD = DOC'PERIOD         !![25]
+                        ORG'DTT = DOC'DTT               !![25]
+                        BAT2'KTYPE = 1
+                        BAT2'KYEAR = DOC'YEAR
+                        BAT2'KBATCH = DOC'BATCH
+!!LOCKING THIS BATCH PREVENTS OTHER USERS FROM DINKING WITH THIS INVOICE
+                        RDLOCK BAT2 INTO BAT2'REC KEY BAT2'KEY
+                        CALL DEL'OLD'AGE
+                        CALL DEL'OLD'DST
+                        \DELREC PRE="DOC" RCN="DOCV'RCN" APP="AR"
+!![ESE]
+!!                      ENTRY = "DEL RCN="+DOC'RCN
+!!                      \KERROR DOC APID="AR" MODE="D" CNO="N"
+!!                      CALL DO'ERRLO
+!![ESE]
+                        IF WRH'FILL'YN = "Y" THEN                       !![3]
+                                NEW'INTERNAL = HHS'INTERNAL
+                        ENDIF
+                        IF BAT2'CTL = 0 THEN
+!!NOTE:  WE DELETED REGARDLESS OF WHETHER BATCH FOUND ... BUT WE UPDATE
+!!       BAT ONLY IF WE FOUND IT ...
+                                ORG'BATCH = DOC'BATCH           !![25]
+                                ORG'TRN = DOC'TRN               !![25]
+                                BAT2'COUNT = BAT2'COUNT - 1
+                                BAT2'TOTAL = BAT2'TOTAL - DOC'AMT
+                                WRITE BAT2 BAT2'RCN FROM BAT2'REC
+                        ENDIF
+                ELSE
+                IF DOCV'CTL = 0 AND DOC'STAT # "U" THEN
+!!WE COULD NOT AUTO DELETE THE INVOICE - SAVE MESSAGE
+                        OLD'DOC'RCN = DOCV'RCN
+                ENDCASE
+        ENDIF
+RETURN
+
+DEL'OLD'AGE:
+        AGE'KDOC'NO = DOC'ORG'NO
+        \DELOOP PRE="AGE" APP="AR" BAD="TEST'AGE"
+RETURN
+
+TEST'AGE:
+        IF AGE'DOC'NO # DOC'ORG'NO THEN AGE'CTL = 3
+RETURN
+
+DEL'OLD'DST:
+        DST'KDOC'NO = DOC'ORG'NO
+        \DELOOP PRE="DST" APP="AR" BAD="TEST'DST"
+RETURN
+
+TEST'DST:
+        IF DST'DOC'NO # DOC'ORG'NO THEN DST'CTL = 3
+RETURN
+
+FIND'OR'ADD'BAT2:
+        \BATBSC DESC="O/E Deposit/Applied" APID="AR" PAY="Y" PRGNAM="OEPDOC"    &
+                DTT="DATE" SOURCE="OE" OCCUR="3" TRN="CHK" BTYPE="2"    &
+                MACT="ARC'CMACT" PTC="ARC'CPTC" CST="ARC'CCST"          &
+                CKB'NO="ARC'CKB'NO" LAST'TRN="LAST'TRN2"                &
+                GET'BATCH="GET'BATCH2" NPRE="BAT2" MODE="MOD'MODE"      &
+                FIND'MODE="""A"""
+        SAV'BAT2'RCN = BAT2'RCN
+        IF BAT2'CTL # 0 THEN
+                APPLY'ERROR = 1
+                ENTRY = "CANNOT ADD BATCH: "+BAT2'KTYPE+"-"+BAT2'KYEAR+"-"+BAT2'KBATCH
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                CALL DO'ERRL
+        ENDIF
+RETURN
+
+MAP1 SAVSTX2'LOC'NO,B,3
+
+GET'STX2:
+        IF STX2'NO # STX2'KNO OR SAVSTX2'LOC'NO # STX2'KLOC'NO OR STX2'CTL # 0 THEN
+                SAVSTX2'LOC'NO = STX2'KLOC'NO
+                USE STX2 INTO STX2'REC KEY STX2'KEY
+                IF STX2'CTL # 0 THEN
+                        STX2'KLOC'NO = 0
+                        USE STX2 INTO STX2'REC KEY STX2'KEY
+                ENDIF
+        ENDIF
+RETURN
+
+COPY    "CVTAPA[SA]"            !!CONVERT'APA:
+
+MAP1 TSTSTX,S,1
+
+COPY "TTLSTX",TST'TAXABLE="TSTSTX"       !!COMPUTE'TTL'STX'PERC:, GET'SF'TAXABLE:
+COPY "TTLSTX",PRE="STX2",TST'TAXABLE="TSTSTX"  !!COMPUTE'TTL'STX2'PERC:
+
+!!COPYF "WGAFIL",=WGA7          !![40] - remove compute nets subroutine.
+MAP1  TMP,B,5
+
+FIND'PRH:                                       !![11] - add caching.
+        \VUSEPRH FLDNAM="PRH'KTRK'NO" SKIP'MAP="Y"
+RETURN
+
+!![47] - below try to use old doc rec even if posted.
+
+DEL'OLD'DOC'ERROR:
+        MSG'DID = "ARMSG"
+        RDLOCK DOC OLD'DOC'RCN INTO DOC'REC
+        ENTRY = ""
+        \HDRERR PRE="HHS" APID="OE"
+        ENTRY = "DUPLICATED BY: "+ENTRY+" USER: "+UB'UID
+        IF DOC'MSGNO = 0 THEN
+                MSG'SPACE = SPACE
+                MSG'DATA = ENTRY
+                ADD MSG
+                DOC'MSGNO = MSG'RCN
+                WRITE DOC
+        ELSE
+                USE MSG DOC'MSGNO INTO MSG'REC
+                DO UNTIL MSG'CH = 0
+                        USE MSG MSG'CH INTO MSG'REC
+                LOOP
+                REL DOC
+                DOCV'RCN = MSG'RCN
+                MSG'SPACE = SPACE
+                MSG'DATA = ENTRY
+                ADD MSG
+                DOC'RCN = MSG'RCN
+                RDLOCK MSG DOCV'RCN INTO MSG'REC
+                MSG'CH = DOC'RCN
+                WRITE MSG
+        ENDIF
+        MSG'DID = "OEMSG"
+!![34] - above
+        ENTRY = "DUPLICATE OLD INVOICE IN A/R: "+HHS'DOC'TYPE+"-"+HHS'INTERNAL
+        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+        CALL DO'ERRL
+        ENTRY = "UNPOST AND DELETE OLD INVOICES FOR: "
+        \HDRERR PRE="HHS" APID="OE"
+        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+        CALL DO'ERRL
+RETURN
+
+CHECK'OLD'DOC:
+        SF = 0
+        DOC2'SPACE = SPACE
+        USE DOC2 OLD'DOC'RCN INTO DOC2'REC
+        DOC3'REC = DOC2'REC
+        DOC3'INVOICE = DOC'INVOICE
+        DOC3'BATCH = DOC'BATCH
+        DOC3'TRN = DOC'TRN
+        DOC3'STAT = DOC'STAT
+        DOC3'MSGNO = DOC'MSGNO
+        DOC3'ORG'NO = DOC'ORG'NO
+        DOC3'PO = DOC'PO
+        DOC3'CKB'CHECK = DOC'CKB'CHECK
+        DOC3'OLD'PERIOD = DOC'OLD'PERIOD
+        IF DOC'INTERUPT # "Y" THEN
+                DOC3'INTERUPT = DOC'INTERUPT
+        ENDIF
+        IF DOC3'REC = DOC'REC THEN
+!!We will use the old doc record ...
+                DST'KDOC'NO = DOC'ORG'NO
+                DST'KSEQ = 0
+                USE DST INTO DST'REC KEY DST'KEY
+                DO
+                        GETNXT DST INTO DST'REC
+                        IF DST'CTL # 0 OR DST'DOC'NO # DOC'ORG'NO EXIT
+                        DST2'KEY = DST'KEY2
+                        DST2'KDOC'NO = DOC2'ORG'NO
+                        USE DST2 INTO DST2'REC KEY DST2'KEY
+                        DST2'DOC'NO = DST'DOC'NO
+                        DST2'MSGNO = DST'MSGNO
+                        IF DST2'REC # DST'REC OR DST2'CTL # 0 THEN SF = 1
+                LOOP UNTIL SF = 1
+                IF SF = 0 THEN
+!![55] - below use old invoice if posted ...
+                        IF WRH'FILL'YN = "Y" OR DOC2'STAT # "U" THEN
+                                NEW'INTERNAL = DOC2'INVOICE     !!old invoice #
+                        ELSE
+                                NEW'INTERNAL = DOC'INVOICE      !!new invoice #
+                        ENDIF
+                        HHS'INTERNAL = DOC'INVOICE      !!new invoice to del
+                        CALL DEL'OLD'DOC                !!really new doc
+                        IF WRH'FILL'YN # "Y" AND DOC2'STAT = "U" THEN
+!!Want new invoice number
+                                RDLOCK DOC OLD'DOC'RCN INTO DOC'REC
+                                \SETKEY DOCV
+                                DELKEY DOCV
+                                DOC'INVOICE = NEW'INTERNAL
+                                HHS'INTERNAL = DOC'INVOICE
+                                \SETKEY DOCV
+                                ADDKEY DOCV
+                                UPDATE DOC FROM DOC'REC         !![55]
+                        ENDIF
+                        HHS'INTERNAL = NEW'INTERNAL
+                        UPDATE HHS FROM HHS'REC
+                ELSE
+                        CALL DEL'OLD'DOC'ERROR
+                ENDIF
+        ELSE
+                CALL DEL'OLD'DOC'ERROR
+        ENDIF
+RETURN
+
+!![47] - above
+
+MAP1 CTC,B,5
+MAP1 IN'TB,B,1
+
+PRE'ERTRAP:
+        IF ERR(0) = 1 THEN
+                CTC = CTC + 1
+                IF CTC > 200 GOTO ERTRAP        !!Die if lots ...
+                ENTRY = "CTRL-C pressed - will abort at a good time."
+                IF IN'TB = 1 THEN
+                        ?TAB(-1,A'RED) ; ENTRY ; TAB(-1,A'NORM) ; TAB(-1,9)
+                ELSE
+                        CALL DO'ERR
+                ENDIF
+                ENTRY = "CTRL-C pressed in OEPDOC: "+PRGNAM
+                \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+                RESUME
+        ENDIF
+        CTC = 0
+GOTO ERTRAP
+
+DO'HDRSUM:
+        \HDRSUM HHS INVOICE="DOC'AMT"
+RETURN
+
+MAP1 DO'SPACE,S
+    MAP2 DO'SHIP,B,1
+    MAP2 DO'BILL,B,1
+
+ADD'ALWAYS'TAD:
+    IF OEC'ALWAYS'TAD # "Y" AND OEC'ALWAYS'TAD # "B" AND &
+                                            OEC'ALWAYS'TAD # "S" RETURN
+    DO'SPACE = SPACE
+    IF OEC'ALWAYS'TAD # "B" THEN DO'SHIP = 1
+    IF OEC'ALWAYS'TAD # "S" THEN DO'BILL = 1
+    TAD'KBS = "S"
+    TAD'KHDR'LOC'NO = HHS'LOC'NO
+    TAD'KDOC'TYPE = HHS'DOC'TYPE
+    TAD'KHDR'NO = HHS'NO
+    USE TAD INTO TAD'REC KEY TAD'KEY
+    IF TAD'CTL = 0 THEN
+        DO'SHIP = 0
+        IF TAD'BOTH'YN = "Y" THEN DO'BILL = 0
+    ENDIF
+    IF DO'BILL = 1 THEN
+        TAD'KBS = "B"
+        USE TAD INTO TAD'REC KEY TAD'KEY
+        IF TAD'CTL = 0 THEN
+            DO'BILL = 0
+            IF TAD'BOTH'YN = "Y" THEN DO'SHIP = 0
+        ENDIF
+    ENDIF
+    IF DO'SHIP = 0 AND DO'BILL = 0 RETURN
+    IF DO'BILL = 1 THEN
+        \USELST HHS'NAM'NO
+        CALL SET'TAD'FROM'LST
+        IF HHS'SHIP'TO = 0 AND HHS'SHP'NO = 0 AND DO'SHIP = 1 THEN
+            TAD'BOTH'YN = "Y"
+            DO'SHIP = 0
+        ELSE
+            TAD'BOTH'YN = "N"
+        ENDIF
+        TAD'BS = "B"
+        TAD'HDR'LOC'NO = HHS'LOC'NO
+        TAD'DOC'TYPE = HHS'DOC'TYPE
+        TAD'HDR'NO = HHS'NO
+        CALL ADD'TAD'REC
+    ENDIF
+    IF DO'SHIP = 1 THEN
+        IF HHS'SHIP'TO # 0 OR HHS'SHP'NO # 0 THEN
+            IF HHS'DROP'YN = "N" THEN HHS'SHP'NO = HHS'NAM'NO
+            \NTABLST PRE="CUS" FLDNAM="HHS'SHP'NO" DSP="Y"  &
+                                                    ALTFLD="HHS'SHIP'TO"
+            IF HHS'DROP'YN = "N" THEN HHS'SHP'NO = 0
+        ELSE
+            IF DO'BILL = 0 THEN
+                \USELST HHS'NAM'NO
+            ENDIF
+        ENDIF
+        CALL SET'TAD'FROM'LST
+        TAD'BOTH'YN = "N"
+        TAD'BS = "S"
+        TAD'HDR'LOC'NO = HHS'LOC'NO
+        TAD'DOC'TYPE = HHS'DOC'TYPE
+        TAD'HDR'NO = HHS'NO
+        CALL ADD'TAD'REC
+    ENDIF
+RETURN
+
+SET'TAD'FROM'LST:
+    TAD'SPACE = SPACE
+    TAD'COMPANY = LST'COMPANY
+    IF LST'FIRST = "" THEN
+        TAD'NAME = LST'LAST
+    ELSE
+        TAD'NAME = LST'FIRST + " " + LST'LAST
+    ENDIF
+    TAD'ADDR1 = LST'ADDR1
+    TAD'ADDR2 = LST'ADDR2
+    TAD'CITY = LST'CITY
+    TAD'ST = LST'ST
+    TAD'ZIP = LST'ZIP
+    TAD'COUNTRY = LST'COUNTRY
+    TAD'RES'YN = LST'RES'YN
+    TAD'PHONE = LST'PHONE1
+    TAD'AUTO'TAD = "Y"
+    TAD'BLIND'YN = HHS'SHIP'BLIND
+RETURN
+
+ADD'TAD'REC:
+    \SETKEY TAD MODE="KEY"
+    ADDL TAD FROM TAD'REC KEY TAD'KEY
+    IF TAD'CTL = 0 THEN
+        \SETKEY TAD MODE="KY2"
+        \ADDKEY TAD MODE="KY2"
+        REL TAD
+    ELSE
+        ENTRY = "Error adding TAD:"
+        \KERROR TAD MODE="K" CNO="N" APID="OE"
+        \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""  !![blm]
+        CALL DO'ERRL
+    ENDIF
+RETURN
+
+MAP1 FFF,F
+
+SET'VICS'PTRS:
+    \DG GETVALUE _OESETUP name_cache ENTRY
+    IF ENTRY # "Y" RETURN                            !!KLUDGE
+    XCALL VICSIT,7,999,"V''PTR1",V''PTR1,FFF
+    XCALL VICSIT,7,999,"V''PTR2",V''PTR2,FFF
+    XCALL VICSIT,7,999,"V''PTR3",V''PTR3,FFF
+    XCALL VICSIT,7,999,"DGMSGPTR",DGMSGPTR,FFF
+RETURN
+
+MAP1 MON'MQID,B,4
+MAP1 MON'KEY,B,2
+MAP1 MON'REC
+    MAP2 MON'SPACE,S
+        MAP3 MON'PRGNAM,S,6
+        MAP3 MON'ENTRY,S,166            !!Data message
+        MAP3 MON'UDT,B,4
+        MAP3 MON'NOLF,B,1
+MAP1 NOLF,B,1
+MAP1 VMYCTL,F
+
+MAP1 MSP,S,20
+MAP1 SPEED'T2,F
+MAP1 DENTRY,S,160
+MAP1 SNDMON'LOG,S,100
+
+SNDMON:
+    IF MON'MQID # 0 THEN
+        MON'SPACE = SPACE
+        MON'PRGNAM = "OEPDOC"
+        \DG GETVALUE _OESETUP monMS MSP
+        IF MSP = "Y" THEN
+            MSP = STR(SPEED'T2)
+            MSP = LEFT(MSP+"000000000",12)
+            MON'ENTRY = MSP+":"+ENTRY
+        ELSE
+            MON'ENTRY = ENTRY
+        ENDIF
+        MON'NOLF = NOLF
+        NOLF = 0
+        \S'TO'U UDT="MON'UDT"
+        MON'MQID = MON'MQID
+        MON'KEY = 1                !!1 for sending to monitor
+        \VIPCSND MON'REC DEST="MON'KEY" CTL="VMYCTL" MQID="MON'MQID"
+        IF SNDMON'LOG = "" THEN
+            \DG GETVALUE _UPSETUP sndmon_log SNDMON'LOG
+            IF DG'CTL # 0 OR SNDMON'LOG # "Y" THEN
+                SNDMON'LOG = "N"
+            ENDIF
+            IF SNDMON'LOG = "Y" THEN
+                SNDMON'LOG = "/logs/sndmon.DAILY"
+            ENDIF
+        ENDIF
+        IF SNDMON'LOG # "N" THEN
+            \U'TO'DTT'HMS UDT="MON'UDT"
+            \STRDTC DDATE="DENTRY"
+            DENTRY = MON'PRGNAM+":"+MON'ENTRY+" D="+DENTRY+ &
+                (HRS USING "#Z") + ":" + &
+                    (MNS USING "#Z") + ":" + (SEC USING "#Z")
+            \ABLOGGER DENTRY SNDMON'LOG
+        ENDIF
+    ENDIF
+RETURN
+
+\COPYF BOX OE MODE="PRI"
+\COPYF VIA IN
+
+UPDATE'MANIFEST:
+
+    VIA'KNO = HHS'VIA'NO
+    USE VIA INTO VIA'REC KEY VIA'KEY
+    IF VIA'CTL # 0 RETURN
+    IF VIA'MTYPE # "U" RETURN
+
+    BOX'SPACE = SPACE
+    BOX'HDR'LOC'NO = HHS'LOC'NO
+    BOX'DOC'TYPE = HHS'DOC'TYPE
+    BOX'HDR'NO = HHS'NO
+    BOX'NO = 1
+    BOX'SHIPMENT = HHS'SHIPMENT
+    \SETKEY BOX MODE="KEY" APID="OE"
+    USE BOX INTO BOX'REC KEY BOX'KEY
+    DO
+        GETNXT BOX INTO BOX'REC
+        IF BOX'CTL # 0 EXIT
+        IF BOX'HDR'LOC'NO # HHS'LOC'NO OR BOX'DOC'TYPE # HHS'DOC'TYPE OR &
+            BOX'HDR'NO # HHS'NO EXIT
+
+        IF BOX'TRACK'NO = "" THEN
+            ENTRY = ""
+            \KERROR BOX
+            ENTRY = ENTRY + " Missing tracking number for box - Manifest date not set"
+            \LABLOGGER ENTRY """/debug/oepdoc_debug.DAILY"""
+            CALL DO'ERRLO
+        ENDIF
+    LOOP
+RETURN
