@@ -1,0 +1,672 @@
+! @#$^&* 382 0 493 0 0 0 0 0 0 0 0 0 0 *&^$#@ 
+!*! Updated on Fri Dec 19 17:37:23 2025 by Will Carroll 16 times 
+!*! Updated on Thu Dec  4 19:52:19 2025 by Will Carroll 1 times 
+!*! Updated on Tue Dec  2 16:30:06 2025 by Will Carroll 1 times 
+PROGRAM POL945,8.0(1) !!Shipment Confirmation 1Z
+!!
+!!                          V. I. C. S.
+!!                       of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!              2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!              (928) 567-3727
+!!
+!!
+!!Revision History:
+!!
+!!
+
+MAP1 PERR,B,2
+MAP1 PO'STARTED,B,1
+MAP1 ORDER,S,80
+MAP1 MANIFESTED'ORDER,S,1
+MAP1 HOB'STARTED,B,1
+MAP1 LBOX,B,2
+MAP1 SKIP'FLAG,B,1
+MAP1 FNAME'DEL,S,128
+MAP1 LOCATION,B,3
+MAP1 STARTED,B,1
+MAP1 LNAME,S,200
+MAP1 SENTRY,S,132
+MAP1 MY'BLF'VERSION,S,3,"1.0"
+MAP1 SAV'MSG,B,3
+MAP1 MY'PURPOSE,S,2
+MAP1 TMP1,S,10
+MAP1 TMP2,S,10
+MAP1 TWO'NAME,S,128,"/logs/pol945.DAILY"
+MAP1 QTYCNT,B,3
+MAP1 ECNT,B,3
+MAP1 CMD,S,300
+MAP1 FNAME,S,300
+MAP1 FNAME2,S,300
+MAP1 X,F
+MAP1 REC'TYPE,S,4
+MAP1 TYPE'OF'DOCUMENT,S,3
+MAP1 II,F
+MAP1 TMP,S,1000
+MAP1 BASE,S,128
+MAP1 DIR,S,128
+MAP1 MY'TRX'TYPE,S,3,"945"
+
+\READCTL APP="OE" GL="N"
+\READCTL APP="PO" GL="Y"
+\READCTL APP="IN" GL="Y"
+\READCTL APID="SA" GL="N"
+\READCTL APID="AR" GL="N"
+
+\COPYF VIA IN
+\COPYF MSG SY
+\COPYF VEN AP
+\COPYF UCC PO
+\COPYF HDR PO
+\COPYF HHS PO
+\COPYF HDR OE OEHDR
+\COPYF BOX OE
+\COPYF TAD OE MODE="PRI"
+\COPYF DDD PO
+
+COPY "CVTMAP"
+COPYF "CMNFIL[SY]",NOAFR
+COPYF "MSGFIL[SY]",NOAFR
+
+FNAME = "/tmp/proc.PID"
+XCALL ABUTIL,46,FNAME,FNAME
+XCALL ABUTIL,46,TWO'NAME,TWO'NAME
+
+LNAME = "/logs/945_error.DAILY"
+XCALL ABUTIL,46,LNAME,LNAME
+
+XCALL ABSPEC,ENTRY               !!pol945 executed in crontab
+IF ENTRY = "" THEN
+    ENTRY = "No directory!"
+    CALL DO'ERRL
+    GOTO ABORT
+ENDIF
+
+!!cronjob dbshell -a PO -s 1 -c 1 run po1945 /wp~766369~1~850
+!!The UCC is the vendor sending followed by the location number follwed by the
+!!blf format
+!!The base is the "in" directory for the ucc sending the 945
+
+\PARSE STRING="ENTRY" DEL="~" BASE UCC'KNO LOCATION BLF'KNO
+
+!! Initalize Cron Execution
+ENTRY = "Cron Job Execution for: "+ENTRY
+\LABLOGGER ENTRY LNAME
+
+
+USE UCC INTO UCC'REC KEY UCC'KEY
+IF UCC'CTL # 0 THEN
+    ENTRY = "Cannot find ucc number"
+    \KERROR UCC MODE="KEY" APID="PO" CNO="N"
+    \LABLOGGER ENTRY LNAME
+    GOTO ABORT
+ENDIF
+
+DIR = BASE + "/in"
+
+ENTRY = "find "+DIR+" -name '945*.txt' -prune -print 2>" + &
+                                                TWO'NAME +" 1>"+FNAME
+!! Log the System Command
+\LABLOGGER ENTRY LNAME
+
+XCALL SYSTEM,ENTRY
+
+LOOKUP FNAME,II
+
+!! Record Directory List and File Size
+ENTRY = "Directory List: "+FNAME+" File Size: "+II
+\LABLOGGER ENTRY LNAME
+
+IF II # 0 THEN
+    SKIP'FLAG = 0
+    ENTRY = "/logs/945_error.DAILY"
+    XCALL ABUTIL,46,ENTRY,ENTRY
+    LNAME = ENTRY
+
+    OPEN #23,FNAME,INPUT
+    DO
+        INPUT LINE #23,ENTRY
+
+        SENTRY = "Processing File: "+ENTRY
+        \LABLOGGER SENTRY LNAME
+
+        IF EOF(23) # 0 EXIT
+        XCALL DB,22,HOB'PKT
+                !!Important, do before fixing so caps are correct
+        II = INSTR(1,ENTRY,"/in/")
+
+        FNAME'DEL = ENTRY[1,II] + "delete" + ENTRY[II+3,-1]
+        TMP1 = "/in/"
+        TMP2 = "work"
+        CALL FIX'FILE
+        FNAME2 = ENTRY[1,II] + "done" + ENTRY[II+3,-1]
+        LOOKUP FNAME2,II
+        IF II # 0 THEN
+            KILL ENTRY
+            REPEAT
+        ENDIF
+        CALL MOVE'FILE
+        CALL PROCESS'FILE
+        ENTRY = FNAME2
+        TMP1 = "/work/"
+        TMP2 = "done"
+        CALL MOVE'FILE
+
+        !!This will schedule it for delete (use touch to keep caps)
+        XCALL SYSTEM,"touch "+FNAME'DEL+ "> /dev/null"
+    LOOP
+ELSE
+    ENTRY = "No 945 files found in "+DIR+" folder"
+    \LABLOGGER ENTRY LNAME
+ENDIF
+
+FINAL'END:
+
+END
+
+FIX'FILE:
+    IF ENTRY # LCS(ENTRY) THEN
+        XCALL SYSTEM,"mv " + ENTRY + " " + LCS(ENTRY)
+        ENTRY = LCS(ENTRY)
+    ENDIF
+RETURN
+
+MOVE'FILE:
+    II = INSTR(1,ENTRY,TMP1)
+    IF II = 0 THEN
+        ENTRY = "Invalid file name " + ENTRY + "("+TMP1+")"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+    FNAME2 = ENTRY[1,II] + TMP2 + ENTRY[II+LEN(TMP1)-1,-1]
+    ENTRY = "mv "+ ENTRY + " " + FNAME2
+    XCALL SYSTEM,ENTRY
+    LOOKUP FNAME2,II
+    IF II = 0 THEN
+        ENTRY = "Failed to move file " + FNAME2
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+RETURN
+
+PROCESS'FILE:
+    OPEN #2001,FNAME2,INPUT
+    DO
+        INPUT LINE #2001, TMP
+        IF EOF(2001) # 0 EXIT
+        \STRIP TMP
+        IF TMP = "" REPEAT
+        LAST'POS = 1
+        CALL GET'VALUE
+        REC'TYPE = VALUE
+
+        IF REC'TYPE = "EASI " REPEAT    !!Routing header
+
+        ENTRY = "Rec type: "+VALUE
+        \LABLOGGER ENTRY LNAME
+
+        CASE
+        IF REC'TYPE = "01" THEN
+            CALL PROCESS'HEADER
+        ELSE
+        IF REC'TYPE = "A" AND MY'PURPOSE = "00" THEN        !!Original
+            CALL PROCESS'DETAIL'A
+        ELSE
+        IF REC'TYPE = "A" AND MY'PURPOSE = "07" THEN        !!Duplicate
+            CALL PROCESS'DETAIL'A
+        ELSE
+        IF REC'TYPE = "A" AND MY'PURPOSE = "16" THEN        !!Corrected
+            CALL PROCESS'DETAIL'A
+        ELSE
+        IF REC'TYPE = "A" AND MY'PURPOSE = "22" THEN       !!Proposed
+            CALL PROCESS'DETAIL'A
+        ELSE
+        IF REC'TYPE = "B" THEN
+            CALL PROCESS'DETAIL'B
+        ELSE
+        IF REC'TYPE = "09" THEN
+            CALL PROCESS'TRAILER
+            STARTED = 0
+        ELSE
+        IF REC'TYPE = "EASX" THEN
+            CALL CLOSE'FILES
+            EXIT
+        ELSE
+            ENTRY = "Invalid record type: "+REC'TYPE
+            \LABLOGGER ENTRY LNAME
+        ENDCASE
+    LOOP
+RETURN
+
+CLOSE'FILES:
+    IF EOF(2001) = 0 THEN
+        CLOSE #2001
+    ENDIF
+    ECNT = 0
+
+    IF HOB'STARTED = 1 AND SKIP'FLAG = 0 AND MANIFESTED'ORDER = "Y" THEN
+        CALL POST'ORDER
+        REL OEHDR
+        IF ECNT = 0 THEN                !!Will leave in HOB if not posted
+            IF HOB'MSGNO # 0 THEN
+                DELMSG HOB'MSGNO "POMSG"
+            ENDIF
+            \SETKEY HOB MODE="ALL"
+            \DELKEY HOB MODE="ALL"
+            DELETE HOB
+        ELSE
+            ENTRY = "Failed to post order"
+            CALL HOB'ERROR
+        ENDIF
+        HOB'STARTED = 0
+    ELSE
+        ECNT = 1
+        IF SKIP'FLAG = 0 THEN
+            ENTRY = "Did not post order"
+            CALL HOB'ERROR
+        ENDIF
+!!If we receive a shipment confirmation without 1z numbers
+        IF MANIFESTED'ORDER # "Y" THEN
+            ENTRY = "Order cancelled at shipping facility; no tracking numbers found"
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            CALL HOB'ERROR
+        ENDIF
+    ENDIF
+    REL HOB
+    REL HDR
+    REL BOX
+    IF ECNT = 0 THEN
+        ENTRY = "Posted order:"
+        \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+        \LABLOGGER ENTRY LNAME
+    ELSE
+    IF ECNT = 2 THEN
+        ENTRY = "Failed to post order:" + CMN'FRM'PRGNAM
+        \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+    ENDIF
+RETURN
+
+PROCESS'HEADER:
+    SENTRY = "Processing Header: "+FNAME2
+    \LABLOGGER SENTRY LNAME
+    STARTED = 1
+    CALL GET'VALUE                        !!Transaction Type
+    IF VALUE # MY'TRX'TYPE THEN
+        ENTRY = "Invalid file, transaction type was "+VALUE+" not "+MY'TRX'TYPE+"!"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+
+    CALL GET'VALUE                        !!Transaction Set Purpose
+    IF VALUE # "00" AND VALUE # "07" AND VALUE # "16" AND VALUE # "22" THEN
+        ENTRY = "Invalid transaction set purpose was "+VALUE
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ELSE
+        MY'PURPOSE = VALUE
+    ENDIF
+
+    CALL GET'VALUE                        !!Version Number
+
+    USE BLF INTO BLF'REC KEY BLF'KEY
+    IF BLF'CTL # 0 THEN
+        ENTRY = "Cannot find interface format to process 945!"
+        \KERROR BLF APID="PO" MODE="KEY" CNO="N"
+        CALL HOB'ERROR
+        GOTO ABORT
+    ELSE
+        IF BLF'DOC'TYPE = "945" THEN
+            IF VALUE # BLF'VERSION THEN
+                ENTRY = "Version mismatch, found "+VALUE+" and program is for "+BLF'VERSION
+                CALL HOB'ERROR
+            ENDIF
+        ENDIF
+    ENDIF
+
+!   IF VALUE # MY'BLF'VERSION THEN
+!       ENTRY = "Version mismatch, found "+VALUE+" and program is for "+MY'BLF'VERSION
+!       \LABLOGGER ENTRY LNAME
+!       GOTO ABORT
+!   ENDIF
+
+    CALL GET'VALUE                        !!Purchase Order Type Code
+    CALL GET'VALUE                        !!Purchase Order Number (our PO number)
+    \STRIP VALUE 3
+
+    SENTRY = "Received O/S Purchase Order # "+VALUE
+    \LABLOGGER SENTRY LNAME
+
+    HOBP'KPOHDR'DTYP = POC'HOB'INVTY
+    HOBP'KPOHDR'NO = VALUE
+    RDKEY HOBP
+    IF HOBP'CTL = 0 THEN
+        RDLOCK HOB HOBP'RCN INTO HOB'REC
+        ENTRY = ""    !!Clear
+        \KERROR HOBP APID="PO" MODE="KEY" CNO="N"
+        ENTRY = "Locked HOB for Purchase Order # "+VALUE+ " key="+ENTRY
+        \LABLOGGER ENTRY LNAME
+
+        ENTRY = ""    !!Clear
+        \KERROR HOBS APID="PO" MODE="DATA" CNO="N"
+        ENTRY = "           on  Sales Order # key="+ENTRY
+        \LABLOGGER ENTRY LNAME
+
+    ELSE
+        IF HOBP'CTL # 0 THEN
+            CALL LOOKUP'ARCHIVED'ORDER
+            SKIP'FLAG = 1
+            RETURN
+        ENDIF
+    ENDIF
+!   HOB'RCN = HOBP'RCN
+    \SETKEY HOB MODE="KY2" BAD1="HOBP"
+
+    HDR'SPACE = SPACE                    !!PO
+    HDR'KDOC'TYPE = HOB'POHDR'DTYP
+    HDR'KNO = HOB'POHDR'NO
+    RDLOCK HDR INTO HDR'REC KEY HDR'KEY
+    IF HDR'CTL # 0 THEN
+        ENTRY = "Could not find Purchase Order: ["+HOB'POHDR'DTYP+" - "+HOB'POHDR'NO+"]"
+        GOTO HOB'ERROR
+    ENDIF
+
+    OEHDR'KLOC'NO = HOB'OEHDR'LOC         !!OE
+    OEHDR'KDOC'TYPE = HOB'OEHDR'DTYP
+    OEHDR'KNO = HOB'OEHDR'NO
+    RDLOCK OEHDR INTO OEHDR'REC KEY OEHDR'KEY
+    IF OEHDR'CTL # 0 THEN
+        ENTRY = "Could not find Sales Order: ["+HOB'OEHDR'DTYP+" - "+HOB'OEHDR'NO+"]"
+        GOTO HOB'ERROR
+    ENDIF
+
+    HOB'STATUS = "4"
+    \UPDKEY HOB MODE="KY2" BAD1="HOBP"
+    UPDATE HOB FROM HOB'REC
+
+    ENTRY = "1. Update HOB:"
+    \KERROR HOBS APID="PO" MODE="DATA" CNO="N"
+    \LABLOGGER ENTRY LNAME
+
+    LBOX = 0
+    HOB'STARTED = 1
+
+    CALL GET'VALUE                        !!PO Date
+    CALL GET'VALUE                        !!PO Time
+    CALL GET'VALUE                        !!Order Ship Date
+    CALL GET'VALUE                        !!Common Carrier Code
+    CALL GET'VALUE                        !!Tracking ID reference
+    CALL GET'VALUE                        !!Receipients Company Name
+RETURN
+MAP1 TRACKING,S,25
+
+PROCESS'DETAIL'A:
+    ENTRY = "Start detail A"
+    \LABLOGGER ENTRY LNAME
+!![WC]  CAll GET'VALUE                  !!
+
+    CALL GET'VALUE                  !!1Z tracking
+    \STRIP VALUE 3
+    TRACKING = VALUE
+    IF TRACKING[1;2] = "10" THEN
+        TRACKING = "1Z"+TRACKING[3,-1]
+    ENDIF
+    ENTRY = "1z number "+VALUE+" TRACK="+TRACKING
+    \LABLOGGER ENTRY LNAME
+
+    BOX'SPACE = SPACE
+    BOX'HDR'LOC'NO = OEHDR'LOC'NO
+    BOX'DOC'TYPE = OEHDR'DOC'TYPE
+    BOX'HDR'NO = OEHDR'NO
+    BOX'NO = LBOX + 1
+    LBOX = BOX'NO
+    BOX'SHIPMENT = OEHDR'SHIPMENT + 1
+
+    ENTRY = "BOX="+BOX'HDR'LOC'NO+"-"+BOX'DOC'TYPE+"-"+BOX'HDR'NO+"-"+BOX'NO+"-"+BOX'SHIPMENT
+    \LABLOGGER ENTRY LNAME
+
+    \SETKEY BOX MODE="KEY" APID="OE"
+    RDLOCK BOX INTO BOX'REC KEY BOX'KEY
+
+    ENTRY = "BOX CTL="+BOX'CTL
+    \LABLOGGER ENTRY LNAME
+
+    IF BOX'CTL # 0 THEN
+        BOX'TRACK'NO = TRACKING
+        ADDL BOX FROM BOX'REC KEY BOX'KEY
+        IF BOX'CTL # 0 THEN
+            ENTRY = "Wierd cannot lock box"
+            \KERROR BOX MODE="KEY" APID="OE" CNO="N"
+            GOTO HOB'ERROR
+        ENDIF
+        \SETKEY BOX MODE="KY2" APID="OE"
+        \ADDKEY BOX MODE="KY2" APID="OE"
+    ELSE
+        \SETKEY BOX MODE="KY2" APID="OE"
+    ENDIF
+    \STRIP TRACKING 3
+    BOX'TRACK'NO = TRACKING
+    \SETKEY BOX MODE="KY2" APID="OE"
+    \UPDKEY BOX MODE="KY2" APID="OE"
+    WRITE BOX FROM BOX'REC
+    MANIFESTED'ORDER = "Y"
+
+    ENTRY = "AFTER WRITE"
+    \LABLOGGER ENTRY LNAME
+
+    CALL GET'VALUE                    !!Manufacturer Serial Case
+    CALL GET'VALUE                    !!Case Weight
+    CALL GET'VALUE                    !!Freight Charge
+RETURN
+
+PROCESS'DETAIL'B:
+    CALL GET'VALUE                  !!Line Item number
+    CALL GET'VALUE                  !!GTIN
+    CALL GET'VALUE                  !!Quantity Shipped
+RETURN
+
+PROCESS'TRAILER:
+    FOR II = 1 TO 5                           !!File Creation Date
+        CALL GET'VALUE                        !!File Creation Time
+    NEXT II                                   !!Total Records
+RETURN
+
+LOOKUP'ARCHIVED'ORDER:
+    HDR'SPACE = SPACE                    !!PO
+    HDR'KDOC'TYPE = POC'HOB'INVTY
+!!  HDR'KNO = HOB'POHDR'NO
+    HDR'KNO = VALUE                !! EASI PO received
+
+    \KERROR HDR APID="PO" MODE="KEY" CNO="N"
+    ENTRY = " Lookup          Purchase Order # key="+ENTRY
+    \LABLOGGER ENTRY LNAME
+
+    USE HDR INTO HDR'REC KEY HDR'KEY
+    IF HDR'CTL # 0 THEN
+        HHS'SPACE = SPACE
+        HHS'KDOC'TYPE = POC'HOB'INVTY
+!!      HHS'KNO = HOB'POHDR'NO
+        HHS'KNO = VALUE            !! EASI PO received
+        HHS'KSHIPMENT = 1
+
+        \KERROR HHS APID="PO" MODE="KEY" CNO="N"
+        ENTRY = " Lookup Archived Purchase Order # key="+ENTRY
+        \LABLOGGER ENTRY LNAME
+
+        USE HHS INTO HHS'REC KEY HHS'KEY
+        IF HHS'CTL # 0 THEN
+            ENTRY = "Could not find Purchase Order to lookup Order"
+            \KERROR HHS APID="PO" MODE="KEY" CNO="N"
+            GOTO HOB'ERROR
+        ELSE
+            IF HHS'MSGNO # 0 THEN
+                USE MSG HHS'MSGNO INTO MSG'REC
+                IF MSG'CTL = 0 THEN
+                    \PARSE STRING="MSG'DATA" DEL=":" ENTRY ORDER
+                    \PARSE STRING="ORDER" DEL="-" OEHHS'KLOC'NO OEHHS'KDOC'TYPE OEHHS'KNO
+                    OEHHS'KSHIPMENT = 1
+                    USE OEHHS INTO OEHHS'REC KEY OEHHS'KEY
+                    IF OEHHS'CTL # 0 THEN
+                        ENTRY = "Cannot find Archived order"
+                        \KERROR HHS APID="OE" CNO="N" MODE="KEY" ALTKEY="OEHHS"
+                        GOTO HOB'ADD'ERROR
+                    ENDIF
+                ELSE
+                    ENTRY = "Cannot find order in PO message"
+                    \KERROR HHS APID="PO" MODE="KEY" CNO="N"
+                    GOTO HOB'ERROR
+                ENDIF
+            ELSE
+                ENTRY = "Cannot read PO message to find Order"
+                \KERROR HHS APID="PO" MODE="KEY" CNO="N"
+                GOTO HOB'ERROR
+            ENDIF
+        ENDIF
+    ELSE
+        MSG'DID = "POMSG"
+        IF HDR'MSGNO # 0 THEN
+            USE MSG HDR'MSGNO INTO MSG'REC
+            IF MSG'CTL = 0 THEN
+                \PARSE STRING="MSG'DATA" DEL=":" ENTRY ORDER
+                \PARSE STRING="ORDER" DEL="-" OEHHS'KLOC'NO OEHHS'KDOC'TYPE OEHHS'KNO
+                \COPYF HHS OE OEHHS MODE="PRI"
+                OEHHS'KSHIPMENT = 1
+                USE OEHHS INTO OEHHS'REC KEY OEHHS'KEY
+                IF OEHHS'CTL # 0 THEN
+                    ENTRY = "Cannot find Archived order"
+                    \KERROR HHS APID="OE" CNO="N" MODE="KEY" ALTKEY="OEHHS"
+                    GOTO HOB'ADD'ERROR
+                ENDIF
+            ELSE
+                ENTRY = "Cannot find order in PO message"
+                \KERROR HDR APID="PO" MODE="KEY" CNO="N"
+                GOTO HOB'ERROR
+            ENDIF
+        ELSE
+            ENTRY = "Cannot read PO message to find Order"
+            \KERROR HDR APID="PO" MODE="KEY" CNO="N"
+            GOTO HOB'ERROR
+        ENDIF
+    ENDIF
+RETURN
+
+HOB'ADD'ERROR:
+    SENTRY = ENTRY
+    HOB'SPACE = SPACE
+    HOB'STATUS = "4"
+    HOB'OEHDR'LOC = 9999
+    HOB'OEHDR'DTYP = 9
+    HOB'OEHDR'NO = -1
+    \SETKEY HOB MODE="KEY"
+    RDKEY HOB
+    GETPRV HOB
+    HOB'KEY = HOB'KEY2
+    IF HOB'KOEHDR'LOC = 9999 THEN
+        HOB'OEHDR'NO = HOB'KOEHDR'NO + 1
+    ELSE
+        HOB'OEHDR'NO = 1
+    ENDIF
+    HOB'POHDR'DTYP = 9
+    HOB'POHDR'NO = HOB'OEHDR'NO
+    DO
+        \SETKEY HOB MODE="KEY" APID="PO"
+        ADDL HOB FROM HOB'REC KEY HOB'KEY
+        IF HOB'CTL = 0 EXIT
+        HOB'OEHDR'NO = HOB'OEHDR'NO + 1
+        HOB'POHDR'NO = HOB'OEHDR'NO
+    LOOP
+    IF HOB'CTL # 0 THEN
+        ENTRY = "Wierd, could not add HOB"
+        \KERROR HOB CNO="N" APID="PO" MODE="KEY"
+        \ABLOGGER ENTRY
+    ELSE
+        \SETKEY HOB MODE="KY2" APID="PO"
+        \ADDKEY HOB MODE="KY2" APID="PO"
+        REL HOB
+        CALL HOB'ERROR
+    ENDIF
+RETURN
+
+HOB'ERROR:
+        HOB'STARTED = 0
+        COPYF "MSGFIL[SY]",NOAFR
+        MSG'DID = "POMSG"
+        MSG'SPACE = SPACE
+        MSG'DATA = ENTRY + " F:"+FNAME
+        ADD MSG
+        ENTRY = MSG'DATA
+        \KERROR HOB APID="PO" MODE="DATA" CNO="N"
+        \LABLOGGER ENTRY LNAME
+        IF HOB'MSGNO = 0 THEN
+            HOB'MSGNO = MSG'RCN
+            UPDATE HOB FROM HOB'REC
+
+            ENTRY = "2. Update HOB:"
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            \LABLOGGER ENTRY LNAME
+        ELSE
+            SAV'MSG = MSG'RCN
+            MSG'RCN = HOB'MSGNO
+            DO WHILE MSG'RCN # 0
+                RDLOCK MSG
+                IF MSG'CTL # 0 EXIT
+                IF MSG'CH = 0 THEN
+                    MSG'CH = SAV'MSG
+                    WRITE MSG
+                    EXIT
+                ELSE
+                    REL MSG
+                    MSG'RCN = MSG'CH
+                ENDIF
+            LOOP
+        ENDIF
+RETURN
+
+POST'ORDER:
+    OEHDR'ACTION = "P"
+    OEHDR'PQU'STAT = "Q"
+    WRITE OEHDR FROM OEHDR'REC
+    CMN'SPACE = SPACE
+    CMN'TO'PRGNAM = "OERCTL"
+    CMN'FRM'PRGNAM = "POL945"
+    CMN'SAV'RCN(1) = OEHDR'RCN
+    \EXPROG OERCTL COMMON="CMN'REC" APID="OE" LFA="L"
+    RDLOCK HOB INTO HOB'REC
+    IF CMN'FRM'PRGNAM = "GOOD" THEN
+        ECNT = 0
+    ELSE
+        ENTRY = "Bad Link to OERCTL: "+ CMN'FRM'PRGNAM + "-" + CMN'OTHER
+        CALL HOB'ERROR
+        ECNT = 2
+    ENDIF
+RETURN
+
+ABORT:
+    IF PO'STARTED = 1 THEN
+        ECNT = ECNT + 1
+        PERR = 1
+    ENDIF
+    \LABLOGGER ENTRY LNAME
+    IF PO'STARTED = 0 THEN
+        ENTRY = "SEVERE ERROR: Program aborted badly!"
+        \LABLOGGER ENTRY LNAME
+        GOTO FINAL'END
+    ENDIF
+RETURN
+
+COPY "FORMAT"
+COPY "BASERR"
+COPY "POLOAD"                             !!GET'VALUE:
+COPY "CVTDTT"

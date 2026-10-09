@@ -1,0 +1,2313 @@
+! @#$^&* 16 0 2086 0 0 0 0 0 0 0 0 0 1693 *&^$#@ 
+!*! Updated on Thu Nov  4 13:31:39 2021 by Cheryl Eberhard  1 times 
+!*! Updated on Thu Apr 15 09:38:34 2021 by Cheryl Eberhard  2 times 
+!*! Updated on Thu Feb 18 13:04:18 2021 by Cheryl Eberhard  1 times 
+PROGRAM POL940,8.0
+GLOBAL V''LINKEE="Y"
+GLOBAL REVISION="001"
+!!POL940.BV - Report Mainline Program for REPORT MODULE: POL940
+!!              Report Program Using the SELECTOR (Schema)
+!!
+!!                       V. I. C. S.
+!!                    of Camp Verde, AZ
+!!
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!              All rights reserved.
+!!
+!!     Model program SSRPT written by:
+!!
+!! Written by Eric S. Eberhard, Kenneth J. Shook, V.I.C.S., Camp Verde, AZ
+!! And Tom Faust, Software Designs, Spokane, WA, December 1985
+!!
+!! Last model update - 04/23/87 KJS
+!!                     07/27/88 ESE/KJS - Add setting of start/end keys.
+!!                     04/20/90 KJS/CLS Changed KILL statement on abort
+!!                                      to use 'r' instead of R'FILENME.
+!!                     08/06/90 KJS     Corrected Schema problem in BGP.
+!!                     10/23/90 BAP     Changed copies test to match spool
+!!                                              test.
+!!                      02/18/91 KJS    Changed IN'BGP test.
+!!                      10/15/91 SLM    Make titles work only w/GENCODES.
+!!                      06/11/92 ESE    7.3 changes incorporated.
+!!
+!! Copyright 1985 Alpha Base Systems, Inc., Los Angeles, CA
+!!         -AND- Copyright 1985 V.I.C.S., Camp Verde, AZ
+!!
+!!                              V.I.C.S.
+!!
+!!                         December 4, 1985
+!!
+!!      Revision History:
+!!
+!![1] 08/18/93 ESE      NEW: security added.
+!!
+!![2] 02/07/94 ESE      NEW: support ULAN local printer support.
+!!
+!![3] 03/18/94 RLC      FIX: Remote PC printing with  ULAN.
+!!
+!![4] 06/06/94 ESE      NEW: Support TOMSG, new PC print.
+!!
+!![5]  06/13/94 CAE     FIX: Corrected printout of User ID on report.
+!!                           IH: need .R
+!!
+!!7.4   09/30/95 CAE    New version created
+!!
+!!8.0  02/04/97 CAE     New version created
+!!
+!![6]  02/04/97 CAE     NEW: Changes for year 2000.
+!!
+!!A note about the schema and stack and various modes of this program:
+!!      There are really three modes to this program for two different
+!!      ways of executing a report.
+!!
+!!              1. User chooses execution in foreground (current user job):
+!!
+!!              2. User chooses execution in background (BGP job):
+!!
+!!                      a. This program runs in foreground
+!!                         and sets up the stack and places this
+!!                         program on the QUEUE for execution
+!!
+!!                      b. This program runs in BGP job and uses
+!!                         information set in 2a above.
+!!
+!!
+!!The program logic is as follows:
+!!
+!!      First we always LDUSR, check pass security, then ...
+!!        (Checks first byte of PWASTR only to determine if allowed to run)
+!!
+!!      Find out if we are running in background (IN'BGP = 1)
+!!
+!!              If we are in background (2b above):
+!!                     -retrieve standard PQU info which occurs in report macros
+!!                     -call SET'USR'DATA and retrieve user info placed
+!!                              on stack (in 2a above).  I suggest using
+!!                              SETUSR macro.
+!!                     -execute report beginning at BEGIN
+!!                     -exit program at ABORT if abnormal, or NORMAL'BGP'FINISH
+!!                              if all is OK
+!!
+!!
+!!              If not in background then we:
+!!                      -calls STANDARD'SCREEN and get standard PQU
+!!                              questions answered.  Programmer may
+!!                              modify this screen (VICSRP.S[11,10])
+!!                              to input user data
+!!                      -calls PUT'USR'DATA where you may make your
+!!                              own input screen and MUST put any
+!!                              user data onto stack if PRW'STK # "N"
+!!                              (or use PUTUSR macro).
+!!                      -IF PRW'STK = "Y" then we go into mode 2a above:
+!!                              -Setup PQU for standard stack data
+!!                              -exit program at END'AFTER'PUT'ON'STACK
+!!                                      on normal exit, ABORT on abnormal
+!!                      -IF PRW'STK = "N" then we go into mode 2b above
+!!                              -execute report beginning at BEGIN
+!!                              -exit program at ABORT if abnormal,
+!!                                      or NORMAL'FINISH if normal exit
+!!
+!!Note:  unlike the old model this program does not exit to perform
+!!       a SELECTOR select/sort ... so nothing needs saving on the QUEUE
+!!       etc.  For those who care, XCALL LINK is used to execute SCHEMA
+!!
+SIGNIFICANCE 11
+
+!!Program control globals
+
+!!The below six globals set records to be put on and retrieved off of
+!!the PQD stack for BGP operation.  They are also used in TITLES macro
+!!so that FUNC-W and FUNC-R will write and read the saved values.
+!!
+GLOBAL PASREC1="TLT'REC"
+GLOBAL PASREC2="CMN'REC"
+!GLOBAL PASREC3="MY3'REC"
+!GLOBAL PASREC4="MY4'REC"
+!GLOBAL PASREC5="MY5'REC"
+!GLOBAL PASREC6="MY6'REC"
+
+
+GLOBAL SCHEMA'TEST="N"          !!Changes PUTUSR and SETUSR behavior
+                                !!and MUST be 'N' if using old select
+                                !!otherwise 'Y' regardless of below global
+
+GLOBAL ALLOW'SCHEMA="N"         !!Causes standard report macros to copy
+                                !!in SCHEMA logic.  Without this NO
+                                !!select or sort can ever be peformed
+
+GLOBAL PROGRAM'FILL="N"         !!If 'Y' will allow program to
+                                !!fill particular values into select/sort
+                                !!areas of USRHDR.  See PRGM'FILL'SLH
+
+GLOBAL ABORT'NOSL="N"           !!If 'Y' will abort when 0 records selected
+                                !!If 'N' will ask screen questions again
+                                !!If 'C' will continue through program flow
+
+        !!The following globals directly affect SELECT.MAC[16,14]
+        !!Which does the actual selection process.  Set the key packets
+        !!in the label "SET'START'END'KEYS" below.
+
+GLOBAL STARTKEY="STR'KEY"       !!MODIFY: If set, will cause primary key to
+                                !!start at given value.  Replace STR'KEY
+                                !!with your key packet and set key to starting
+                                !!values.
+
+GLOBAL ENDKEY="END'KEY" !!MODIFY: If set, will cause primary key to
+                                !!stop at given value.  Replace END'KEY
+                                !!with your key packet and set key to ending
+                                !!values.  If using STARTKEY above, make sure
+                                !!you use different key packets!!
+
+        !!The following globals are use in VICSRP.S[11,10]
+        !!which is the screen used in STANDARD'SCREEN
+        !!They are the defaults to the fields on that screen, name of
+        !!the screen, and edit routines on that screen.
+
+        !!The defaults MUST have three quotes if literals
+        !!or single quotes if variables
+
+SYMBOL SCREEN="POL940"          !!Default screen
+GLOBAL DFLT'PRW'SUM="""N"""     !!Default for Summary option (Y/N)
+GLOBAL DFLT'PRW'SEL="""N"""     !!Default for Select/Sort option (Y/N)
+!GLOBAL PRW'SEL'EDITS = "ADDITIONAL EDITS ON PRW'SEL"  !!Enable if you
+                                !!need more than standard edit for PRW'SEL
+
+                !!These second two must be "" (NO default)
+                !!or numbers or a variable
+
+GLOBAL DFLT'PRW'SCHEMA=""       !!Default for Schema number in (####)
+CIF DFLT'PRW'SCHEMA = "" THEN
+        GLOBAL DFLT'PRW'SCHEMA="SPACE"  !!Default for Schema number in (####)
+ENDCIF
+
+GLOBAL DFLT'PRW'HEADER=""       !!Default for Schema header in (####)
+CIF DFLT'PRW'HEADER = "" THEN
+        GLOBAL DFLT'PRW'HEADER="SPACE"  !!Default for Schema header in (####)
+ENDCIF
+
+!GLOBAL USER'SELECT="LABLE'NAME" !!To perform your own \SELECT macro call
+
+!!Standard file definitions:
+!!
+        COPYF   "USRFIL[SY]",NOAFR
+        COPYF   "USRKEY[SY]"
+        COPYF "CMNFIL[SY]"
+
+
+!!Standard copied maps:
+!!
+        \SSRPTMAPS                      !! SSRPT.MAC
+
+!!User file definitions and maps
+                                        !!MODIFY:  add your maps and
+                                        !!         COPYF's here
+
+!!Skip fields on STANDARD'SCREEN parameters
+
+        MAP1    MULTI'LOC,S,1
+        MAP1    NOSEL,B,1,1             ! Set = to 1 to bypass Selection choice
+        MAP1    NOSUM,B,1,1             ! Set = to 1 to bypass Summary choice
+        MAP1    NOSTACK,B,1,1           ! Set = to 1 to bypass stack choice
+        MAP1    NOSCHEMA,B,1,1          ! Set = to 1 to bypass SCHEMA choice
+        MAP1    NOHEADER,B,1,1          ! Set = to 1 to bypass HEADER choice
+!!Skip fields in SELECT program paramaters (defined in HEADER PRW'HEADER)
+!!                                         (and defined by PRW'SCHEMA   )
+
+        MAP1    NOSRT,B,1               ! Set = to 1 to disallow change of
+                                        ! SORT parameters in the passed header.
+        MAP1    NOSLCT,B,1              ! Set = to 1 to disallow change of
+                                        ! the SELECT parameters in the
+                                        ! passed header
+        MAP1    NOSEE,B,1               ! Set = to 1 to not LINK to SELECT
+                                        ! and sort screen at ... not allow
+                                        ! user to see or modifiy the
+                                        ! passed header that will still
+                                        ! be used for select and sort.
+        MAP1    NOCOPIES,B,1,0          ! Set # to 0 to bypass COPIES choice
+                                        ! and hard code number of copies
+!!Misc user parameters
+
+        MAP1    DSK                     ! USR Params for RPT Stack
+                MAP2    DEV,S,3
+                MAP2    DRV,S,2
+        MAP1    PPN,S,7
+
+        MAP1    FORMID,S,6
+        MAP1    H'QUE,B,1,60            ! Standard Hold Que
+        MAP1    P'QUE,B,1,20            ! Standard Process Que
+
+        MAP1    ASKEXT,S,1              ! Ask any key to Exit in select/sort
+
+                                        !                       to print
+        MAP1    LV,F,6,1                ! Start level - do not change
+
+        MAP1    RP'GROUP,S,1            ! Group headers (Y-N)
+        MAP1    RP'SKIP,B,1             ! Break line skip count
+        MAP1    SAV'PRTNO,S,4           ! Save area for AFRing
+        COPY "FORMAD"
+
+        COPY "CVTMAP"
+        COPYF "WRKFIL[IN]",NOAFR
+        COPYF "OC2FIL[OE]",NOAFR
+
+        \COPYF LST MC LST2
+        \COPYF CMP SY
+        \COPYF MSG SY
+        \COPYF HDR PO MODE="PRI"
+        \COPYF LIN PO MODE="PRI"
+        \COPYF SUB PO MODE="PRI"
+        \COPYF UCC PO
+        \COPYF BLF PO MODE="PRI"
+        \COPYF VEN AP MODE="PRI"
+        \COPYF TRH AR MODE="PRI"
+        \COPYF HDR OE OEHDR
+        \COPYF LIN OE OELIN
+        \COPYF SUB OE OESUB
+        \COPYF BOX OE OEBOX
+        \COPYF TAD OE MODE="PRI"
+        \COPYF LOC IN MODE="PRI"
+        \COPYF VIA IN MODE="PRI"
+        \COPYF UOM IN MODE="PRI"
+        \COPYF PRH IN MODE="PRI"
+        \COPYF ATT IN MODE="PRI"
+        \COPYF TBL IN MODE="PRI"
+        \COPYF RZC UP MODE="PRI"
+        \COPYF LST MC
+        \COPYF EXT MC
+        \COPYF CUS AR
+        \COPYF ATQ CV
+        \COPYF UPS IN
+
+        MAP1 MY'LOC,B,2
+        MAP1 CREATE'ONE'PO,S,1
+        MAP1 ALL'DONE,F
+        MAP1 RELEASED,B,1,0
+        MAP1 SKIPPED'ORDER,B,4,0
+        MAP1 EMAIL'NAME,S,80
+        MAP1 EMAIL'COMMAND,S,80
+        MAP1 TMP'FNAME,S,80
+        MAP1 ENCODE'COMMAND,S,80
+        MAP1 EMAIL'ADMIN,S,20
+        MAP1 EMAIL'FILE'NAME,S,50
+        MAP1 PO'STARTED,B,1
+        MAP1 ECNT,B,5
+        MAP1 PERR,B,1
+        MAP1 POCNT,B,5
+        MAP1 TOTAL,B,5
+        MAP1 BUS'PHONE,S,15
+        MAP1 TYPE'OF'DOCUMENT,S,3
+        MAP1 TOTAL'QUANTITY,B,5
+        MAP1 NUM'OF'RECORDS,B,2
+        MAP1 OLD'NUM'OF'RECORDS,B,2
+        MAP1 OESUB'II,F
+        MAP1 BERROR,B,1
+        MAP1 BASE,S,128
+        MAP1 DIR,S,128
+        MAP1 TWO'NAME,S,128,"/logs/pol940.DAILY"
+        MAP1 I,F
+        MAP1 II,F
+        MAP1 WNAME,S,128
+        MAP1 BNAME,S,128
+        MAP1 OUTNAME,S,128
+        MAP1 PURPOSE,S,1
+        MAP1 EASI'SENDER'ID,S,15
+        MAP1 LINE'ITEM'COUNTER,B,3
+        MAP1 DID'ANYTHING,B,1
+
+        MAP1 EASI'HEADER                   !!Header
+            MAP2 HEADER,S,2
+            MAP2 TRANS'TYPE,S,3
+            MAP2 TRANS'SET'PURPOSE,S,2
+            MAP2 VERSION'NUMBER,S,3
+            MAP2 PO'TYPE'CODE,S,2
+            MAP2 WHOLESALER'PO'NUMBER,S,22
+            MAP2 PO'DATE,S,8
+            MAP2 PO'TIME,S,6
+            MAP2 CUSTOMER'PO'NUMBER,S,30
+            MAP2 CURRENCY'CODE,S,3
+            MAP2 PO'ACCOUNT'ID,S,12
+            MAP2 STORE'ID,S,9
+            MAP2 VENDOR'ID,S,10
+            MAP2 CONTACT'NAME,S,45
+            MAP2 FOB,S,2
+            MAP2 SALES'CODE'SHIPMENT,S,2
+            MAP2 SALES'CODE'TRUCK,S,2
+            MAP2 SALES'CODE'SHIP'DATE,S,2
+            MAP2 SALES'CODE'CONSIGNEE,S,2
+            MAP2 COD'FOR'MERCHANDISE,S,3
+            MAP2 PAYMENT'TERMS'DISCOUNT,S,4
+            MAP2 PAYMENT'TERMS'DAYS,S,3
+            MAP2 PAYMENT'DUE'DAYS,S,3
+            MAP2 SPECIFIC'PAYMENT'DATE,S,8
+            MAP2 LITERAL'PAYMENT'TERMS,S,45
+            MAP2 REQUESTED'SHIP'DATE,S,8
+            MAP2 DELIVERY'OPTION,S,15
+            MAP2 CARRIER'ROUTING'DETAILS,S,4
+            MAP2 CANCEL'DATE,S,8
+            MAP2 DELIVER'TO'COMPANY,S,45
+            MAP2 DELIVER'TO'CONTACT,S,30
+            MAP2 RECEIVERS'PHONE,S,20
+            MAP2 RECEIVERS'EMAIL,S,50
+            MAP2 ACCOUNT'NUMBER,S,20
+            MAP2 NAME'OF'ACCOUNT,S,45
+            MAP2 TRACKING'ID,S,45
+            MAP2 PURCHASERS'ACCOUNT'ID,S,45
+            MAP2 DELIVER'TO'ADDR1,S,30
+            MAP2 DELIVER'TO'ADDR2,S,30
+            MAP2 DELIVER'TO'CITY,S,30
+            MAP2 DELIVER'TO'STATE,S,2
+            MAP2 DELIVER'TO'ZIP,S,11
+            MAP2 DELIVER'TO'COUNTRY,S,3
+            MAP2 DROP'SHIP'CODE,S,1
+            MAP2 SPEC'DELIVERY'INSTRUCTIONS,S,90
+            MAP2 SPEC'ORDER'INSTRUCTIONS,S,90
+            MAP2 COMMERCIAL'OR'RESIDENTIAL,S,1
+            MAP2 COD'TAGS'INDICATOR,S,1
+            MAP2 THIRD'PARTY'ACCOUNT,S,20
+            MAP2 DELIVER'TO'COUNTY,S,30
+            MAP2 PROMO'CODE,S,20
+
+        MAP1 PO'DETAIL                !!PO detail
+            MAP2 DETAIL'CODE,S,2
+            MAP2 LINE'ITEM'NUM,S,4
+            MAP2 ITEM'ID'GTIN,S,14
+            MAP2 MASTER'STYLE,S,10
+            MAP2 COLOR'CODE,S,7
+            MAP2 SIZE'CODE,S,7
+            MAP2 QUANTITY'ORDERED,S,10
+            MAP2 PO'UOM,S,2
+            MAP2 SELLING'UNIT'PRICE,S,10
+            MAP2 TOTAL'LINE'ITEM,S,10
+
+        MAP1 OTHER'CHARGES'REC        !!Other charges record
+            MAP2 OTHER'CHARGES,S,2
+            MAP2 OC'LINE'ITEM'NUM,S,2
+            MAP2 OTHER'CHARGE'DESC,S,45
+            MAP2 OTHER'CHARGE'AMT,S,10
+
+        MAP1 TRAILER                  !!Trailer record
+            MAP2 TRAILER'RECORD,S,2
+            MAP2 RECORD'COUNT,S,7
+            MAP2 TOTAL'QUANTITY'ORDERED,S,10
+            MAP2 NUMBER'OF'CASES,S,7
+            MAP2 TOTAL'PO'AMOUNT,S,14
+
+
+ON ERROR GOTO ERTRAP
+
+BEGIN:
+!!Can't have any database calls before getcmn
+        GETCMN
+        IF IN'BGP = 0 THEN
+            CMN'REC = PASS'SEL'REC
+        ENDIF
+        \READCTL APID="PO" GL="N"
+        \READCTL APID="IN" GL="N"
+        \READCTL APID="AR" GL="N"
+        \READCTL APID="SA" GL="N"
+        \READCTL APID="MC" GL="N"
+        \READCTL APID="OE" GL="N"
+        USE OEC UB'CNO INTO OEC'REC
+        USE OC2 UB'CNO INTO OC2'REC
+        IF OC2'CTL # 0 THEN
+            ENTRY = "Cannot read OC2!"
+            CALL DO'ERRL
+            GOTO ABORT
+        ENDIF
+        \DG GETSTRING _POSETUP po1hob_A4_ucc_no A4'UCC'NO
+        \DG GETSTRING _POSETUP po1hob_DYE_ucc_no DYE'UCC'NO
+
+                        !!         with a different area than PASS'SEL'AR
+                        !!  If MY'REC <= 998 bytes
+                        !!         add following:  MY'REC = PASS'SEL'REC
+                        !!
+                        !!  If MY'REC > 998 bytes
+                        !!        add following:  GETCMN MY'REC
+                        !!                        PASS'SEL'REC = MY'REC
+
+
+                        !!MODIFY:  If you need to do input statements
+                        !!         (from a menu or command or .DO file)
+                        !!         code as follows:
+                        !!
+                        !!      IF IN'BGP = 0 THEN
+                        !!                      !!Input if not in background
+                        !!              INPUT MY'VARIABLE1
+                        !!              INPUT MY'VARIABLE2
+                        !!      ENDIF
+                        !!
+                        !!NOTE:  you may also want to test your common area!
+
+        \DOPASS
+        \TMREADCTL
+        \DG GETSTRING _POSETUP pol940.po_multi_store PO'MULTI'STORE
+        PQD'DATA = "Direct Shipment PO"
+        PQU'PROG = "POL940"
+
+        \VICSRPT                                !!SSRPT.MAC
+
+        CALL MAKE'940
+        IF IN'BGP CALL NORMAL'BGP'FINISH ELSE CALL NORMAL'FINISH
+END
+
+
+!!Exit routines - one for each type of possible exit!!
+
+
+ABORT:                          !!Used for abnormal exit of program
+                                !!such as error conditions or user
+                                !!voluntary exit.
+        IF IN'BGP CALL NORMAL'BGP'FINISH ELSE CALL NORMAL'FINISH
+
+        IF PO'STARTED = 1 THEN
+            ECNT = ECNT + 1
+            PERR = 1
+        ENDIF
+        IF TST'FUNC # 1 THEN
+            IF PO'STARTED = 0 THEN
+                ENTRY = "SEVERE ERROR: Program aborted badly!"
+                CALL DO'ERR
+                GOTO FINAL'END
+            ENDIF
+        ENDIF
+END
+
+END'AFTER'PUT'ON'STACK:         !!Normal exit after report has been QUEUE'd
+                !!MODIFY:  if you need to do a SNDCMN upon completion, one
+                !!                 goes here and in NORMAL'FINISH
+END
+
+MAP1 NORMAL'FINISH,B,1
+
+NORMAL'FINISH:                          !!Normal exit after report compelted
+        NORMAL'FINISH = 1
+        CALL CLEAN'UP
+                !!MODIFY:  if you need to do a SNDCMN upon completion, one
+                !!                 goes here and in END'AFTER'PUT'ON'STACK
+RETURN
+
+NORMAL'BGP'FINISH:                      !!Normal exit after report completed
+                                        !!running on BGP
+        NORMAL'FINISH = 1
+        CALL CLEAN'UP
+RETURN
+
+CLEAN'UP:               !!Called unless case 2a above (just put rpt on stack)
+                        !!including ABORT, BGP, etc.
+                        !!MODIFY:  release any record locks, close files, etc.
+        CIF ALLOW'SCHEMA = "Y" THEN
+                CALL FREE'SELECT'WORK'FILE
+        ENDCIF
+        IF CMN'FRM'PRGNAM = "POKEDT" OR CMN'FRM'PRGNAM = "POSUNE" THEN
+            IF NORMAL'FINISH = 1 THEN
+                CMN'FRM'PRGNAM = "GOOD"
+            ELSE
+                CMN'FRM'PRGNAM = "BAD"
+            ENDIF
+            SNDCMN CMN'REC
+        ENDIF
+RETURN
+
+!! Standard report module subroutines !!
+
+COPYR   "POL940"
+                                !!MODIFY:  if you changed STANDARD'SCREEN
+                                !!         to use a different screen.
+CIF SCREEN="VICSRP" THEN
+        COPY    "DSK0:VICSRP[11,10]"
+CELSE
+        COPYS   "|SCREEN|"
+ENDCIF
+                                !!MODIFY:  if company control or program
+                                !!         name changes since you generated
+                                !!         this program.
+                                !!         VPRGDESC may be used to send
+                                !!         a variable as a description
+                                !!         rather than PRGDESC which requires
+                                !!         a literal.
+
+\SSRPT PRGNAM="POL940" VPRGDESC="PQD'DATA" CMP'CONTROL="Y"
+\\TSTFUNC                               !!TSTFNC.MAC
+
+
+!! User modifyable subroutines !!
+
+DSP'STANDARD'SCREEN:            !! Leave here - used in \WINDOW call
+                                !! in select/sort macros
+                                !!
+                                !! WARNING: NEVER EVER NEVER do ANYTHING
+                                !! except the DSP SCREEN when dspsw = 220
+                                !! (E.G. put IF  statement around ALL
+                                !!  other code)
+        IF CMN'FRM'PRGNAM # "POKEDT" AND CMN'FRM'PRGNAM # "POSUNE" THEN
+            DSP |SCREEN|
+            IF dspsw # 220 THEN
+                ENTRY = "For "+PQD'DATA
+                ENTRY = SPACE( INT((72 - LEN(ENTRY))/2) ) + ENTRY !!Center it
+                CALL DSP'VICSRP'ENTRY
+            ENDIF
+        ENDIF
+RETURN
+
+GDB'STANDARD'SCREEN:            !! Leave here - needed for re-GDB when
+                                !! no selections made ... you may make
+                                !! your own screen ... but it must have
+                                !! all LABELS that are in VICSRP.S
+
+!!      AUTO'ROW = 12           !!MODIFY:  If autoprompting used, set to 1st
+                                !!blank line on screen ... already set to 11
+                                !!in MAP statement for VICSRP
+
+    IF CMN'FRM'PRGNAM # "POKEDT" AND CMN'FRM'PRGNAM # "POSUNE" THEN
+        ENTRY = "*       "      !!Leave blanks!
+        XCALL PRTQUE,SS'STACK'TST
+        IF UB'PRTSTK = "X" OR NOSTACK = 1 OR SS'STACK'TST = "N" THEN
+                ENTRY[2;1] = "X"                !!disable stack option
+                PRW'STK = "N"
+        ENDIF
+        PRW'PRTNO = 1
+        PRT'KSEQ = 1
+        USE PRT INTO PRT'REC KEY PRT'KEY
+        DO
+            GETNXT PRT INTO PRT'REC
+            IF PRT'CTL # 0 EXIT
+            IF PRT'CRT # "Y" THEN
+                PRW'PRTNO = PRT'SEQ
+                EXIT
+            ENDIF
+        LOOP
+
+!!      IF UB'PRTOVR # 0 THEN
+                ENTRY[3;1] = "X"                !!disable printer option
+!!              PRW'PRTNO = UB'PRTOVR
+!!      ENDIF
+        IF NOSUM = 1 THEN
+                ENTRY[4;1] = "X"                !!disable summary option
+                PRW'SUM = "N"
+        ENDIF
+        IF NOCOPIES = 0 THEN                    !!disable copies option
+                ENTRY[8;1] = "X"
+                PRW'COPIES = NOCOPIES
+        ENDIF
+
+        CIF ALLOW'SCHEMA = "Y" THEN
+                IF NOSEL = 1 THEN
+
+!!MODIFY:  to force a select/sort without giving the user a choice you
+!!         must set PRW'SEL = "Y", and set PRW'SCHEMA and optionally
+!!         set PRW'HEADER ... you may want to set NOSRT and NOSLCT to
+!!         prevent the user from changing the preset SCHEMA header.
+!!         If you leave PRW'HEADER = 0 all records will be selected
+!!         (e.g. select ALL and SORT them) unless you leave NOSLCT = 0
+!!         to allow the user to enter selection criteria.
+
+                        ENTRY[5;1] = "X"        !!disable select option
+                        PRW'SEL = "N"
+                        ENTRY[6;1] = "X"        !!disable schema option
+                        PRW'SCHEMA = 0
+                        ENTRY[7;1] = "X"        !!disable header option
+                        PRW'HEADER = 0
+                ENDIF
+                IF NOSCHEMA = 1 THEN ENTRY[6;1] = "X"   !!disable schema option
+                IF NOHEADER = 1 THEN ENTRY[7;1] = "X"   !!disable header option
+        CELSE
+                ENTRY[5;1] = "X"
+                PRW'SEL = "N"
+                ENTRY[6;1] = "X"
+                PRW'SCHEMA = 0
+                ENTRY[7;1] = "X"
+                PRW'HEADER = 0
+        ENDCIF
+        IF INSTR(1,ENTRY,"X") # 0 THEN
+                \AFR EDIT="N"
+        ENDIF
+        MAP1 PO'MULTI'STORE,S,1
+        IF PO'MULTI'STORE = "Y" THEN
+            \GAFR |SCREEN| AFR="E:WRK'STORE'ID" EDIT="N"
+        ELSE
+            \GAFR |SCREEN| AFR="X:WRK'STORE'ID" EDIT="N"
+        ENDIF
+!       See global of PASREC1 - PASREC6 to pass records
+        CIF V''GENCODES = "Y" THEN
+                \TITLES |SCREEN| ACTION="SET'TITLES"
+        CELSE
+                GDB |SCREEN|
+        ENDCIF
+        CALL TST'FUNC
+        IF TST'FUNC = 1 THEN
+            ABORT'FLAG = 1
+            GOTO ABORT
+        ENDIF
+        MAP1 ABORT'FLAG,B,1
+    ELSE
+        PRW'PRTNO = 1
+        PRT'KSEQ = 1
+        USE PRT INTO PRT'REC KEY PRT'KEY
+        DO
+            GETNXT PRT INTO PRT'REC
+            IF PRT'CTL # 0 EXIT
+            IF PRT'CRT # "Y" THEN
+                PRW'PRTNO = PRT'SEQ
+                EXIT
+            ENDIF
+        LOOP
+        PRW'COPIES = 1
+        PRW'SEL = "N"
+        PRW'SUM = "N"
+        PRW'STK = "N"
+        PRW'SCHEMA = 0
+        PRW'HEADER = 0
+        MAP1 PASS'AREA
+            MAP2 PASS'UCC'NO,S,10
+            MAP2 PASS'STORE'ID,S,9
+            MAP2 PASS'TMODE,S,1
+        PASS'AREA = CMN'OTHER
+        WRK'UCC'NO = PASS'UCC'NO
+        WRK'STORE'ID = PASS'STORE'ID
+        WRK'SUMMARY = PASS'TMODE
+        WRK'TYP'NO = CMN'SAV'RCN(1)
+        WRK'LOC'NO = CMN'SAV'RCN(2)
+        WRK'STRK'NO = CMN'SAV'RCN(3)
+        WRK'MODE = CMN'SAV'RCN(4)
+        \DG GETSTRING _POSETUP pol940.aa_ucc_no AA'UCC'NO
+        IF DG'CTL = 0 AND AA'UCC'NO # "" THEN
+            IF STR(AA'UCC'NO) = WRK'UCC'NO THEN
+                \DG GETSTRING _POSETUP pol940.gildan_ucc_no GILDAN'UCC'NO
+                IF DG'CTL = 0 AND GILDAN'UCC'NO # "" THEN
+                    WRK'UCC'NO = GILDAN'UCC'NO
+                ENDIF
+            ENDIF
+        ENDIF
+    ENDIF
+RETURN
+
+MAP1 LL,F
+
+SET'TITLES:
+        IF PRW'SEL = "Y" THEN LL = 4 ELSE LL = 3
+RETURN
+
+E'PRTNO:
+                                !!MODIFY:  if custom STANDARD'SCREEN
+        \TABPRT
+RETURN
+
+SET'ASKEXT:
+        ASKEXT = PRT'CRT
+RETURN
+
+PUT'USR'DATA:
+
+        !!  MODIFY:  modify the following as needed
+        !!  This is where user defined parameters are entrered and then if
+        !!  PRW'STK # "N" then the data must be "stacked" on the PQD file
+        !!  for later use.
+
+        !!VICS macros make the below typical:
+
+!!      DSP |SCREEN|                            !!It may be better to
+!!                                              !!change STANDARD'SCREEN
+!!                                              !!instead of having a second
+!!      GDB |SCREEN|                            !!screen here ...
+!!      CALL TST'FUNC : IF TST'FUNC = 1 GOTO ABORT
+!!      See global of PASREC1 - PASREC6 to pass records
+        \PUTUSR                                 !!this part is always needed
+                                                !!when user data is saved
+
+!!To get multiple records stacked on PQD code as follows:
+!!
+!!      \PUTUSR WR1'REC WR2'REC WR3'REC ... etc.
+!!
+!!Make sure and read them off in SETUSR in the same order!
+
+RETURN
+
+SET'USR'DATA:
+
+        !!   This is where the PQD'DATA is pulled in for Print Execution.
+        !!   PQU'DTAPTR contains the 1st record. See above for layout
+        !!   This routine will only be called if executed by stack
+        !!   in the background execution mode.
+
+!VICS macros make the below typical:
+!       See global of PASREC1 - PASREC6 to pass records
+
+        \SETUSR
+
+RETURN
+
+CHECK'SCHEMA:
+                !!MODIFY:  Set SF = 1 to skip a schema during tabbing
+                !!         and disallow it for use in this report.
+        CIF ALLOW'SCHEMA = "Y" THEN
+                IF SCH'PDBID[1;5] # "ARTCD"[1;5] THEN SF = 1
+        ENDCIF
+RETURN
+
+CHECK'HEADER:
+                !!MODIFY:  Set SF = 1 to skip a header during tabbing
+                !!         and disallow it for use in this report.
+RETURN
+
+CIF STARTKEY OR ENDKEY THEN
+        COPYF "HDRKEY",=STR
+        COPYF "HDRKEY",=END
+        CIF ALLOW'SCHEMA # "Y" THEN
+                ERROR - Why set start or end key if schema not used?
+        ENDCIF
+
+        SET'START'END'KEYS:
+                !!MODIFY:  Set starting and ending key values from here.
+                !!         If stack is allowed then remember to save what
+                !!         is needed in PUTUSR and SETUSR.
+                !!         Be SURE and set the company number to UB'CNO
+                !!         as selector will not set it for you!
+        RETURN
+ENDCIF
+
+CIF PROGRAM'FILL = "Y" THEN
+        CIF ALLOW'SCHEMA # "Y" THEN
+                ERROR - Why set program fill if schema not used?
+        ENDCIF
+PRGM'FILL'SLH:
+!!      ! MODIFY:  Here is where you can force a sort and select
+!!      !          using SCHEMA.
+!!
+!!      \FORCE'SORT DBID="APCAT" SORT="DESC" ORDER="A"
+!!              ! CLR="N" &     Only if you do not want sort area cleared.
+!!              ! OCCUR="1"     Only if you want specify which field. (1-6)
+!!      ! Call this macro up to six times to force sort fields.
+!!      !Note: Field sorting order is order of macro occurance.
+!!
+!!      \FORCE'FLD DBID="APDOC" FIELD="NO" COMP="GT" VALUE="10"
+!!              ! CONT="AND" ST'PAREN="(" EN'PAREN=")"  ! Optional here on
+!!              ! DETAIL'NO=1   ! Normally not passed because fields are added
+!!                              ! Set this to # of existing FIELD to change.
+!!
+!!      \FORCE'FLD DETAIL'NO="SLD'NO" CONT=" "
+!!              ! USE ABOVE TO CLEAR LAST CONTINUATION WHEN IF STATEMENTS
+!!              ! ARE USED TO SET SELECT FIELDS
+!!
+!!      ! Call this macro for each field in the selection.
+!!
+RETURN
+ENDCIF
+
+MAKE'940:                   !!MODIFY - add your reporting logic here
+    WNAME = "/tmp/work.PID"
+    XCALL ABUTIL,46,WNAME,WNAME
+    BNAME = "/tmp/bwork.PID"
+    XCALL ABUTIL,46,BNAME,BNAME
+    OPEN #123,BNAME,OUTPUT
+    CLOSE #123
+
+    XCALL ABUTIL,46,TWO'NAME,TWO'NAME
+
+    IF POC'DUNS'NUM[1;1] = 0 THEN
+        EASI'SENDER'ID = POC'DUNS'NUM[2;8]
+        CHANGED'FLAG = 1
+    ELSE
+        EASI'SENDER'ID = POC'DUNS'NUM
+    ENDIF
+
+    MAP1 AA'UCC'NO,S,10
+    MAP1 GILDAN'UCC'NO,S,10
+
+    UCC'KNO = WRK'UCC'NO
+    USE UCC INTO UCC'REC KEY UCC'KEY
+    IF UCC'CTL # 0 THEN
+        ENTRY = "Cannot find ucc number"
+        \KERROR UCC MODE="KEY" APID="PO" CNO="N"
+        CALL DO'ERR
+        \LABLOGGER ENTRY LNAME
+        ABORT'FLAG = 1
+        GOTO ABORT
+    ELSE
+        IF PO'MULTI'STORE = "Y" THEN
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = WRK'STORE'ID
+            USE UCD INTO UCD'REC KEY UCD'KEY
+            IF UCD'CTL # 0 THEN
+                ENTRY = "1: Cannot find store number"
+                \KERROR UCD MODE="KEY" APID="PO" CNO="N"
+                CALL DO'ERR
+                \LABLOGGER ENTRY LNAME
+                ABORT'FLAG = 1
+                GOTO ABORT
+            ELSE
+                CALL LOOKUP'PO
+            ENDIF
+        ELSE
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = 0
+            USE UCD INTO UCD'REC KEY UCD'KEY
+            DO
+                GETNXT UCD INTO UCD'REC
+                IF UCD'CTL # 0 THEN
+                    ENTRY = "2: Cannot find store number"
+                    \KERROR UCD MODE="KEY" APID="PO" CNO="N"
+                    CALL DO'ERR
+                    \LABLOGGER ENTRY LNAME
+                    ABORT'FLAG = 1
+                    GOTO ABORT
+                ENDIF
+                IF UCD'LOC'NO = WRK'LOC'NO THEN
+                    UCD'KSTORE'ID = UCD'STORE'ID
+                    CALL LOOKUP'PO
+                    EXIT
+                ELSE
+                    IF UCD'LOC'NO < WRK'LOC'NO THEN
+                        REPEAT
+                    ELSE
+                        ENTRY = "Cannot find location setup on UCC"
+                        \KERROR UCD MODE="KEY" APID="PO" CNO="N"
+                        CALL DO'ERR
+                        \LABLOGGER ENTRY LNAME
+                        ABORT'FLAG = 1
+                        GOTO ABORT
+                    ENDIF
+                ENDIF
+            LOOP
+        ENDIF
+    ENDIF
+RETURN
+
+FINAL'END:
+    CMN'FRM'PRGNAM = "BAD"
+    SNDCMN CMN'REC
+END
+
+LOOKUP'PO:
+    HDR'KDOC'TYPE = WRK'MODE
+    HDR'KNO = WRK'STRK'NO
+    USE HDR INTO HDR'REC KEY HDR'KEY
+    IF HDR'CTL # 0 THEN
+        ENTRY = "Cannot find purchase order to create 940 "+HDR'KDOC'TYPE+"-"+HDR'KNO
+        CALL DO'ERR
+        ABORT'FLAG = 1
+        GOTO ABORT
+    ENDIF
+    IF HDR'SHIPMENT > 0 THEN
+        ENTRY = "Cannot create 940 on a purchase order that has receipts!"
+        \KERROR HDR APID="PO" CNO="N"
+        CALL DO'ERR
+        ABORT'FLAG = 1
+        GOTO ABORT
+    ENDIF
+    IF HDR'LSTID = "POL940" THEN
+        IF WRK'SUMMARY # "Y" THEN
+            ENTRY = "940 has already been sent for this purchase order!"
+            \KERROR HDR APID="PO" CNO="N"
+            CALL DO'ERR
+            ABORT'FLAG = 1
+            GOTO ABORT
+        ENDIF
+    ENDIF
+    CALL ADD'940
+RETURN
+
+ADD'940:
+    TYPE'OF'DOCUMENT = "940"
+    BLF'KNO = WRK'TYP'NO
+    CALL FIND'ROUTING'ENVELOPE      !!hobsub.cpy
+    CALL CREATE'ENVELOPE'HEADER     !!hobsub.cpy
+    CALL MAKE'PO
+
+    MAP1 CRITICAL'ERROR,B,1
+    IF CRITICAL'ERROR # 1 THEN
+        IF POCNT > 0 THEN
+            IF CHANGED'FLAG = 1 THEN
+                EASI'SENDER'ID = POC'DUNS'NUM
+            ENDIF
+            OUTNAME = "/" + BASE + "/out/940_"+EASI'SENDER'ID+"_" + FILE'CREATION'DTT+FILE'CREATION'TIME
+            OUTNAME = OUTNAME + ".txt"
+            OPEN #33,WNAME,OUTPUT
+            PRINT #33, ROUTING'HEADER; CHR(9);
+            PRINT #33, ROUTING'VERSION'NUMBER; CHR(9);
+            PRINT #33, SENDER'QUALIFIER; CHR(9);
+            PRINT #33, SENDER'ID; CHR(9);
+            PRINT #33, RECEIVER'QUALIFIER; CHR(9);
+            PRINT #33, RECEIVER'ID; CHR(9);
+            PRINT #33, FILE'CREATION'DTT; CHR(9);
+            PRINT #33, FILE'CREATION'TIME; CHR(9);
+            PRINT #33, TIME'ZONE; CHR(9);
+            PRINT #33, PRODUCTION'OR'TEST; CHR(9);
+            PRINT #33, DOCUMENT'TYPE; CHR(9);
+            PRINT #33, HEADER'INTERCHANGE'ID;
+            PRINT #33, CHR(13) + CHR(10);                   !!CRLF
+            CLOSE #33
+            ENTRY = "cat "+BNAME+" >>"+WNAME
+            XCALL SYSTEM,ENTRY
+            CALL CREATE'ENVELOPE'TRAILER        !!hobsub.cpy
+            OPEN #33,WNAME,APPEND
+            PRINT #33, ROUTING'TRAILER; CHR(9);
+            PRINT #33, TRAILER'INTERCHANGE'ID; CHR(9);
+            PRINT #33, NUMBER'OF'TRAILER'DOCUMENTS;
+            PRINT #33, CHR(13) + CHR(10);                   !!CRLF
+            CLOSE #33
+            LOOKUP OUTNAME,II
+            IF II # 0 THEN
+                KILL OUTNAME
+            ENDIF
+            XCALL SYSTEM,"aroot chmod a+rw " +WNAME
+            XCALL SYSTEM,"mv "+WNAME+" "+ OUTNAME
+            XCALL SYSTEM,"aroot chmod a+rw " +OUTNAME
+            LOOKUP BNAME,II
+            IF II # 0 THEN
+                KILL BNAME
+            ENDIF
+            LOOKUP WNAME,II
+            IF II # 0 THEN
+                KILL WNAME
+            ENDIF
+        ENDIF
+    ENDIF
+
+    IF CRITICAL'ERROR = 1 THEN
+        ENTRY = "940 not created due to GTIN errors, see /logs/940_error.YYMMDD"
+        CALL DO'ERR
+    ELSE
+        IF ECNT = 0 THEN
+            ENTRY = "Processed 940 "+POCNT+" perfectly! File is: " + OUTNAME
+            CALL DO'ERR
+        ELSE
+            ENTRY = "Processed 940 " +POCNT+" with "+ECNT+" errors, see /logs/940_error.YYMMDD"
+            CALL DO'ERR
+        ENDIF
+    ENDIF
+    CALL UPDATE'PO
+RETURN
+
+UPDATE'PO:
+    HDR'KDOC'TYPE = WRK'MODE
+    HDR'KNO = WRK'STRK'NO
+    RDLOCK HDR INTO HDR'REC KEY HDR'KEY
+    IF HDR'CTL = 0 THEN
+        HDR'LSTID = "POL940"
+        HDR'LSTDT = DATE
+        WRITE HDR FROM HDR'REC
+    ELSE
+        ENTRY = "Cannot read PO!"
+        \KERROR HDR APID="PO" CNO="N"
+        \LABLOGGER ENTRY LNAME
+        REL HDR
+    ENDIF
+RETURN
+
+E'WRK'UCC'NO:
+    \TABC NPRE="UCC" NKEY="NO" FLDNAM="WRK'UCC'NO" DSPNAM="DSP'UCC'NO" &
+        APID="PO" MAND="Y"
+    \DG GETSTRING _POSETUP pol940.aa_ucc_no AA'UCC'NO
+    IF DG'CTL = 0 AND AA'UCC'NO # "" THEN
+        IF STR(AA'UCC'NO) = WRK'UCC'NO THEN
+            \DG GETSTRING _POSETUP pol940.gildan_ucc_no GILDAN'UCC'NO
+            IF DG'CTL = 0 AND GILDAN'UCC'NO # "" THEN
+                WRK'UCC'NO = GILDAN'UCC'NO
+            ENDIF
+        ENDIF
+    ENDIF
+RETURN
+
+E'LOC'NO:
+    \TABC FROM="WRK" ON="LOC" DSPFLD="Y" APID="IN" DEFAULT="UB'LOC" &
+        DSPLEN="25"
+RETURN
+
+E'WRK'TYP'NO:
+    \TABC NPRE="BLF" NKEY="NO" FLDNAM="WRK'TYP'NO" DSPNAM="DSP'BLF'NO" &
+        APID="PO" MAND="Y" SF'TEST="E'HEADER'SF"
+RETURN
+
+E'STORE'ID:
+    \TABC APRE="UCD" AKEY="STORE'ID" KFLD1="UCC'NO" BAD1="UCC'NO" &
+        FLDNAM="WRK'STORE'ID" APID="PO" DSPNAM="DSP'STORE'DESC"
+RETURN
+
+E'HEADER'SF:
+    IF BLF'TYPE # "V" OR BLF'DOC'TYPE # "940" THEN
+        SF = 2
+        ENTRY = "Format must be for 940 PO output!"
+    ENDIF
+RETURN
+
+MAKE'PO:
+    SF = 0
+    CALL LOOKUP'OE'ORDER
+    CALL LOOKUP'CREDIT'HOLD        !!Look up orders on CC hold
+    IF SF = 1 RETURN               !!KLUDGE
+    PO'STARTED = 1
+
+    HDR'KDOC'TYPE = WRK'MODE
+    HDR'KNO = WRK'STRK'NO
+    USE HDR INTO HDR'REC KEY HDR'KEY
+    IF HDR'CTL # 0 THEN
+        ENTRY = "PO not found in current: "
+        \KERROR HDR MODE="K" CNO="N" APID="PO"
+        ENTRY = ENTRY +" for location: "+ WRK'LOC'NO
+        CALL DO'ERR
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+
+    IF HDR'LSTID = "POL940" THEN
+        PURPOSE = "U"                !!Update
+    ELSE
+        PURPOSE = "F"                !!First time
+    ENDIF
+    OLD'NUM'OF'RECORDS = NUM'OF'RECORDS
+
+    OPEN #33,WNAME,OUTPUT
+    CALL CREATE'940'HEADER
+    CALL CREATE'940'DETAIL
+    CALL CREATE'940'TRAILER
+    CLOSE #33
+    IF PERR = 0 THEN
+        POCNT = POCNT + 1
+        ENTRY = "cat "+WNAME+" >>"+BNAME
+        XCALL SYSTEM,ENTRY
+        ALL'DONE = 1
+    ELSE
+        NUM'OF'RECORDS = OLD'NUM'OF'RECORDS
+        PERR = 0
+    ENDIF
+    KILL WNAME
+RETURN
+
+
+CREATE'940'HEADER:
+        NUM'OF'RECORDS = 0
+        EASI'HEADER = SPACE
+
+        HEADER = "01"
+        PRINT #33, HEADER; CHR(9);
+
+        TRANS'TYPE = "940"
+        PRINT #33, TRANS'TYPE; CHR(9);
+
+        IF PURPOSE = "F" THEN
+            TRANS'SET'PURPOSE = "00"        !!00=Original, 07=Duplicate
+            PRINT #33, TRANS'SET'PURPOSE; CHR(9);
+        ELSE
+            TRANS'SET'PURPOSE = "07"        !!16=Proposed, 22=Information copy
+            PRINT #33, TRANS'SET'PURPOSE; CHR(9);
+        ENDIF
+
+        USE BLF INTO BLF'REC KEY BLF'KEY
+        IF BLF'CTL # 0 THEN
+            ENTRY = "Cannot find interface format to process 940!"
+            \KERROR BLF APID="PO" MODE="KEY" CNO="N"
+            ENTRY = ENTRY + " for format " + BLF'KNO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ELSE
+            IF BLF'DOC'TYPE = "940" THEN
+                VERSION'NUMBER = BLF'VERSION
+                PRINT #33, VERSION'NUMBER; CHR(9);
+                IF BLF'FILE'NAME[1;1] = "/" THEN
+                    BLF'FILE'NAME = BLF'FILE'NAME[2,-1]
+                    JJ = INSTR(1,BLF'FILE'NAME,"/")
+                    IF JJ # 0 THEN
+                        BASE = BLF'FILE'NAME[1,JJ-1]
+                    ENDIF
+                ENDIF
+            ENDIF
+        ENDIF
+
+        PO'TYPE'CODE = "SA"
+        PRINT #33, PO'TYPE'CODE; CHR(9);
+
+        WHOLESALER'PO'NUMBER = HDR'NO
+        PRINT #33, WHOLESALER'PO'NUMBER; CHR(9);
+
+        \STRDTT DTT="HDR'ORDER'DTT" YYMMDD="Y" CDATE="PO'DATE"
+        PO'DATE = "20" +PO'DATE
+        PRINT #33, PO'DATE CHR(9);
+
+        \S'TO'HMS
+        ENTRY = (HRS USING "#Z")+(MNS USING "#Z")+(SEC USING "#Z")
+        PO'TIME = ENTRY
+        PRINT #33, PO'TIME; CHR(9);
+
+        IF OEHDR'PO # "" THEN
+            CUSTOMER'PO'NUMBER = OEHDR'PO
+            PRINT #33, CUSTOMER'PO'NUMBER; CHR(9);
+        ELSE
+            \S'TO'HMS
+            ENTRY = (HRS USING "#Z")+(MNS USING "#Z")+(SEC USING "#Z")
+            CUSTOMER'PO'NUMBER = ENTRY
+            PRINT #33, CUSTOMER'PO'NUMBER; CHR(9);
+        ENDIF
+
+        TAD'SPACE = SPACE
+        TAD'KBS = "P"
+        TAD'KHDR'LOC'NO = 0
+        TAD'KDOC'TYPE = HDR'DOC'TYPE
+        TAD'KHDR'NO = HDR'NO
+        USE TAD INTO TAD'REC KEY TAD'KEY
+        IF TAD'CTL = 0 THEN
+            CASE
+            IF TAD'COUNTRY = "USA" OR TAD'COUNTRY = "US" THEN
+                CURRENCY'CODE = "USD"
+                PRINT #33, CURRENCY'CODE; CHR(9);
+            ELSE
+            IF TAD'COUNTRY = "CAN" OR TAD'COUNTRY = "CA" THEN
+                CURRENCY'CODE = "CAD"
+                PRINT #33, CURRENCY'CODE;  CHR(9);
+            ELSE
+                CURRENCY'CODE = "EUR"
+                PRINT #33, CURRENCY'CODE; CHR(9);
+            ENDCASE
+        ELSE
+            ENTRY = "Country code not on file"
+            \KERROR TAD MODE="KEY" CNO="N" APID="OE"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ENDIF
+
+        IF UCD'KSTORE'ID = "" THEN
+            UCD'CTL = 0
+            UCD'VEN'NO = UCC'VEN'NO
+            UCD'LOC'NO = UCC'LOC'NO
+        ELSE
+            UCD'KUCC'NO = UCC'NO
+            USE UCD INTO UCD'REC KEY UCD'KEY
+            UCC'VEN'NO = UCD'VEN'NO
+            UCC'LOC'NO = UCD'LOC'NO
+        ENDIF
+        IF UCD'CTL # 0 THEN
+            ENTRY = "Cannot find UCD number"
+            \KERROR UCD MODE="KEY" APID="PO" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ELSE
+            IF UCD'VEN'NO = HDR'NAM'NO AND UCD'LOC'NO = OEHDR'LOC'NO THEN
+                VEN'SPACE = SPACE
+                VEN'KNO = UCD'VEN'NO
+                USE VEN INTO VEN'REC KEY VEN'KEY
+                IF VEN'CTL = 0 THEN
+                    IF VEN'ACCOUNT = "" THEN
+                        ENTRY = "Vendor account must be set up"
+                        \KERROR VEN MODE="KEY" CNO="N" APID="AP"
+                        ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                                 OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                        \LABLOGGER ENTRY LNAME
+                        CALL DO'ERR
+                        GOTO ABORT
+                    ELSE
+                        PO'ACCOUNT'ID = VEN'ACCOUNT
+                        PRINT #33, PO'ACCOUNT'ID; CHR(9);
+                        IF UCD'STORE'ID = "" THEN
+                            ENTRY = "Store ID must be set up"
+                            \KERROR UCD MODE="KEY" CNO="N" APID="PO"
+                            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                                     OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                            \LABLOGGER ENTRY LNAME
+                            CALL DO'ERR
+                            GOTO ABORT
+                        ELSE
+                            STORE'ID = UCD'STORE'ID
+                            PRINT #33, STORE'ID; CHR(9);
+                        ENDIF
+                    ENDIF
+                ELSE
+                    ENTRY = "Vendor account not on file"
+                    \KERROR VEN MODE="KEY" CNO="N" APID="AP"
+                    ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                    \LABLOGGER ENTRY LNAME
+                    CALL DO'ERR
+                    GOTO ABORT
+                ENDIF
+            ELSE
+                IF UCD'VEN'NO # HDR'NAM'NO THEN
+                    MAP1 AA'VEN'ACCOUNT,S,10
+                    \DG GETSTRING _POSETUP pol940.aa_ven_account,AA'VEN'ACCOUNT
+                    IF DG'CTL = 0 AND AA'VEN'ACCOUNT # 0 THEN
+                        PO'ACCOUNT'ID = AA'VEN'ACCOUNT
+                        PRINT #33, PO'ACCOUNT'ID; CHR(9);
+                        STORE'ID = UCD'STORE'ID
+                        PRINT #33, STORE'ID; CHR(9);
+                    ENDIF
+                ELSE
+                    ENTRY = "Ven/loc"
+                    \KERROR UCD MODE="KEY" CNO="N" APID="PO"
+                    ENTRY = ENTRY + " PO="
+                    \KERROR HDR MODE="D" CNO="N" APID="PO"
+                    ENTRY = ENTRY + " Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                    ENTRY = ENTRY + "("+STR(HDR'NAM'NO)+"-"+STR(UCD'VEN'NO)+")("+&
+                        STR(HDR'LOC'NO)+"-"+STR(UCD'LOC'NO)+")"
+                    \LABLOGGER ENTRY LNAME
+                    CALL DO'ERR
+                    GOTO ABORT
+                ENDIF
+            ENDIF
+        ENDIF
+
+        VENDOR'ID = UCC'NO
+        PRINT #33, VENDOR'ID; CHR(9);
+
+        LOC'SPACE = SPACE
+        LOC'KNO = OEHDR'LOC'NO
+        USE LOC INTO LOC'REC KEY LOC'KEY
+        IF LOC'CTL # 0 THEN
+            ENTRY = "Cannot find location"
+            \KERROR LOC MODE="KEY" APID="IN" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+        ELSE
+            LST'SPACE = SPACE
+            LSTF'KNO = LOC'LST'NO              !!Contact on location maintenace
+            USE LSTF INTO LST'REC KEY LSTF'KEY
+            IF LSTF'CTL = 0 THEN
+                FOR II = 1 TO 3
+                    IF UCS(LST'PTY'NO(II)) = "O" THEN
+                        BUS'PHONE = LST'PHONE(II)
+                    ENDIF
+                NEXT II
+                IF LST'PHONE(II) # "" THEN
+                    CONTACT'NAME = LST'FIRST + " " + LST'LAST + " " + &
+                        BUS'PHONE[1;3]+ "-" + BUS'PHONE[4;3] + "-" + &
+                        BUS'PHONE[7;4]
+                    PRINT #33, CONTACT'NAME; CHR(9);
+                ELSE
+                    CONTACT'NAME = LST'FIRST + " " + LST'LAST
+                    PRINT #33, CONTACT'NAME; CHR(9);
+                ENDIF
+            ELSE
+                CONTACT'NAME = ""
+                PRINT #33, CHR(9);
+            ENDIF
+        ENDIF
+
+        FOB = "PP"                            !!PP-Wholesaler pays freight
+        PRINT #33, FOB; CHR(9);
+                                              !!CC-Purchaser pays freight & UPS account
+        SALES'CODE'SHIPMENT = "SC"            !!SC-Ship complete, BK-Ship partial & BO
+        PRINT #33, SALES'CODE'SHIPMENT; CHR(9);
+                                              !!SP-Ship partial & cancel rest
+        SALES'CODE'TRUCK = "LT"
+        PRINT #33, SALES'CODE'TRUCK; CHR(9);
+
+        SALES'CODE'SHIP'DATE = "P2"
+        PRINT #33, SALES'CODE'SHIP'DATE; CHR(9);
+
+        TRH'SPACE = SPACE
+        TRH'KNO = OEHDR'TRH'NO
+        USE TRH INTO TRH'REC KEY TRH'KEY
+        IF TRH'CTL # 0 THEN
+            ENTRY = "1: Cannot find terms"
+            \KERROR TRH MODE="KEY" APID="AR" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ELSE
+            CASE
+            IF TRH'COD'STATUS = 2 THEN                   !!Business check
+                SALES'CODE'CONSIGNEE = ""                !!Not blind shipped
+                PRINT #33, SALES'CODE'CONSIGNEE; CHR(9);
+            ELSE
+            IF TRH'COD'STATUS = 3 THEN                   !!Certified funds
+                SALES'CODE'CONSIGNEE = ""                !!Not blind shipped
+                PRINT #33, SALES'CODE'CONSIGNEE; CHR(9);
+            ELSE
+                SALES'CODE'CONSIGNEE = "SB"              !!Ship blind
+                PRINT #33, SALES'CODE'CONSIGNEE; CHR(9);
+            ENDCASE
+        ENDIF
+
+        TRH'SPACE = SPACE
+        TRH'KNO = OEHDR'TRH'NO
+        USE TRH INTO TRH'REC KEY TRH'KEY
+        IF TRH'CTL # 0 THEN
+            ENTRY = "2: Cannot find terms"
+            \KERROR TRH MODE="KEY" APID="AR" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ELSE
+            CASE
+            IF TRH'COD'STATUS = 2 THEN                   !!Business check
+                COD'FOR'MERCHANDISE = "Y2"
+                PRINT #33, COD'FOR'MERCHANDISE; CHR(9);
+            ELSE
+            IF TRH'COD'STATUS = 3 THEN                   !!Certified funds
+                COD'FOR'MERCHANDISE = "Y1"
+                PRINT #33, COD'FOR'MERCHANDISE; CHR(9);
+            ELSE
+                COD'FOR'MERCHANDISE = "N"
+                PRINT #33, COD'FOR'MERCHANDISE; CHR(9);
+            ENDCASE
+            IF TRH'DESC = "" THEN
+                ENTRY = "Must set terms description"
+                \KERROR TRH MODE="KEY" APID="AR" CNO="N"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ENDIF
+        ENDIF
+
+        PAYMENT'TERMS'DISCOUNT = ""
+        PRINT #33, PAYMENT'TERMS'DISCOUNT; CHR(9);
+
+        PAYMENT'TERMS'DAYS = ""
+        PRINT #33, PAYMENT'TERMS'DAYS; CHR(9);
+
+        PAYMENT'DUE'DAYS = ""
+        PRINT #33, PAYMENT'DUE'DAYS; CHR(9);
+
+        SPECIFIC'PAYMENT'DATE = ""
+        PRINT #33, SPECIFIC'PAYMENT'DATE; CHR(9);
+
+        LITERAL'PAYMENT'TERMS = TRH'DESC
+        PRINT #33, LITERAL'PAYMENT'TERMS; CHR(9);
+
+        REQUESTED'SHIP'DATE = ""
+        PRINT #33, REQUESTED'SHIP'DATE; CHR(9);
+
+        MAP1 VIA'FROM'PO,S,1
+        \DG GETSTRING _POSETUP pol940.via_from_po VIA'FROM'PO
+        IF DG'CTL = 0 AND VIA'FROM'PO = "Y" THEN
+            VIA'SPACE = SPACE
+            VIA'KNO = HDR'VIA'NO
+            USE VIA INTO VIA'REC KEY VIA'KEY
+            IF VIA'CTL # 0 THEN
+                ENTRY = "1: Cannot find ship via"
+                \KERROR VIA MODE="KEY" APID="IN" CNO="N"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                CALL LOOKUP'VIA
+            ENDIF
+        ELSE
+            VIA'SPACE = SPACE
+            VIA'KNO = OEHDR'VIA'NO
+            USE VIA INTO VIA'REC KEY VIA'KEY
+            IF VIA'CTL # 0 THEN
+                ENTRY = "2: Cannot find ship via"
+                \KERROR VIA MODE="KEY" APID="IN" CNO="N"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                CALL LOOKUP'VIA
+            ENDIF
+        ENDIF
+
+        IF VIA'MTYPE = "U" THEN
+            IF LEFT(DELIVERY'OPTION,2) = "03" OR LEFT(DELIVERY'OPTION,2) = "15" OR &
+                LEFT(DELIVERY'OPTION,2) = "01" OR LEFT(DELIVERY'OPTION,2) = "13" OR &
+                LEFT(DELIVERY'OPTION,2) = "07" OR LEFT(DELIVERY'OPTION,2) = "02" OR &
+                LEFT(DELIVERY'OPTION,2) = "12" OR LEFT(DELIVERY'OPTION,2) = "41" OR &
+                LEFT(DELIVERY'OPTION,2) = "44" THEN
+                CARRIER'ROUTING'DETAILS = "UPS"
+                PRINT #33, CARRIER'ROUTING'DETAILS; CHR(9);
+            ENDIF
+        ELSE
+            IF VIA'MTYPE = "F" THEN
+                IF LEFT(DELIVERY'OPTION,2) = "01" OR LEFT(DELIVERY'OPTION,2) = "03" OR &
+                    LEFT(DELIVERY'OPTION,2) = "05" OR LEFT(DELIVERY'OPTION,2) = "06" OR &
+                    LEFT(DELIVERY'OPTION,2) = "20" OR LEFT(DELIVERY'OPTION,2) = "90" OR &
+                    LEFT(DELIVERY'OPTION,2) = "92" THEN
+                        CARRIER'ROUTING'DETAILS = "FEDEX"
+                        PRINT #33, CARRIER'ROUTING'DETAILS; CHR(9);
+                ENDIF
+            ENDIF
+        ENDIF
+        IF CARRIER'ROUTING'DETAILS = "" OR (VIA'MTYPE = "O" AND VIA'FROM'PO = "Y") THEN
+            PRINT #33, CARRIER'ROUTING'DETAILS; CHR(9);
+        ENDIF
+
+        CANCEL'DATE = ""
+        PRINT #33, CANCEL'DATE; CHR(9);
+
+        IF VIA'MTYPE = "O" AND VIA'FROM'PO = "Y" AND HDR'DROP'YN = "L" THEN
+            LOC'SPACE = SPACE
+            LOC'KNO = HDR'SHP'NO
+            USE LOC INTO LOC'REC KEY LOC'KEY
+            IF LOC'CTL # 0 THEN
+                ENTRY = "Cannot find location"
+                \KERROR LOC MODE="KEY" APID="IN" CNO="N"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                                 OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+            ELSE
+                LST2'SPACE = SPACE
+                LSTF'KNO = LOC'LST'NO              !!Contact on location maintenace
+                USE LSTF INTO LST2'REC KEY LSTF'KEY
+                IF LSTF'CTL = 0 THEN
+                    DELIVER'TO'COMPANY = LST2'COMPANY
+                    PRINT #33, DELIVER'TO'COMPANY; CHR(9);
+                ENDIF
+            ENDIF
+        ELSE
+            DELIVER'TO'COMPANY = TAD'COMPANY
+            PRINT #33, DELIVER'TO'COMPANY; CHR(9);
+        ENDIF
+
+        DELIVER'TO'CONTACT = ""
+        PRINT #33, DELIVER'TO'CONTACT; CHR(9);
+
+        IF VIA'MTYPE = "O" AND VIA'FROM'PO = "Y" AND HDR'DROP'YN = "L" THEN
+            IF LST2'PHONE(1) = "" THEN
+                ENTRY = "Enter phone number number on location"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                    OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                RECEIVERS'PHONE = ""
+                PRINT #33, RECEIVERS'PHONE; CHR(9);
+            ELSE
+                BUS'PHONE = LST2'PHONE(1)
+                RECEIVERS'PHONE = BUS'PHONE[1;3]+ "-" + BUS'PHONE[4;3] + &
+                        "-" + BUS'PHONE[7;4]
+                PRINT #33, RECEIVERS'PHONE; CHR(9);
+            ENDIF
+
+            EXT'KLST'NO = LOC'LST'NO
+            USE EXT INTO EXT'REC KEY EXT'KEY
+            IF EXT'CTL # 0 THEN
+                ENTRY = "External email file not found"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                RECEIVERS'EMAIL = ""
+                PRINT #33, RECEIVERS'EMAIL; CHR(9);
+            ELSE
+                RECEIVERS'EMAIL = EXT'EMAIL
+                PRINT #33, RECEIVERS'EMAIL; CHR(9);
+            ENDIF
+
+            LOC'KNO = OEHDR'LOC'NO
+            USE LOC INTO LOC'REC KEY LOC'KEY
+                IF LOC'CTL # 0 THEN
+                ENTRY = "Cannot find drop ship location number!"
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                UPS'KMTYPE = "F"
+                UPS'KLOC'NO = LOC'NO
+                USE UPS INTO UPS'REC KEY UPS'KEY
+                IF UPS'CTL # 0 THEN
+                    ENTRY = "Cannot find UPS file to lookup shipper number!"
+                    \LABLOGGER ENTRY LNAME
+                    CALL DO'ERR
+                    GOTO ABORT
+                ELSE
+                    ACCOUNT'NUMBER = UPS'SHIPPER
+                    PRINT #33, ACCOUNT'NUMBER; CHR(9);
+                ENDIF
+            ENDIF
+
+            USE CMP UB'CNO INTO CMP'REC
+            IF CMP'CTL # 0 THEN
+                ENTRY = "Must set up company number: "+ CMP'NO
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                NAME'OF'ACCOUNT = CMP'NAME
+                PRINT #33, NAME'OF'ACCOUNT; CHR(9);
+            ENDIF
+
+            TRACKING'ID = OEHDR'LOC'NO + "-" + OEHDR'DOC'TYPE + "-"+ &
+                     OEHDR'NO + "-" + OEHDR'NAM'NO
+            PRINT #33, TRACKING'ID; CHR(9);
+
+            PURCHASERS'ACCOUNT'ID = OEHDR'NAM'NO
+            PRINT #33, PURCHASERS'ACCOUNT'ID; CHR(9);
+
+            DELIVER'TO'ADDR1 = LST2'ADDR(1)
+            PRINT #33, DELIVER'TO'ADDR1; CHR(9);
+
+            IF LST2'ADDR2 = "" THEN
+                DELIVER'TO'ADDR2 = ""
+                PRINT #33, DELIVER'TO'ADDR2; CHR(9);
+            ELSE
+                DELIVER'TO'ADDR2 = LST2'ADDR(2)
+                PRINT #33, DELIVER'TO'ADDR2; CHR(9);
+            ENDIF
+
+            IF LST2'CITY = "" THEN
+                ENTRY = "City not entered on shipping address"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                DELIVER'TO'CITY = LST2'CITY
+                PRINT #33, DELIVER'TO'CITY; CHR(9);
+            ENDIF
+
+            CASE
+            IF LST2'ST = "" THEN
+                ENTRY = "State not entered on shipping address"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+            IF LEN(LST2'ST) > 2 OR LEN(LST2'ST) = 1 THEN
+                ENTRY = "State must be 2 character abbreviation"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                DELIVER'TO'STATE = LST2'ST
+                PRINT #33, DELIVER'TO'STATE; CHR(9);
+            ENDCASE
+
+            IF LEN(LST2'ZIP) > 5 THEN
+                IF LST2'ZIP[6;4] = "0000" THEN
+                    DELIVER'TO'ZIP = LST2'ZIP[1;5]
+                    \STRIP DELIVER'TO'ZIP 3
+                ELSE
+                    DELIVER'TO'ZIP = LST2'ZIP[1;9]
+                    \STRIP DELIVER'TO'ZIP 3
+                ENDIF
+                PRINT #33, DELIVER'TO'ZIP; CHR(9);
+            ELSE
+                DELIVER'TO'ZIP = LST2'ZIP[1;5]
+                \STRIP DELIVER'TO'ZIP 3
+                PRINT #33, DELIVER'TO'ZIP; CHR(9);
+            ENDIF
+
+            DELIVER'TO'COUNTRY = ""
+            PRINT #33, DELIVER'TO'COUNTRY; CHR(9);
+        ELSE
+            LST'SPACE = SPACE
+            LSTF'KNO = OEHDR'NAM'NO            !!Customer on order
+            USE LSTF INTO LST'REC KEY LSTF'KEY
+            IF LSTF'CTL # 0 THEN
+                ENTRY = "Could not find LST record for customer"
+                \KERROR LST APID="MC" CNO="N" MODE="KEY"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                IF LST'PHONE(1) = "" THEN
+                    ENTRY = "Customer should have phone number entered"
+                    \KERROR LST APID="MC" CNO="N" MODE="KEY"
+                    ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                    \LABLOGGER ENTRY LNAME
+                    RECEIVERS'PHONE = ""
+                    PRINT #33, RECEIVERS'PHONE; CHR(9);
+                ELSE
+                    BUS'PHONE = LST'PHONE(1)
+                    RECEIVERS'PHONE = BUS'PHONE[1;3]+ "-" + BUS'PHONE[4;3] + &
+                        "-" + BUS'PHONE[7;4]
+                    PRINT #33, RECEIVERS'PHONE; CHR(9);
+                ENDIF
+            ENDIF
+
+            EXT'KLST'NO = OEHDR'NAM'NO
+            USE EXT INTO EXT'REC KEY EXT'KEY
+            IF EXT'CTL # 0 THEN
+                ENTRY = "External email file not found"
+                \KERROR EXT APID="MC" CNO="N" MODE="KEY"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                RECEIVERS'EMAIL = ""
+                PRINT #33, RECEIVERS'EMAIL; CHR(9);
+            ELSE
+                RECEIVERS'EMAIL = EXT'EMAIL
+                PRINT #33, RECEIVERS'EMAIL; CHR(9);
+            ENDIF
+
+            MAP1 WP'NO'ACCOUNT,S,1
+            \DG GETSTRING _POSETUP po1hob_wp_no_account,WP'NO'ACCOUNT
+            IF WP'NO'ACCOUNT = "Y" AND UCC'NO = "0820599" THEN
+                ACCOUNT'NUMBER = ""
+                PRINT #33, ACCOUNT'NUMBER; CHR(9);
+            ELSE
+                LOC'KNO = OEHDR'LOC'NO
+                USE LOC INTO LOC'REC KEY LOC'KEY
+                IF LOC'CTL # 0 THEN
+                    ENTRY = "Cannot find drop ship location number!"
+                    \LABLOGGER ENTRY LNAME
+                    CALL DO'ERR
+                    GOTO ABORT
+                ELSE
+                    IF VIA'MTYPE = "U" THEN
+                        UPS'KMTYPE = "U"
+                    ELSE
+                        IF VIA'MTYPE = "F" OR (VIA'MTYPE = "O" AND VIA'FROM'PO = "Y") THEN
+                            UPS'KMTYPE = "F"
+                        ENDIF
+                    ENDIF
+                    UPS'KLOC'NO = LOC'NO
+                    USE UPS INTO UPS'REC KEY UPS'KEY
+                    IF UPS'CTL # 0 THEN
+                        ENTRY = "Cannot find UPS file to lookup shipper number!"
+                        \LABLOGGER ENTRY LNAME
+                        CALL DO'ERR
+                        GOTO ABORT
+                    ELSE
+                        ACCOUNT'NUMBER = UPS'SHIPPER
+                        PRINT #33, ACCOUNT'NUMBER; CHR(9);
+                    ENDIF
+                ENDIF
+            ENDIF
+
+            USE CMP UB'CNO INTO CMP'REC
+            IF CMP'CTL # 0 THEN
+                ENTRY = "Must set up company number: "+ CMP'NO
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                NAME'OF'ACCOUNT = CMP'NAME
+                PRINT #33, NAME'OF'ACCOUNT; CHR(9);
+            ENDIF
+
+            TRACKING'ID = OEHDR'LOC'NO + "-" + OEHDR'DOC'TYPE + "-"+ &
+                     OEHDR'NO + "-" + OEHDR'NAM'NO
+            PRINT #33, TRACKING'ID; CHR(9);
+
+            PURCHASERS'ACCOUNT'ID = OEHDR'NAM'NO
+            PRINT #33, PURCHASERS'ACCOUNT'ID; CHR(9);
+
+            IF TAD'ADDR1 = "" THEN
+                IF TAD'ADDR2 # "" THEN
+                    TAD'ADDR1 = TAD'ADDR2
+                    DELIVER'TO'ADDR1 = TAD'ADDR1
+                    PRINT #33, DELIVER'TO'ADDR1; CHR(9);
+                ELSE
+                    ENTRY = "Shipping address required!"
+                    \KERROR TAD APID="OE" CNO="N" MODE="KEY"
+                    ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                    \LABLOGGER ENTRY LNAME
+                    CALL DO'ERR
+                    GOTO ABORT
+                ENDIF
+            ELSE
+                DELIVER'TO'ADDR1 = TAD'ADDR1
+                PRINT #33, DELIVER'TO'ADDR1; CHR(9);
+            ENDIF
+
+            IF TAD'ADDR2 = "" THEN
+                DELIVER'TO'ADDR2 = ""
+                PRINT #33, DELIVER'TO'ADDR2; CHR(9);
+            ELSE
+                DELIVER'TO'ADDR2 = TAD'ADDR2
+                PRINT #33, DELIVER'TO'ADDR2; CHR(9);
+            ENDIF
+
+            IF TAD'CITY = "" THEN
+                ENTRY = "City not entered on shipping address"
+                \KERROR TAD APID="OE" CNO="N" MODE="KEY"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                DELIVER'TO'CITY = TAD'CITY
+                PRINT #33, DELIVER'TO'CITY; CHR(9);
+            ENDIF
+
+            CASE
+            IF TAD'ST = "" THEN
+                ENTRY = "State not entered on shipping address"
+                \KERROR TAD APID="OE" MODE="KEY" CNO="N"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+            IF LEN(TAD'ST) > 2 OR LEN(TAD'ST) = 1 THEN
+                ENTRY = "State must be 2 character abbreviation"
+                \KERROR TAD APID="OE" MODE="KEY" CNO="N"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                DELIVER'TO'STATE = TAD'ST
+                PRINT #33, DELIVER'TO'STATE; CHR(9);
+            ENDCASE
+
+            IF LEN(TAD'ZIP) > 5 THEN
+                IF TAD'ZIP[6;4] = "0000" THEN
+                    DELIVER'TO'ZIP = TAD'ZIP[1;5]
+                    \STRIP DELIVER'TO'ZIP 3
+                ELSE
+                    DELIVER'TO'ZIP = TAD'ZIP[1;9]
+                    \STRIP DELIVER'TO'ZIP 3
+                ENDIF
+                PRINT #33, DELIVER'TO'ZIP; CHR(9);
+            ELSE
+                DELIVER'TO'ZIP = TAD'ZIP[1;5]
+                \STRIP DELIVER'TO'ZIP 3
+                PRINT #33, DELIVER'TO'ZIP; CHR(9);
+            ENDIF
+
+            DELIVER'TO'COUNTRY = ""
+            PRINT #33, DELIVER'TO'COUNTRY; CHR(9);
+        ENDIF
+
+        DROP'SHIP'CODE = "Y"
+        PRINT #33, DROP'SHIP'CODE; CHR(9);
+
+        IF OEHDR'BOX'COUNT > 1 THEN
+            SPEC'DELIVERY'INSTRUCTIONS = "Pack in " + OEHDR'BOX'COUNT + " boxes."
+            PRINT #33, SPEC'DELIVERY'INSTRUCTIONS; CHR(9);
+        ELSE
+            SPEC'DELIVERY'INSTRUCTIONS = "Pack in " + OEHDR'BOX'COUNT + " box."
+            PRINT #33, SPEC'DELIVERY'INSTRUCTIONS; CHR(9);
+        ENDIF
+
+        IF OEHDR'PO # "" THEN
+            SPEC'ORDER'INSTRUCTIONS = OEHDR'PO
+        ENDIF
+        PRINT #33, SPEC'ORDER'INSTRUCTIONS; CHR(9);
+
+        VIA'SPACE = SPACE
+        VIA'KNO = OEHDR'VIA'NO
+        USE VIA INTO VIA'REC KEY VIA'KEY
+        IF VIA'CTL # 0 THEN
+            ENTRY = "Cannot find via for residential lookup"
+            \KERROR VIA MODE="KEY" APID="IN" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ELSE
+            CALL LOOKUP'RURAL'ZIP
+        ENDIF
+
+        TRH'KNO = OEHDR'TRH'NO
+        USE TRH INTO TRH'REC KEY TRH'KEY
+        IF TRH'CTL # 0 THEN
+            ENTRY = "Order terms not found"
+            \KERROR TRH MODE="KEY" APID="AR" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ELSE
+            CASE
+            IF TRH'COD'STATUS = 1 THEN
+                COD'TAGS'INDICATOR = "N"            !!No tags
+                PRINT #33, COD'TAGS'INDICATOR; CHR(9);
+            ELSE
+            IF TRH'COD'STATUS = 2 AND OC2'ONECOD'OVR # "N" THEN  !!Force 1 cod if company check
+                COD'TAGS'INDICATOR = "O"            !!One tag
+                PRINT #33, COD'TAGS'INDICATOR; CHR(9);
+            ELSE
+            CUS'KNO = OEHDR'NAM'NO
+            USE CUS INTO CUS'REC KEY CUS'KEY
+            IF CUS'CTL # 0 THEN
+                ENTRY = "Customer not found"
+                \KERROR CUS MODE="KEY" APID="AR" CNO="N"
+                ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                GOTO ABORT
+            ELSE
+                IF CUS'ONE'COD = "Y" THEN
+                    COD'TAGS'INDICATOR = "O"            !!One tag
+                    PRINT #33, COD'TAGS'INDICATOR; CHR(9);
+                ELSE
+                    COD'TAGS'INDICATOR = "M"            !!Multiple tags
+                    PRINT #33, COD'TAGS'INDICATOR; CHR(9);
+                ENDIF
+            ENDCASE
+        ENDIF
+
+        THIRD'PARTY'ACCOUNT = ""
+        PRINT #33, THIRD'PARTY'ACCOUNT; CHR(9);
+
+        DELIVER'TO'COUNTY = ""
+        PRINT #33, DELIVER'TO'COUNTY; CHR(9);
+
+        PROMO'CODE = ""
+        PRINT #33, PROMO'CODE
+
+        NUM'OF'RECORDS = NUM'OF'RECORDS + 1
+        NOTD = NOTD + 1
+        PRINT #33, CHR(13) + CHR(10);                   !!CRLF
+RETURN
+
+LOOKUP'VIA:
+        CASE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "A" AND VIA'1Z'SERV = "01" AND &
+                    VIA'SAT'IND # "Y" THEN   !!UPS Next Day
+            DELIVERY'OPTION = "01"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "A" AND VIA'1Z'SERV = "44" AND &
+                    VIA'SAT'IND = "Y" THEN   !!UPS Next Day Saturday
+            DELIVERY'OPTION = "44"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "A" AND VIA'1Z'SERV = "41" AND &
+                    VIA'SAT'IND = "Y" THEN   !!UPS Next Day AM Saturday
+            DELIVERY'OPTION = "41"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "A" AND VIA'1Z'SERV = "15" THEN
+            DELIVERY'OPTION = "15"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "A" AND VIA'SERV'TYPE = "13" THEN !!UPS Next Day Saver
+            DELIVERY'OPTION = "13"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "S" AND VIA'SERV'TYPE = "02" THEN !!UPS 2nd Day
+            DELIVERY'OPTION = "02"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "S" AND VIA'SERV'TYPE = "59" THEN !!UPS 2nd Day A.M.
+            DELIVERY'OPTION = "07"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "R" THEN                          !!UPS 3rd Day
+            DELIVERY'OPTION = "12"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "U" AND VIA'MAN'YN = "C" THEN                          !!UPS Ground
+            DELIVERY'OPTION = "03"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "F" AND VIA'MAN'YN = "B" THEN
+            DELIVERY'OPTION = "01"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "F" AND VIA'MAN'YN = "G" THEN
+            DELIVERY'OPTION = "03"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "F" AND VIA'MAN'YN = "A" THEN
+            DELIVERY'OPTION = "05"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "F" AND VIA'MAN'YN = "D" THEN
+            DELIVERY'OPTION = "06"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "F" AND VIA'MAN'YN = "F" THEN
+            DELIVERY'OPTION = "20"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "F" AND VIA'MAN'YN = "H" THEN
+            DELIVERY'OPTION = "90"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "F" AND VIA'MAN'YN = "C" THEN
+            DELIVERY'OPTION = "92"
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+        IF VIA'MTYPE = "O" AND VIA'FROM'PO = "Y" THEN
+            DELIVERY'OPTION = ""
+            PRINT #33, DELIVERY'OPTION; CHR(9);
+        ELSE
+            ENTRY = "Not one of the available shipment methods"
+            \KERROR VIA MODE="KEY" APID="IN" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                OEHDR'DOC'TYPE + "-" + OEHDR'NO+" MAN  ="+VIA'MTYPE+" TYPE="+VIA'MAN'YN + &
+                " SERV="+VIA'SERV'TYPE
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            SKIPPED'ORDER = OEHDR'RCN
+            GOTO ABORT
+        ENDCASE
+RETURN
+
+CREATE'940'DETAIL:            !!PO detail
+    LINE'ITEM'COUNTER = 0
+    LIN'KDOC'TYPE = HDR'DOC'TYPE
+    LIN'KHDR'NO = HDR'NO
+    LIN'KNO = 0
+    USE LIN INTO LIN'REC KEY LIN'KEY
+    GETNXT LIN INTO LIN'REC
+    DO UNTIL LIN'CTL # 0 OR LIN'DOC'TYPE # LIN'KDOC'TYPE OR &
+        LIN'HDR'NO # LIN'KHDR'NO
+        CALL LOOKUP'SUBS
+!!      CALL CREATE'940'OTHER'CHARGES'REC
+        GETNXT LIN INTO LIN'REC
+    LOOP
+RETURN
+
+LOOKUP'SUBS:
+    SUB'KDOC'TYPE = HDR'DOC'TYPE
+    SUB'KHDR'NO = HDR'NO
+    SUB'KLIN'NO = LIN'NO
+    SUB'KNO = 0
+    USE SUB INTO SUB'REC KEY SUB'KEY
+    GETNXT SUB INTO SUB'REC
+    DO UNTIL SUB'CTL # 0 OR SUB'KDOC'TYPE # SUB'DOC'TYPE OR &
+            SUB'KHDR'NO # SUB'HDR'NO OR SUB'KLIN'NO # SUB'LIN'NO
+        PO'DETAIL = SPACE
+        DETAIL'CODE = "02"
+        PRINT #33, DETAIL'CODE; CHR(9);
+        LINE'ITEM'COUNTER = LINE'ITEM'COUNTER + 1
+        LINE'ITEM'NUM = LINE'ITEM'COUNTER
+        PRINT #33, LINE'ITEM'NUM; CHR(9);
+        CALL LOOKUP'PART'GTIN
+        CALL LOOKUP'PDD'INFO
+        CALL LOOKUP'QUANTITY
+
+        NUM'OF'RECORDS = NUM'OF'RECORDS + 1
+        GETNXT SUB INTO SUB'REC
+    LOOP
+RETURN
+
+\COPYF INT IN
+
+LOOKUP'PART'GTIN:
+    INT'SPACE = SPACE
+    INT'TRK'NO = LIN'TRK'NO
+    INT'ATT'NO1 = SUB'ATT'NO1
+    INT'TYPE = "V"
+    INT'NAM'NO = UCC'INT'VEN'NO
+    INT'UOM'NO = 1
+    \SETKEY INT MODE="KEY" APID="IN"
+    USE INT INTO INT'REC KEY INT'KEY
+    IF INT'CTL # 0 THEN
+        ENTRY = "Cannot find GTIN for this part"
+        \KERROR INT APID="IN" MODE="KEY" CNO="N"
+        ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+        \LABLOGGER ENTRY LNAME
+        CALL DO'ERR
+        SKIPPED'ORDER = OEHDR'RCN
+        GOTO ABORT
+    ELSE
+        IF INT'PART[1;1] # "0" THEN
+            ENTRY = "Invalid GTIN for this part"
+            \KERROR INT APID="IN" MODE="KEY" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            SKIPPED'ORDER = OEHDR'RCN
+            GOTO ABORT
+        ELSE
+            \STRIP INT'PART 3
+            ITEM'ID'GTIN = INT'PART
+            PRINT #33, ITEM'ID'GTIN; CHR(9);
+        ENDIF
+    ENDIF
+RETURN
+
+LOOKUP'PDD'INFO:
+    MASTER'STYLE = ""
+    PRINT #33, MASTER'STYLE; CHR(9);
+
+    COLOR'CODE = ""
+    PRINT #33, COLOR'CODE; CHR(9);
+
+    SIZE'CODE = ""
+    PRINT #33, SIZE'CODE; CHR(9);
+RETURN
+
+LOOKUP'QUANTITY:
+    CALL FIND'UOM
+    CALL LOOKUP'SELLING'PRICE
+RETURN
+
+FIND'UOM:
+    UOM'KNO = LIN'UOM'NO
+    USE UOM INTO UOM'REC KEY UOM'KEY
+    IF UOM'CTL # 0 THEN
+        ENTRY = "Cannot find unit of measure"
+        \KERROR UOM APID="IN" MODE="KEY" CNO="N"
+        ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+        \LABLOGGER ENTRY LNAME
+        CALL DO'ERR
+        GOTO ABORT
+    ELSE
+        IF UOM'NO = 1 THEN
+            QUANTITY'ORDERED = SUB'ORDER'QTY
+            PRINT #33, QUANTITY'ORDERED; CHR(9);
+            PO'UOM = "EA"
+            PRINT #33, PO'UOM; CHR(9);
+            TOTAL'QUANTITY = TOTAL'QUANTITY + QUANTITY'ORDERED
+        ELSE
+            QUANTITY'ORDERED = ((UOM'NUNITS/UOM'DUNITS) * SUB'ORDER'QTY)
+            PRINT #33, QUANTITY'ORDERED; CHR(9);
+            PO'UOM = "EA"
+            PRINT #33, PO'UOM; CHR(9);
+            TOTAL'QUANTITY = TOTAL'QUANTITY + QUANTITY'ORDERED
+        ENDIF
+    ENDIF
+RETURN
+
+MAP1 A4'UCC'NO,S,10
+MAP1 DYE'UCC'NO,S,10
+
+LOOKUP'SELLING'PRICE:
+    IF A4'UCC'NO = UCC'KNO OR DYE'UCC'NO = UCC'KNO THEN
+        SELLING'UNIT'PRICE = "0.0000"
+        TOTAL'LINE'ITEM = "0.0000"
+    ELSE
+        SELLING'UNIT'PRICE = ""
+        TOTAL'LINE'ITEM = ""
+    ENDIF
+    PRINT #33, SELLING'UNIT'PRICE; CHR(9);
+
+    PRINT #33, TOTAL'LINE'ITEM;
+    PRINT #33, CHR(13) + CHR(10);                   !!CRLF
+RETURN
+
+
+CREATE'940'TRAILER:
+    TRAILER = SPACE
+    TRAILER'RECORD = "09"
+    PRINT #33, TRAILER'RECORD; CHR(9);
+
+    NUM'OF'RECORDS = NUM'OF'RECORDS + 1
+    RECORD'COUNT = NUM'OF'RECORDS
+    PRINT #33, RECORD'COUNT; CHR(9);
+
+    TOTAL'QUANTITY'ORDERED = TOTAL'QUANTITY
+    PRINT #33, TOTAL'QUANTITY'ORDERED; CHR(9);
+
+    IF OEHDR'BOX'COUNT = 0 THEN
+        ENTRY = "Must have more than 1 box in shipment"
+        \KERROR HDR APID="PO" MODE="KEY" CNO="N"
+        ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+        \LABLOGGER ENTRY LNAME
+        CALL DO'ERR
+        GOTO ABORT
+    ENDIF
+    NUMBER'OF'CASES = STR(OEHDR'BOX'COUNT)
+    PRINT #33, NUMBER'OF'CASES; CHR(9);
+
+    \STRIP COD'FOR'MERCHANDISE 3
+    IF COD'FOR'MERCHANDISE = "N" THEN
+        TOTAL'PO'AMOUNT = ""
+        PRINT #33, TOTAL'PO'AMOUNT;
+    ELSE
+        \HDRSUM OEHDR BALANCE="TOTAL" LOCAL'TOTALS="Y"
+        IF TOTAL = 0 OR OEHDR'SHP'TOTAL = 0 THEN
+            ENTRY = "COD order has "+(TOTAL/100 USING "###,###.##")+ &
+                " total with "+(OEHDR'SHP'TOTAL/100 USING "###,###.##")+" committed"
+            \KERROR HDR APID="PO" MODE="KEY" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ENDIF
+        TOTAL'PO'AMOUNT = (TOTAL/100 USING "#########.####")
+        PRINT #33, TOTAL'PO'AMOUNT;
+    ENDIF
+    PRINT #33, CHR(13) + CHR(10);                   !!CRLF
+    TOTAL'QUANTITY = 0
+RETURN
+
+MSG'DID="POMSG"
+LOOKUP'OE'ORDER:
+    O2P'KPDOC'TYPE = WRK'MODE
+    O2P'KPNO = WRK'STRK'NO
+    USE O2P INTO O2P'REC KEY O2P'KEY
+    IF O2P'CTL # 0 THEN
+        ENTRY = "Cannot find purchase order to lookup order"
+        CALL DO'ERR
+        ABORT'FLAG = 1
+        GOTO ABORT
+    ENDIF
+RETURN
+
+LOOKUP'CREDIT'HOLD:
+    OEHDR'SPACE = SPACE
+    OEHDR'KLOC'NO = O2P'OLOC'NO
+    OEHDR'KDOC'TYPE = O2P'ODOC'TYPE
+    OEHDR'KNO = O2P'ONO
+    USE OEHDR INTO OEHDR'REC KEY OEHDR'KEY
+    IF OEHDR'CTL # 0 THEN
+        ENTRY = "Order not found in current file"
+        \KERROR HDR MODE="KEY" APID="OE" CNO="N" ALTKEY="OEHDR"
+        ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+        \LABLOGGER ENTRY LNAME
+        CALL DO'ERR
+        SF = 1
+    ENDIF
+    IF OEHDR'HOLD'YN # "N" AND OEHDR'HOLD'YN # "O" THEN
+        ENTRY = "Order on credit hold " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+        \LABLOGGER ENTRY LNAME
+        CALL DO'ERR
+        SF = 1
+    ENDIF
+
+    TRH'KNO = OEHDR'TRH'NO
+    USE TRH INTO TRH'REC KEY TRH'KEY
+    IF TRH'CTL # 0 THEN
+        ENTRY = "3: Cannot find terms"
+        \KERROR TRH MODE="KEY" APID="AR" CNO="N"
+        ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+            OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            SKIPPED'ORDER = OEHDR'RCN
+            GOTO ABORT
+    ELSE
+        IF TRH'CTP'NO > 0 THEN                       !!Credit Card
+            IF OEHDR'SOURCE = "WB" THEN
+                ATQT'KSOURCE = "WB"
+            ELSE
+                ATQT'KSOURCE = "OE"
+            ENDIF
+            ATQT'KCNO = UB'CNO
+            ATQT'KSPECIAL[1;4] = OEHDR'LOC'NO USING "#ZZZ"
+            ATQT'KSPECIAL[5;1] = OEHDR'DOC'TYPE
+            ATQT'KSPECIAL[6;7] = OEHDR'NO USING "#ZZZZZZ"
+            ATQT'KSPECIAL[13;4] = OEHDR'SHIPMENT USING "#ZZZ"
+            USE ATQT INTO ATQ'REC KEY ATQT'KEY
+            IF ATQT'CTL # 0 THEN
+                IF ATQT'KSOURCE = "OE" THEN
+                    ATQT'KSOURCE = "WB"
+                ELSE
+                    ATQT'KSOURCE = "OE"
+                ENDIF
+                USE ATQT INTO ATQ'REC KEY ATQT'KEY
+            ENDIF
+            IF ATQT'CTL = 0 THEN
+                ENTRY = "Authorization record found " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                IF ATQT'KSOURCE # OEHDR'SOURCE THEN
+                    ENTRY = ENTRY + " Source fixed to "+ATQT'KSOURCE
+                ENDIF
+                \LABLOGGER ENTRY LNAME
+                CALL DO'ERR
+                SF = 0
+                IF ATQ'APPROVAL = "" AND ATQ'STATUS # "A" THEN
+                    \HDRSUM OEHDR BALANCE="TOTAL" LOCAL'TOTALS="Y"
+                    IF TOTAL > 0 AND ATQ'AMT > 0 THEN
+                        ENTRY = "Order not authorized " + OEHDR'LOC'NO + "-" + &
+                            OEHDR'DOC'TYPE + "-" + OEHDR'NO+ " APPROVAL: "+ ATQ'APPROVAL +"-"+ ATQ'STATUS
+                        \LABLOGGER ENTRY LNAME
+                        CALL DO'ERR
+                        SF = 4
+                    ENDIF
+                ENDIF
+            ELSE
+                ENTRY = "1: Authorization record not found " + OEHDR'LOC'NO + "-" + &
+                             OEHDR'DOC'TYPE + "-" + OEHDR'NO
+                \LABLOGGER ENTRY LNAME
+                SF = 4
+            ENDIF
+            IF SF = 4 THEN
+                SKIPPED'ORDER = OEHDR'RCN
+            ENDIF
+        ENDIF
+    ENDIF
+RETURN
+
+LOOKUP'RURAL'ZIP:
+    IF VIA'TBL'NO(1) # 0 THEN
+        TBL'KNO = VIA'TBL'NO(1)
+        USE TBL INTO TBL'REC KEY TBL'KEY
+        IF TBL'CTL # 0 THEN
+            ENTRY = "Cannot find freight table"
+            \KERROR TBL MODE="KEY" APID="IN" CNO="N"
+            ENTRY = ENTRY + " for Order " + OEHDR'LOC'NO + "-" + &
+                         OEHDR'DOC'TYPE + "-" + OEHDR'NO
+            \LABLOGGER ENTRY LNAME
+            CALL DO'ERR
+            GOTO ABORT
+        ELSE
+            IF TBL'RURAL'CHK = "Y" THEN
+                RZC'KZIP = TAD'ZIP[1;5]
+                USE RZC INTO RZC'REC KEY RZC'KEY
+                IF RZC'CTL = 0 THEN
+                    IF RZC'ZIP[1;5] = TAD'ZIP[1;5] THEN
+                        IF TAD'RES'YN = "Y" THEN
+                            COMMERCIAL'OR'RESIDENTIAL = "2" !!Rural Residential
+                            PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+                        ELSE
+                            COMMERCIAL'OR'RESIDENTIAL = "4" !!Rural Commercial
+                            PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+                        ENDIF
+                    ENDIF
+                ELSE
+                    IF TAD'RES'YN = "Y" THEN
+                        COMMERCIAL'OR'RESIDENTIAL = "2" !!Urban Residential
+                        PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+                    ELSE
+                        COMMERCIAL'OR'RESIDENTIAL = "0" !!Urban Commercial
+                        PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+                    ENDIF
+                ENDIF
+            ELSE
+                IF TAD'RES'YN = "Y" THEN
+                    COMMERCIAL'OR'RESIDENTIAL = "2"    !!Urban Residential
+                    PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+                ELSE
+                    COMMERCIAL'OR'RESIDENTIAL = "0"    !!Urban Commercial
+                    PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+                ENDIF
+            ENDIF
+        ENDIF
+    ELSE
+        IF TAD'RES'YN = "Y" THEN
+            COMMERCIAL'OR'RESIDENTIAL = "2"    !!Urban Residential
+            PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+        ELSE
+            COMMERCIAL'OR'RESIDENTIAL = "0"    !!Urban Commercial
+            PRINT #33, COMMERCIAL'OR'RESIDENTIAL; CHR(9);
+        ENDIF
+    ENDIF
+RETURN
+
+E'POL940'PRW'STK'1:
+    \\TSTFUNC
+    \TABEDTC PRWSTK PRW'STK MAND="N" EXITDSP="(30)" APID="SY"
+RETURN
+
+
+COPY "HOBSUB.CPY[PO]"
+
