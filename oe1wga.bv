@@ -1,0 +1,770 @@
+! @#$^&* 5 15 0 0 0 0 0 0 0 0 0 0 0 *&^$#@ 
+!*! Updated on Thu Aug  7 15:04:03 2025 by Benito Medrano 2 times 
+!*! Updated on Fri Jul 18 10:59:45 2025 by Benito Medrano 2 times 
+!*! Updated on Mon Nov 15 11:15:42 2021 by Cheryl Eberhard  1 times 
+!@(#)oe1wga.bv  8.57 12/3/97 16:08:23 - SCCS
+GLOBAL MY'PRGNAM="OE1WGA"
+GLOBAL SKIP'PRT'COPYF = "Y"
+GLOBAL DO'FIRST'SET="Y"
+GLOBAL DEBUG="N"
+GLOBAL SKIP'DAYS="M"
+COPY "CVTMAP",SKIP'DAYS="M"
+CIF DEBUG="Y" THEN
+        PROGRAM OE1WGA,8.0D(47)  !!Order Entry (T-Shirt)
+CELSE
+        PROGRAM OE1WGA,8.0(47)  !!Order Entry (T-Shirt)
+ENDCIF
+!%W% %G% %U% - SCCS
+GLOBAL UP'CHARGES = "N"
+CIF UP'CHARGES = "N" THEN
+    GLOBAL UP'HDR = "CHR(0)"
+    GLOBAL TOTAL'UP'CHARGE = "II"
+    GLOBAL UP'NEEDED'DOZ2 = "II"
+    GLOBAL UP'NEEDED'PCS2 = "II"
+    GLOBAL UP'RTOTAL2 = "II"
+CELSE
+    GLOBAL UP'HDR = "UP'HDR"
+    GLOBAL TOTAL'UP'CHARGE = "TOTAL'UP'CHARGE"
+    GLOBAL UP'NEEDED'DOZ2 = "UP'NEEDED'DOZ(2)"
+    GLOBAL UP'NEEDED'PCS2 = "UP'NEEDED'PCS(2)"
+    GLOBAL UP'RTOTAL2 = "UP'RTOTAL(2)"
+ENDCIF
+
+GLOBAL NOT'REFCHG="Y"
+GLOBAL V''MBA'LOG = "N"
+GLOBAL WGA'PRGNAM="OE1WGA"
+GLOBAL USE'SRL="N"
+GLOBAL V''SKIP'PTP="Y"
+GLOBAL E'ADD3="E'ADD3"
+GLOBAL DELETE'IT3="DELETE'IT3"
+GLOBAL ATTDPTR="ATTDPTR"
+GLOBAL MCPTYPTR="MCPTYPTR"
+GLOBAL STXPTR="STXPTR"
+GLOBAL TRHPTR="TRHPTR"
+GLOBAL USE'CC="Y"
+GLOBAL USE'PLUG="N"
+GLOBAL USE'CUTS="N"
+GLOBAL USE'TAD="Y"
+GLOBAL USE'CAP="N"
+GLOBAL USE'CHO="L"
+GLOBAL USE'CHI="Y"
+GLOBAL USE'RTN="N"
+COPY "OE1HDR.BV"
+COPYF "PRWFIL[SY]"
+!!
+!!                        V. I. C. S.
+!!                     of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!
+!!       Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!       All rights reserved.
+!!
+!!
+!!LINWGA[13] 07/25/90 ESE       Log changes in price.
+!![14] 08/03/90 ESE - SUPPORT of internal credit.
+!![15] 09/13/90 ESE - Fix LINWGA.CPY to skip location nicely.
+!![16] 09/14/90 ESE     Make location default correctly ...
+!![17] 10/04/90 BAP     Modified LINP, LHSP, and Added LHSC and LHSD keys
+!![18] 11/12/90 BAP     Changed around uncommented code to allow compile
+!!                      because of label limits
+!![19] 11/14/90 HLB     Mapped a bunch of unmapped variables in HDRSUB,
+!!                      LINWGA, SUBWGA, and TTLSTX
+!![20] 11/27/90 KJS     Fixed single size & 0 quantity problem.
+!!                      Fixed change price & tab problem (pieces only mode).
+!!              KJS/HLB Fixed lookup archives problem.
+!![43] 11/29/90 KJS     Fixed skipping of location on line item screen
+!![44] 12/12/90 KJS     Fixed totalling problem (OE1WGA only)
+!![45] 12/12/90 ESE     Add account number to screen SFINA5.
+!![46] 12/19/90 ESE     Optionally display quantity available and also
+!!                      cache ATT'REC.
+!![47] 12/19/90 KJS     Fixed problem where Fn-W from LIN would not DDB
+!!                      entire area.
+!![48] 01/05/91 ESE     Allow stock to be committed if on hold.
+!![49] 01/16/91 KJS     Fixed price computation problem if not using dz/pc
+!![50] 01/31/91 KJS/ESE If u changed price on case pricing then net was bad.
+!![51] 02/25/91 KJS     Fix net problem.
+!![52] 02/28/91 ESE     Cosmetic change on VDSP of HDR.
+!![53] 03/07/91 KJS     Fix net problem, again.
+!![54] 03/14/91 KJS     Removed LWH junk.  Fixed net problem for real?
+!![55] 03/21/91 BAP     Fixed unmapped OEC variables.
+!![56] 04/24/91 ESE     Dangerous code to CACHE qty records (LINWGA[33]).
+!![57] 04/29/91 ESE     Bugs fixed in above.  Less dangerous.
+!![58] 05/10/91 KJS     Simplified linking to OEC'DEL'PRGNAM
+!![59] 05/10/91 ESE     Speed tricks (LINWGA[35]).
+!!
+!![60] 05/14/91 ESE     Updated credit checking.
+!![61] 06/10/91 HLB     Add new hold statuses, "P" for customer pick-up and
+!!                      "B" for completely backordered
+!![62] 06/10/91 HLB     If FN'7 from header VDSP, start listing at first
+!!                      type 1 order for user's location
+!![63] 06/14/91 HLB     Log hold status and price change messages according
+!!                      to OEC'MSG'LOG
+!![64] 06/19/91 ESE     Display Control number on shipping info screen.
+!!                      Made Func-Q work w/our redisplay.
+!!                      Fix bad OLD QTY ...
+!!
+!![65] 06/20/91 ESE     Control number not displaying properly always.
+!!
+!![66] 07/02/91 KJS/MCT Added template capability to messages.
+!!
+!![67] 07/10/91 ESE     Add link to OE1SHP ability (KJS's idea).
+!!                      REQUIRES OE1SHP.RUN[75] or greater!
+!![68] 07/11/91 ESE/KJS Skip some disk reads.
+!!
+!![69] 07/14/91 ESE     Pass PRH array to OE1SHP.
+!!
+!![70] 07/16/91 ESE     Do not display when switching to archives.
+!!                      Do not display when aborting an add record.
+!![71] 07/19/91 ESE     Remove QTY/LIN caching.
+!!
+!![72] 08/20/91 KJS     Fixed invalid invoice problem when selling cases,
+!!                      using dz/pcs, and changing price.
+!!
+!![73] 08/23/91 ESE     Implement VICQTY.SBR.
+!!
+!![74] 08/27/91 HLB     Problem with available lookup in [73]
+!!
+!![75] 08/27/91 HLB     Yanking a multi line order was not correctly
+!!                      calculating LIN'NET
+!!              ESE     Also, fixing VICQTY.SBR bugs.
+!!
+!![76] 08/28/91 ESE     If not using fast qty, avl never computed.
+!!
+!![77] 08/29/91 HLB     New pricing modification for garment pricing
+!!                      broke case pricing.
+!!
+!![78] 08/30/91 ESE     New credit limit checking. (CMPCRL.CPY).
+!!
+!![79] 09/10/91 ESE/HLB Bug with new garment pricing.
+!!
+!![80] 09/20/91 ESE     Problem w/new parts in quick pricing.
+!!                      Some "INVALID INVOICE" probs fixed.
+!![81] 09/24/91 ESE     Check credit early if fast A/R and also
+!!                      add current order to fast ar.
+!![82] 10/14/91 ESE     Odd size not displaying.  Some speed tricks.
+!!
+!![83] 10/22/91 ESE      Compute sales tax different for pickups (TTLSTX[5]).
+!!
+!![84] 10/30/91 ESE     1) Fix invalid invoice
+!!                      2) If location closed, increment the promised date
+!!                      by one.
+!!
+!![85] 11/05/91 ESE     Allow more space for part # if not multi-loc.
+!!
+!![86] 11/05/91 ESE     Edit PO field for apply to credits.
+!!
+!![87] 11/06/91 ESE     Pricing for special customer type pricing wrong
+!!                      because of one of the speed tricks.
+!!
+!![88] 11/06/91 ESE     More pricing changes.
+!!
+!![89] 11/07/91 ESE     Would not change return flag correctly on func-z.
+!!
+!![90] 11/11/91 ESE     Display 'X' in vdsp if on bo and pickup.
+!!
+!![91] 11/12/91 HLB     Not displaying control number right on SHIPIN
+!!                      if control number from invoice number
+!!                      VCR:OES7:SHIPIN.S
+!![92] 12/04/91 ESE     Fixed an "invalid invoice" problem.
+!!
+!![93] 12/05/91 ESE     Correct computations of lines w/com and w/bo.
+!!
+!![94] 12/10/91 HLB     Change VDSP to show "B" if partially backordered
+!!                      and ship when complete.
+!!
+!![95] 12/10/91 ESE/HLB Cannot add line number zero any more.
+!!
+!![96] 12/18/91 ESE     Priorities tabbed incorrectly if 1st priorty skipped.
+!!
+!![97] 12/26/91 ESE     Display correct location in multi-location orders.
+!!                      Display puller/checker data on shipping screen.
+!!                      Display correct address if func-w from lin.
+!!
+!![98] 01/09/92 HLB     [54] in HDRSUB caused an attempt to repaint a screen
+!!                      using the contents of a PRH rec.  Screen/system lock.
+!!
+!![99] 01/16/92 ESE     Allow alpha entry of apply-to and force F8 if
+!!                      not applied.
+!![100] 01/21/92 ESE    Blank PO number forced F8 always.
+!!
+!![101] 01/27/92 ESE    Check cash terms correctly w/100 dz pricing.
+!![102] 01/29/92 ESE    Make so that F4 to cancel still requires an order
+!!                      quantity.
+!![103] 01/31/92 ESE    Do not allow delete of HDR if 7th security not 'Y'.
+!![104] 02/03/92 ESE    Finally correct AFR in add mode ...
+!![105] 02/10/92 ESE    Option to not discount cases
+!![106] 02/19/92 ESE    Support task manager queue.
+!![107] 02/20/92 HLB    If not using dozens and pieces, do not assume that
+!!                      the "middle" price is for a dozen.  This done to
+!!                      facilitate "6-packs".
+!![108] 02/20/92 ESE    Allow override customer type from control record.
+!![109] 02/25/92 ESE    Make sure prices round out to piece price ...
+!![110] 02/27/92 ESE    Check past due invoice for credit.
+!![111] 03/02/92 ESE    Changed override type not to override special pricing.
+!![112] 03/10/92 ESE    Make cancel/replace invoice directly.
+!!                      Special 100 dz pricing.
+!![113] 03/11/92 HLB    Added display of M if customer message and A if
+!!                      alternate address.
+!![114] 03/11/92 ESE    Use PRH attribute caching.  MUST run INXPR3 7.2F(4)
+!!                      on remote system before installing this!!!!
+!!7.3A  03/16/92 ESE    New LIN and SUB and WGP stuff.
+!!
+!![115] 03/30/92 ESE    Allow delete of orders if auto packing.
+!!
+!![116] 04/03/92 ESE    On type 1200-1299 always use the special price.
+!![117] 04/08/92 ESE    Return processing flag not set properly.
+!!
+!![118] 04/13/92 ESE    Choose closer location more intelligently.
+!!
+!![119] 04/17/92 ESE    Fix invalid invoice in some discount cases.
+!!                      Also made 100dz price not discount if not
+!!                      discounting cases.
+!!
+!![120] 04/20/92 HLB     Database not found message on customer type
+!!
+!![121] 04/21/92 ESE    Do not print pick ticket on internal credit.
+!!
+!![122] 04/23/92 KJS    Fixed mark copy adding of LINP & LINB keys.
+!!
+!![123] 05/05/92 ESE    Made return processing not ask on non-inventory items.
+!!      05/05/92 ESE    On yank, yank messages also. (HDRSUB[71]).
+!!
+!!7.3a[124] 05/07/92 ESE Did not update QTY properly if change from order
+!!                      to quote.  Auto fill backorders if changed from
+!!                      order to quote.
+!![125] 05/12/92 ESE    Correct consolidation problem if not skipping either
+!!                      of 1st two fields on screen and set to auto consolidate.
+!!                      (if user chose not to consolidate it kept asking!)
+!!
+!![126] 05/18/92 ESE    Correct display problem if adding an order from
+!!                      customer order key.
+!!
+!![127] 06/05/92 HLB    Corrected a subscript out of range error.
+!!                      Could cause it by entering a , in the order
+!!                      quantity field and pressing escape.
+!!
+!![128] 06/05/92 ESE    Entering a return to update the order header
+!!                      screen was causing the backorders in the order
+!!                      to be filled.
+!!
+!![129] 06/17/92 ESE/HLB Fix consolidation problem and AFR problem so that
+!!                      both work (see [104] and [125])!
+!!
+!![130] 06/22/92 ESE    Changed to work with new AR1OEU in A/R.
+!!
+!![131] 07/08/92 HLB    FIX: If you are using dozens and pieces and you
+!!                      enter more than 12 pieces on a credit, the price
+!!                      was calculating wrong.
+!!
+!![132] 07/10/92 HLB/ESE FIX: Funct N and F7 on customer field not working.
+!!
+!![133] 07/30/92 ESE    NEW: Made order processing type default to 1.
+!!
+!![134] 07/30/92 ESE    FIX:  rounding error if case pricing w/discount.
+!!                      NEW: Made terms/etc. not change to defaults when
+!!                      going to header screen even in add mode!
+!!
+!![ESE] 07/30/92 ESE    Somewhere around here, Eric fixed the problem
+!!                      where returning to the header screen changed the
+!!                      fields back to the customer defaults again.
+!!
+!![135] 08/11/92 ESE    FIX:  if started with 0 pieces of an item and then
+!!                      changed it to have some pieces and then changed
+!!                      it back to zero - all without leaving the field -
+!!                      then it would set the most previously non-zero
+!!                      size to zero.  If you did not understand that,
+!!                      assume it is very rare indeed and forget it!
+!!
+!![136] 10/14/92 ESE    NEW: Display amount applied on shipping screen.
+!!
+!![137] 10/28/92 ESE    NEW: Do NOT check credit on credit memos.
+!!
+!![138] 11/03/92 ESE    NEW: Kit stuff.
+!!
+!![139] 11/05/92 ESE    NEW: Auto extra large added.
+!!
+!![140] 11/06/92 ESE    NEW: Special high quantity pricing added.
+!!
+!![141] 12/02/92 ESE    FIX:  AFR, consolidate, window problems with cursor
+!!                      ending up on wrong field.
+!!
+!![142] 12/16/92 ESE    FIX: cosmetic problem with credits on vdsp if
+!!                      customer pickup.  Subscript out of range for
+!!                      transfers.
+!!
+!![143] 12/17/92 ESE    FIX:  tabbing on customers .... again.
+!![144] 12/28/92 ESE    FIX: consolidate cosmetic problems.
+!![145] 01/11/93 ESE    NEW: true 7.3 edition.
+!![146] 01/13/93 ESE/HLB FIX: backorder did not work w/dozens & pieces.
+!![147] 01/14/93 ESE    NEW: delete CON file if needed.  Delete "zero"
+!!                      orders even if half posted.
+!![148] 01/26/93 ESE    NEW: support for func-w from OE1SHP.
+!!
+!![149] 02/23/93 ESE    FIX: minor consolidate problems.
+!!
+!![150] 03/02/93 ESE    FIX: not setting terms if security bit 7 = N
+!!
+!![151] 03/19/93 HLB    FIX: Occasionally not setting HDR'GL'CNO
+!!
+!![152] 04/05/93 ESE    NEW: log credit manager as an option.
+!!
+!![153] 04/09/93 ESE    NEW: Display new control number format.
+!!
+!![154] 04/20/93 ESE    NEW: Improve checking of hold status w/security set.
+!!
+!![155] 05/06/93 HLB    FIX: Dozens/Pieces screen display problem
+!!
+!![156] 05/07/93 HLB    FIX: The consolidate window would not automatically
+!!                      open if customer number order was used.  HDRSUB.CPY
+!!
+!![157] 05/20/93 ESE    NEW: display 'a' next to archived order date if
+!!                      credit/debit/cash applied to order.
+!!
+!![158] 05/28/93 ESE    NEW: change backorder filling on func-B.
+!!
+!![159] 06/04/93 ESE    NEW: allow "4" option in CREDIT hold.
+!!                      Need OECRS2.TAB - HLB
+!!
+!![160] 06/11/93 HLB    FIX: Tabbing not working on terms code
+!!                      for non-window tabbing.
+!![161] 06/28/93 HLB    FIX: DOPASS was changed to fix terms code tabbing.
+!!                      This change was modified to make it better.  SAVIER1
+!!                      was added to DOPASS.
+!!
+!![162] 07/09/93 ESE/HLBNEW: Do not remove the hold flag if not
+!!                      recalculating the credit limit.
+!!
+!![163] 07/14/93 ESE    NEW: screen change for OE1HDR required recompil.
+!!                      IH: include OE2HDR.S
+!!
+!![164] 08/03/93 ESE    NEW: because of inconsitancies use FNDLOC.MAC instead
+!!                      of handwritten code from this program.
+!![165] 08/05/93 ESE    NEW: New PRH caching
+!!                      IH: need VICSIT.SBR 7.3a(7) and a lot of other
+!!                          programs (see ESEPRH.CMD).
+!!
+!![166] 08/09/93 ESE    NEW: improvements in passing records in UNIX.
+!!
+!![167] 08/13/93 ESE    NEW: caching added to many macros.
+!!
+!![168] 09/28/93 HLB    NEW: No longer allow duplicate orders in the CONO key.
+!!
+!![169] 10/08/93 ESE    NEW: make prototype messages work.
+!!
+!![170] 10/20/93 ESE    FIX: set default location from customer correctly.
+!!
+!![171] 10/22/93 ESE    FIX: problem overflowing GOSUB stack fixed.
+!!
+!![172] 11/08/93 ESE    FIX: problem overflowing GOSUB stack fixed.
+!!
+!![173] 11/08/93 ESE    FIX: problem overflowing GOSUB stack fixed.
+!!
+!![174] 11/23/93 HLB    NEW: Allow more than one unapplied batch.
+!!
+!![175] 11/24/93 HLB    FIX: If OEC'CALC'YN = "N" and running on a UNIX
+!!                      system and not doing sales tax by location, the
+!!                      sales tax would not calculate.
+!!
+!![176] 02/03/94 ESE     NEW: another variation on "20" case pricing.
+!!                       IH: need in INCWGA.S too (set EASY="Y" for new)
+!!
+!![177] 02/15/94 ESE     FIX: multi-user problem.
+!!
+!![178] 02/16/94 ESE    NEW: Add marketing screen pop-up if required.
+!!                      IH:  Need absolutely current A/R and TO if you
+!!                      want to use this feature, otherwise its safe.
+!!
+!![179] 02/27/94 ESE    FIX: marketing screen popped up too often.
+!!
+!![180] 02/28/94 ESE    NEW: marketing screen not on credit memos.
+!!
+!![181] 03/01/94 ESE    NEW: separate some delete functions.
+!!                      IH: OE1DEL.RUN must go with this!!!!
+!!
+!![182] 03/14/94 ESE    NEW: The seventh security byte which disallows
+!!                      changing of document type also disallows change of
+!!                      the order number.
+!!
+!![183] 04/05/94 ESE    NEW: Make PO required if customer record set.
+!!
+!![184] 04/07/94 HLB    FIX: If using T-Shirt interface, and not using
+!!                      the closest location determination, was setting
+!!                      the location wrong.
+!!
+!![185] 04/07/94 HLB    FIX: Dozens/Pieces screen display problem when
+!!                      entering more than is available.  Need OE1WGA.S
+!!
+!![186] 05/03/94 ESE    NEW: use new HHSP key (see NEWHHS.TXT).
+!!
+!![187] 05/04/94 ESE    NEW: check if even piece price when price changed.
+!!
+!![188] 05/18/94 ESE    NEW: do not change credit status if manually on hold.
+!!
+!![189] 05/25/94 ESE    NEW: display free freight terms oe2hdr screen.
+!!
+!![190] 06/10/94 ESE/HLB NEW: check queue on multi-location orders.
+!!
+!![191] 06/21/94 HLB    NEW: Credit card handling.
+!!
+!![192] 06/23/94 HLB    FIX: Corrected a tabbing problem with long names.
+!!                      IH: Fix in NTABLST
+!!
+!![193] 06/23/94 HLB    FIX: Give an error if the user is using dozens and
+!!                      pieces and tries to exceed 999 dozen 11 pieces.
+!!
+!![194] 07/08/94 HLB    FIX: Fix manifest mode problems
+!!
+!![195] 08/08/94 ESE    NEW: Do not check credit limit on credit cards.
+!!
+!![196] 08/09/94 HLB/ESE FIX: Fix manifest mode problems.
+!!
+!![197] 08/10/94 ESE    NEW: On line items fill backorder for line item only.
+!!
+!![198] 08/18/94 HLB    FIX: Made some changes to the credit card handling
+!!                      including undocumented changes to E'HDR'PO and
+!!                      E'TRH'NO
+!!
+!![199] 08/23/94 ESE     FIX: spurious even dozens price error message.
+!!
+!![200] 09/23/94 HLB     NEW: Was scanning through the whole file to find the
+!!                       next available sequence number for credit cards!!
+!!
+!![201] 11/22/94 ESE    NEW: Allow inactive ship via numbers.
+!!
+!![202] 12/05/94 HLB    NEW: Use the option to force dozens display.
+!!
+!![203] 12/06/94 SLM    NEW: If Multi-Loc = "N" then print last four digits of
+!!                           the PO number instead of the short loc description.
+!!                           HDRSUB.CPY[119]
+!!
+!![204] 12/12/94 ESE    NEW: Make pieces field large if no dozens ...
+!!
+!![205] 12/14/94 HLB    NEW: If using option to force dozens display, and
+!!                      overriding prices, allow entry of dozens price rather
+!!                      than for actual UOM.
+!!
+!!7.4   01/06/95 ESE    NEW: fmtad2 changed.
+!!
+!![1] 01/06/95 ESE      NEW: Implement "slip" pricing (see OEC'SLIP'PRICE).
+!!
+!![2] 02/09/95 ESE      FIX: Slip pricing.
+!!
+!![3] 02/15/95 ESE      FIX: Allow credit card to replace COD terms.
+!!
+!![4] 03/02/95 HLB      FIX: Undocumented improvements to credit card handling
+!!                      Send with OERCTL, OEPDOC, and OE2CRE.
+!!
+!![5] 03/23/95 ESE/HLB FIX: Not setting flag indicating pick ticket needed
+!!                            in all cases.
+!!
+!![6] 05/05/95 HLB      FIX: Past due checking did not work if the
+!!                      aging selection was by invoice date.  See CMPCRL
+!!
+!![7] 06/02/95 ESE      FIX: Unix problem with write/nolock and "customer
+!!                      type on order not found!"
+!!
+!![8] 07/03/95 ESE      NEW: Support OEPACK!
+!!
+!![9] 07/14/95 ESE      NEW: HDRLNK.MAC changed.
+!!
+!![10] 07/18/95 ESE     NEW: More OEPACK stuff.
+!![11] 08/10/95 HLB     FIX: If add/change/delete line, update last
+!!                      update user and date on header.
+!!
+!![12] 09/06/95 HLB     FIX: If checking past due, the credit limit was being
+!!                      "lost" as if the credit limit was zero.
+!!                      See CMPCRL[3]
+!!
+!![13] 12/11/95 SLM     NEW: AFR "1. Enter Location" if INC'MULTI'LOC # "Y".
+!!                           HDRSUB[123]
+!!
+!![14] 12/17/95 ESE     NEW: Set bill ship via if needed for OEPACK.
+!!
+!![15] 12/18/95 ESE     FIX: make [14] work!
+!!
+!![16] 12/20/95 ESE     NEW: Credit card keys broken on credit memos.
+!![17] 12/22/95 ESE     NEW: Show only valid colors per style.
+!!
+!![18] 01/02/96 ESE     FIX: FINDYR macro incorrect if AR not matching GL.
+!!
+!![19] 01/04/96 ESE     NEW: Force UOM = 1 for all lines.
+!!
+!![20] 02/07/96 ESE     NEW:  force correct division of "non-piece" inventory.
+!!
+!![21] 02/09/96 ESE     NEW: after F7 on line item, return to correct field.
+!!
+!![22] 02/12/96 ESE     FIX: allowed zero line item.
+!!
+!![23] 04/15/96 ESE     NEW: some screen print stuff.
+!!
+!![24] 05/15/96 ESE     FIX: minor display problem - did not always display
+!!                           the location description on the header.
+!!
+!![25] 05/28/96 ESE     FIX: Make TABC defaults correct (terms, via, fob, typ).
+!!                           IH:  oe2hdr.s too.
+!!
+!![26] 06/24/96 ESE     NEW: pack05.s changed to have weight on it (need .s).
+!!                      FIX: If customer number only changed then last ID
+!!                      not updated.
+!!                      FIX: if using F5 window to change ship via, bill
+!!                      ship via not changed and if invalid hard to fix.
+!!
+!![27] 07/11/96 ESE     NEW: support new post level (see oerctl!!!).
+!!
+!![28] 08/07/96 ESE     NEW: Set closest and original location.
+!!
+!![29] 08/13/96  ESE    NEW: Keep total for splits for free freight.
+!!
+!![30] 09/18/96  ESE    FIX: Could sometime change actual ship via and
+!!                           it would not change bill ship via.
+!!
+!![31] 11/15/96  ESE    NEW: Check ship via's against ship to address
+!!                      for validity of shipping states.
+!!                      IH: Send with IN1VIA.RUN, IN1VIA.S,INALLO.TAB
+!!
+!![32] 12/03/96  ESE   NEW: recompil for BALFWD changes for new credit fields.
+!!
+!![33] 12/11/96  ESE   NEW: add WBWHAP test to credit checking (CMPCRL.CPY).
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![34] 03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!![35] 04/11/97 ESE/CAE FIX: Sales tax was not always being computed
+!!                      (LINWGA.CPY[97])
+!!
+!![36] 04/11/97 CAE    NEW: security on resequencing orders and consolidating
+!!                     orders if pwastr[7;1] is set (HDRSUB.CPY[133])
+!!
+!![37] 05/15/97 ESE    NEW: use ADDL
+!!
+!![38] 05/19/97 ESE   FIX: location display error fixed.  Spurious 'F' in
+!!                                                       credit field fixed.
+!![39] 05/12/97 SLM/ROM FIX: Add "R-Commit Review" to OECRST.TAB & OECRS2.TAB
+!!
+!![40] 05/22/97  ESE   NEW: only change FFP'TOTAL if order changes.
+!!
+!![41] 05/20/97 ESE/CAE FIX: Save HDR'VIA'NO when aborting from order.
+!!
+!![42] 06/06/97 CAE    FIX: change to fndloc.mac so that locations which
+!!                     have LOC'REAL'YN = N will not be used.
+!!
+!![43] 06/06/97 ESE    NEW: compute FFP'TOTAL from previous values.
+!!
+!![44] 06/10/97  ESE   FIX: write/nolock error fixed in vics.mac
+!!
+!![45] 06/12/97  ESE   FIX: write/nolock error fixed in vuemlt.mac
+!!
+!![46] 07/14/97  ESE   FIX: delete ATQ if change customer.
+!!
+!![47] 07/23/97  ESE   NEW: VERIFY'ATQ macro now checks AVS codes.
+!!
+!  8.155  09/30/03 cae      OE Free freight modifications
+!  8.156  10/01/03 cae      Comments only: Correct problem with 20 case
+!                           pricing on the first line of the order; was
+!                           not setting the prh'mea'ovr. Do not check to
+!                           see if a ship to or drop ship address has
+!                           changed if you are in add or insert mode.
+!  8.157  11/05/03 cae      When using quotes, pay attention to the Order
+!                           Header Control record field quotes when
+!                           setting the afr control on the quote field in
+!                           oe1hdr
+!  8.158  11/06/03 cae      Correct invalid number error message
+!  8.159  11/19/03 cae      Correct deleting of orders after entering
+!                           subject; Correct AFR'ing of quotes free
+!                           freight field; Correct getting pricing from
+!                           quotes if 20 case customer Add getdata macro
+!                           for Morris
+!  8.160  12/10/03 cae      If you deleted an order, then immediately
+!                           added an order, the totals at the top of the
+!                           screen would be negative.
+!  8.161  02/10/04 cae      Add environment variable BO_OTHERS; allows
+!                           you to backorder parts with active flag of
+!                           closeout (C), or discontinued (M or D)
+!  8.162  03/17/04 cae      Move environment variable OE1WGA_QUOTE_MODE
+!                           so that it is used in all programs not just
+!                           oe1wga
+!  8.163  03/19/04 cae      Make oe1qut display Quote entry instead of
+!                           Order Entry
+!  8.164  06/11/04 cae      Correct problem with allowing overriding of
+!                           backorder quantities on one-time parts if the
+!                           bo_one_time was set
+!  8.165  08/04/04 cae      Added new security oe1sec if set to "N"
+!                           cannot delete orders, fixed problem when
+!                           changing credit status on orders and then
+!                           going back into order for customers with a 4
+!                           or 7 cr'status, fixed compiling problems
+!  8.166  08/13/04 cae      In archives if a user searches for their
+!                           orders by user id, display the totol time
+!                           remaining for the display to happen. If a
+!                           customer has a quote and the part ordered is
+!                           on sale, compare the quote price against the
+!                           regular price and give the lower price
+!  8.167  08/16/04 cae      Display balance due in archives, do not
+!                           change via to residential for t-shirt
+!  8.168  08/27/04 cae      Move check for oe1sec security program into
+!                           the correct place!
+!  8.169  09/21/04 cae      If changing order hold to 5 allow the user to
+!                           go past the hdr'nam'no field
+!  8.170  09/24/04 cae      Do not override credit hold on order if
+!                           manually set to 5
+!  8.171  09/27/04 cae      Corrected duplicate map statments
+!  8.172  10/07/04 cae      Set 20 case pricing properly if no 20 case
+!                           price on part and the price was coming from a
+!                           quote
+!  8.173  10/13/04 cae      Change security of overriding quantities to
+!                           8th bit of oe1sec program
+!  8.174  02/09/05 cae      For HOB orders check the VIA'HOB'YN field and
+!                           only allow ship via's that are set to "Y"
+!  8.175  03/04/05 cae      CIF Cap Interface to compile oe1wga; Add new
+!                           security in1fl1 and in1fl2. If Location
+!                           Security number is set and it that bit is set
+!                           to N in security maintenance then users will
+!                           not be able to place orders for that location
+!  8.176  03/18/05 cae      Add security for deleting HOB orders. If 6th
+!                           bit is set to "N" on oe1sec, users cannot
+!                           delete HOB orders if they have been picked.
+!  8.177  04/04/05 cae      Set the default line location number if blank
+!  8.178  04/20/05 cae      Display TAD address as ship to address
+!  8.179  04/20/05 cae      Show TAD billing name/address if used
+!  8.180  04/29/05 cae      Correct email for oe1wga compile, correct
+!                           display of error messages on ship via
+!  8.181  05/03/05 cae      Reduce number of variables
+!  8.182  08/14/05 cae      Changes for USPS and environment variables
+!  8.183  08/19/05 cae      Correct display of tad address on page
+!  8.184  08/24/05 cae      Correction for looking up canada
+!  8.185  09/26/05 cae      Display ffp description at the bottom of the
+!                           screen
+!  8.186  10/13/05 cae      Allow users to press return on "F"ailed
+!                           orders and not print documents
+!  8.187  11/04/05 cae      Change to residential ship via on oe1hdr.s
+!  8.188  12/13/05 cae      Changes to display entire PO in archives;
+!                           error message for WP orders
+!  8.189  12/20/05 cae      Add environment variable to disallow orders
+!                           with non-UPS ship via's to the WP location
+!  8.190  01/06/06 cae      Commented environment variables
+!  8.191  03/07/06 cae      Reduce number of variables
+!  8.192  03/09/06 cae      Add new fields to Temporary Address File
+!                           including name and phone number
+!  8.193  04/19/06 cae      Add new TAD fields, correct display when
+!                           using multiple locations
+!  8.194  05/01/06 cae      Changes for Global Express mail outside the
+!                           US
+!  8.195  05/20/06 cae      Put a CIF around CHO macro
+!  8.196  05/23/06 cae      Correct future dated orders
+!  8.197  06/16/06 cae      Check Saturday Delivery for California
+!                           Overnight
+!  8.198  07/07/06 cae      Add date/time order was first picked
+!  8.199  08/02/06 cae      Correct screen vdsp being dim
+!  8.200  08/09/06 cae      Correct display of 2x quantities for 2nd
+!                           location
+!  8.201  09/08/06 jmcook   added oe "on sale" memo     , added default
+!                           backorder flag
+!  8.202  10/13/06 cae      Changes for morris, correct looking up 2x
+!                           quantities
+!  8.203  03/08/07 cae      Changes for credit cards
+!  8.204  04/30/07 cae      Changes for cvv2, display of cvv2 number
+!                           starting with a leading zero
+!  8.205  05/01/07 cae      Correct entry of credit cards on fly
+!  8.206  06/06/07 cae      Correction for parts set up to override
+!                           quantities
+!  8.207  07/02/07 cae      Add new ship blind field
+!  8.208  07/05/07 cae      Add ship blind field
+!  8.209  09/07/07 cae      Changes for allow/disallow ship via and terms
+!  8.210  10/26/07 elaine   change copyright
+!  8.211  08/10/09 elaine   copyright
+!  8.212  12/29/09 elaine   copyright
+!  8.213  01/13/11 cae      Copyright
+!  8.214  06/08/11 ese      Added CHO and CHI for XML loading with wb1xml
+!  8.215  07/20/11 ese      Changes to allow sending of item_update files
+!                           with price/details for any item
+!  8.216  12/28/11 cae      Copyright
+!  8.217  07/24/14 cae      Add a global statement
+!  8.218  10/31/17 cae      Copyright
+!  8.219  04/03/20 ese      qmail, email, oemai, hdrsub changes to make
+!                           work on delete for t-shirt and fix some
+!                           mapping issues to reduce maps
+!  8.220  05/14/20 ese      Changes for delete when email and post --
+!                           moved double case into oemail.bv so that if
+!                           it does mail it only asks reason once. If
+!                           only post still done in oe1wga/oe1hdr.
+!  8.221  09/01/20 ese      Changed for new WCS bits
+!  8.222  09/15/20 cae      Copyright
+!  8.223  01/30/21 ese      Added tracking to first shipping detail
+!                           screen
+!  8.224  03/12/21 ese      Skip PRT copyf
+!  8.225  03/17/21 ese      Fix "cannot reserve" code and some cosmetices
+!  8.226  09/02/21 ese      re-compiled f oe1del link change
+!  8.227  09/22/21 ese      Change map FST'BOX to match oe1del
+!  8.228  09/23/21 ese      Fix screen scroll if system call gets an
+!                           error
+!  8.229  10/19/21 ese      Changed for soft coded UPS tracking URL
+!  8.230  11/15/21 cae      Copyright
+!  8.231  02/16/22 ese      Make delete of order link to PO if
+!                           appropriate so it can be deleted
+!  8.232  03/14/22 ese      Fix problem where credit card could not be
+!                           re-entered if switch from WB entry to OE
+!                           entry
+!  8.233  04/05/22 ese      display clean PO number after entry
+!  8.234  06/11/22 ese      Made so totals come out even when USR'OQTY is
+!                           not set
+!  8.235  08/08/22 ese      Made func-x do where is my order as well and
+!                           fn'11
+!  8.236  05/26/23 j4878    ANET VOID changes
+!  8.237  06/09/23 j4878    Final ANET Modifications
+!  8.238  06/26/23 j5512    The order total on the main screen was not
+!                           matching the detail screen.
+!  8.239  07/03/23 j5724    Credit Memo using invoice for previous VisaNet will get error message
+!  8.240  07/17/23 j5512    added error calls when a user changes an
+!                           order to quote or quote to order
+!  8.241  07/18/23 j5512    fixed screen error
+!  8.242  09/07/23 page     Pass HDR to in3sum
+!  8.243  09/07/23 page     Take HDR off in3sum
+!  8.244  09/22/23 j5724    Don't allow non Lead parts on quotes with
+!                           Lead flag set to Y
+!  8.245  09/26/23 j5512    fix quote/order flag on field 18 so that it
+!                           warns when this flag is changed
+!  8.246  12/07/23 page     Added totals of commited qty to top display,
+!                           set dollar totals back to not include frieght
+!                           and tax and so forth so that it reflects
+!                           total lin net which displays an the right
+!                           side of the list display
+!  8.247  05/01/24 page     Fix data base error caused by using wrong
+!                           packet (pkt)
+!  8.248  01/21/25 j5724    Prevent user from adding a Refund or Credit
+!                           greater than the authorized credit card
+!                           amount or original order
+!  8.249  01/31/25 j5724    Do not allow a type 4 credit to be used in
+!                           more than one order. This mod requires the
+!                           CMA file. OE1WGA and OPACK have to be
+!                           deployed together.
+!  8.250  04/21/25 j4878    Stahl's Quantity break fractional pricing changes
+!  8.251  06/12/25 j5512    The Order status window was allowing the user
+!                           to clear the status field. Tighte ned up code
+!                           so that this is no longer possible.
+!  8.252  07/03/25 j4878    Update Quantity Break Level pricing for additional levels 100 and 250 Removed display of QBK
+!                           level to fix the UOM Ttles for the QBK pricing on the detail line
+!  8.253  07/06/25 j4878    Fix buand QBK pricing display
+!  8.254  08/19/25 j5512    add logic so that best price between quote, tier and special price is selected
+!  8.255  08/25/25 j5512    Modifications to allow program to find lowest
+!                           price for customer
+!  8.256  10/29/25 j5724    Add CMAI'HDR'NO to the CMAI key
+!  8.257  01/23/26 j5724    Recompile with new CMAFIL layout
+!  8.258  03/04/26 j5724    Do not allow an invoice over 174 days old in
+!                           the PO field.
+!  8.259  03/04/26 j5724    This code is part of version 8.258. The 174
+!                           invoice date limit is only for credit card
+!                           terms. If not credit card terms do not
+!                           perform test.
+! !!COMMENT-MARKER!!LANGUAGE=BASIC!!    DO NOT REMOVE  DO NOT REMOVE
+
+
