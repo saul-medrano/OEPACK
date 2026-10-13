@@ -1,0 +1,995 @@
+! @#$^&* 413 0 414 0 0 0 0 0 0 0 0 0 0 *&^$#@ 
+!* Updated on 12-Feb-96 at 3:50 PM by Eric Eberhard; edit time: 5:35:55
+!!WGAWGA.CPY 8.0 - used in OESHOP.RUN and OE1WGA.RUN
+!!             copied in SUBWGA.CPY and LINWGA.CPY respectively.
+!!                      V. I. C. S.
+!!                   of Camp Verde, AZ
+!%W% %G% %U% - SCCS
+
+IF 1 = 0 ? "VERSION %W%: %G%"
+!!
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!                     V. I. C. S.
+!!                    of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,
+!!                              1997 by
+!!       Vertical Integrated Computer Systems, Camp Verde, AZ  USA 
+!!       All rights reserved.   
+!!
+!!
+!!Created:  11/04/92 ESE/HLB
+!!
+!![1] 05/06/93 HLB      FIX: Dozens/Pieces screen display problem
+!!
+!![2] 04/07/94 HLB      FIX: Dozens/Pieces screen display problem when
+!!                      entering more than is available.  Need OE1WGA.S
+!!
+!![3] 06/23/94 HLB      FIX: Give an error if the user is using dozens and
+!!                      pieces and tries to exceed 999 dozen 11 pieces.
+!!
+!![4] 12/12/94 ESE     NEW: Make pieces field large if no dozens ...
+!!
+!!7.4   09/30/95 CAE    New version created
+!!
+!![5] 02/07/96 ESE      NEW:  force correct division of "non-piece" inventory.
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![6]  03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!  8.190  03/17/21 ese      Fix "cannot reserve" code and some cosmetices
+!  8.191  11/15/21 cae      Copyright
+!  8.192  06/26/23 j5512    The order total on the main screen was not
+!                           matching the detail screen.
+!  8.193  12/07/23 page     Added totals of commited qty to top display,
+!                           set dollar totals back to not include frieght
+!                           and tax and so forth so that it reflects
+!                           total lin net which displays an the right
+!                           side of the list display
+!  8.194  05/01/24 page     Fix data base error caused by using wrong
+!                           packet (pkt)
+!  8.195  01/21/25 j5724    Prevent user from adding a Refund or Credit
+!                           greater than the authorized credit card
+!                           amount or original order
+! !!COMMENT-MARKER!!LANGUAGE=BASIC!!    DO NOT REMOVE  DO NOT REMOVE
+!!
+MAP1 ORDER'TOTALS,S,26
+PRE'DSP'TOTALS:
+    CIF UP'CHARGES = "Y" THEN
+        CIF WGA'PRGNAM="OE1WGA" THEN
+            IF OEC'SKIP'UP # "Y" THEN
+                CALL SHOW'UP'CHARGE        !!Must compute 1st as result is
+            ENDIF
+        ENDCIF
+        II = HDR'LIN'TOTAL + TOTAL'UP'CHARGE
+        ORDER'TOTALS = II/100 USING "$$#,###.##-"
+    CELSE
+        ORDER'TOTALS = HDR'LIN'TOTAL/100 USING "$$#,###.##-"
+!!Ben -- the HDR screen includes tax and shipping, etc. -- Invoice total
+!!         this screen is supposed to show the total of the NET seen in
+!!         the far right column labeled NET ... so that people entering an
+!!         can see the order totals as they.  The invoice total is not really
+!!         valid until they invoice :-)
+!!      IF ORDER'TOTALS # CALC'HTOTAL THEN
+!!          \HDRSUM INVOICE="CALC'HTOTAL"
+!!          ORDER'TOTALS = CALC'HTOTAL/100 USING "$$#,###.##-"
+!!      ENDIF
+    ENDCIF
+    \STRIP ORDER'TOTALS 3
+    IF ARCHIVE'FLAG = "A" THEN
+        COPYF "LHSKEY",LHS2
+        CAPTTL = 0
+        LHS2'KHDR'LOC'NO = HDR'LOC'NO
+        LHS2'KDOC'TYPE = HDR'DOC'TYPE
+        LHS2'KHDR'NO = HDR'NO
+        LHS2'KSHIPMENT = HDR'SHIPMENT
+        LHS2'KNO = 0
+        USE LHS2 INTO LIN2'REC KEY LHS2'KEY
+        DO
+            GETNXT LHS2 INTO LIN2'REC
+            \CHKKEY LHS ALTPRE="LIN2" ALTKEY="LHS2"
+            IF LHS2'CTL # 0 EXIT
+            CAPTTL = CAPTTL + LIN2'USR'OQTY
+        LOOP
+    ENDIF
+!!  IF ARCHIVE'FLAG = "C" THEN
+        ORDER'TOTALS = STR(CAPTTL) + "/" + ORDER'TOTALS
+!!  ENDIF                     !!part of total display.
+    CALL DSP'TOTALS
+RETURN
+
+SET'ATT'CODE:
+    \SETATT
+RETURN
+
+PRE'DSP'DOZENS:
+    FOR II = 1 TO 6
+        CALL DSP'DOZENSII
+    NEXT II
+RETURN
+
+DSP'DOZENSII:
+    CIF USE'CAP = "Y" THEN
+        IF (INC'TS'SUBI = 4 AND II > 1) THEN
+            RETURN
+        ENDIF
+    ENDCIF
+    CASE
+    IF WGA'AFR(II) = "Y" THEN
+        DZPC(II)="   *  "
+    ELSE
+    IF WGA'TITLES(II) = "" THEN
+        DZPC(II) = SPACE(6)
+    ELSE
+        IF INC'DZ'PIECES # "N" THEN
+            DZPC(II) = (ABS(WGA'DOZENS(II)) USING "###") + "/" + ABS(WGA'PIECES(II)) + SPACE(2)
+        ELSE
+            DZPC(II) = WGA'PIECES(II) + SPACE(6)
+        ENDIF
+    ENDCASE
+    CIF WGA'PRGNAM="OE1HDR" OR WGA'PRGNAM="OE1WGA" THEN     !![1]
+          ON II CALL DSP'DOZENS1,DSP'DOZENS2,DSP'DOZENS3,       &
+                                DSP'DOZENS4,DSP'DOZENS5,DSP'DOZENS6
+    ENDCIF
+RETURN
+
+MAP1 AUTO'TRK'NO,B,3
+
+HANDLE'ODD'STUFF:
+    IF ECFLD = lastfn AND AUTO'DXL = 0 THEN
+        IF INX2 = FN'12 THEN
+            XCALL GETENV,"PRHURL",ENTRY
+            IF ENTRY = "" THEN
+                INX2 = FN'C12
+            ELSE
+                RETURN
+            ENDIF
+        ENDIF
+        IF INX2 = FN'5 THEN INX2 = FN'C5
+        IF INX2 = FN'C5 OR INX2 = FN'C12 THEN
+            IF PRH'ODD'TRK'NO # 0 THEN
+                AUTO'DXL = 1
+                INX2 = FN'1
+            ELSE
+                ENTRY = "No odd size available!"
+                GOTO DO'ERR
+            ENDIF
+        ELSE
+        IF INX2 = FN'S5 OR INX2 = FN'S12 THEN
+            AUTO'DXL = 99
+            INX2 = FN'1
+        ENDIF
+        ENDIF
+        IF AUTO'DXL # 0 THEN
+            AUTO'TRK'NO = 0
+            IF PRH'ODD'TRK'NO # 0 THEN
+                IF AUTO'DXL = 99 THEN
+                    II = PRH'TRK'NO
+                    PRH2'REC = PRH'REC
+                    DO WHILE PRH2'ODD'TRK'NO # 0 AND PRH2'ODD'TRK'NO # II
+                        PRH2'KTRK'NO = PRH2'ODD'TRK'NO
+                        USE PRH2 INTO PRH2'REC KEY PRH2'KEY
+                    LOOP
+                    IF PRH2'ODD'TRK'NO = II THEN
+                        AUTO'TRK'NO = PRH2'TRK'NO
+                    ENDIF
+                ELSE
+                    AUTO'TRK'NO = PRH'ODD'TRK'NO
+                ENDIF
+                IF AUTO'TRK'NO = 0 THEN
+                    AUTO'DXL = 0
+                    INX1 = I'RT : INX2 = 0 : IER1 = 0
+                ENDIF
+            ENDIF
+        ENDIF
+    ENDIF
+RETURN
+
+CHG'ODD'TRK'NO:
+    IF AUTO'TRK'NO # 0 THEN
+        LIN'TRK'NO = AUTO'TRK'NO
+    ENDIF
+    AUTO'DXL = 0
+    ECFLD = 2
+    INX1 = I'RT : INX2 = 0 : IER1 = 0
+RETURN
+
+E'DOZENS:
+    arrowc = |EX'EDD| OR arrowc
+    IF EDSPSW # 0 GOTO EDIT'DOZENS
+    CIF WGA'PRGNAM="OE1WGA" THEN
+        IF PG = |NM| AND SELECT(|NM|) = 1 AND IER1 # 0 THEN
+            CALL HANDLE'ODD'STUFF
+            IF IER1 = 0 RETURN
+        ENDIF
+    ENDCIF
+    IF PG = 3 THEN
+        VV = INT((ECFLD+1)/2)
+    ELSE
+        \GETFLD |SCREEN| WGA'DOZENS(1) V''TMP
+        VV = INT((ECFLD+2-|V''TMP|)/2)
+    ENDIF
+    IF INX1 = I'TAB THEN
+        WGA'DOZENS(VV) = DOZENS(VV) MIN 864
+        IF DOZENS(VV) = 0 THEN
+            WGA'PIECES(VV) = PIECES(VV) MIN 11
+        ELSE
+            WGA'PIECES(VV) = 0
+        ENDIF
+        CALL PRE'DSP'DOZENS
+        IER1 = 0
+    ENDIF
+    \EAMT TYPE="HDR'DOC'TYPE" FLDNAM=WGA'DOZENS(VV) &
+                                DOERR="GOTO" APID="AR" DO'TSTFUNC="N"
+    IF (INX1 = I'UA OR INX1 = I'HME) AND EFCHG # 0 THEN
+        CALL UPDATE'DOZENS'PIECES
+    ENDIF
+    CALL EDIT'DOZENS
+    CIF WGA'PRGNAM="OE1WGA" THEN
+        IF (lastchb = 20 OR lastchb = 18 OR INX2 = FN'11 OR INX1 = I'HME OR &
+                            lastchb = 5) AND PG = 2 AND EDSPSW = 0 THEN
+            GOTO E'BOTTOMS
+        ENDIF
+    ENDCIF
+RETURN
+
+E'PIECES:
+
+    IF EDSPSW # 0 GOTO EDIT'PIECES
+    CIF WGA'PRGNAM="OE1WGA" THEN
+        IF PG = |NM| AND SELECT(|NM|) = 1 AND IER1 # 0 THEN
+            CALL HANDLE'ODD'STUFF
+            IF IER1 = 0 RETURN
+        ENDIF
+    ENDCIF
+    CALL TST'FUNC
+    IF TST'FUNC = 1 THEN
+        II = 0
+        FOR I = 1 TO 6
+            II = II + WGA'PIECES(I) + (12*WGA'DOZENS(I))
+        NEXT I
+        CASE
+        IF SAVE'ORG'INV'AMT # 0 THEN
+            STRING'AMT = II/100 USING "##,###,###.##-"
+            \STRIP STRING'AMT 3
+            IF HDR'DOC'TYPE = 2 AND ABS(II) > ABS(SAVE'ORG'INV'AMT) THEN
+                ENTRY = "Credit cannot exceed Invoice amt of "+STRING'AMT
+                CALL DO'ERR
+                IER1 = 1
+            ENDIF
+        ELSE
+        IF SAVE'ATQ'AMT # 0 THEN
+            STRING'AMT = II/100 USING "##,###,###.##-"
+            \STRIP STRING'AMT 3
+            IF HDR'DOC'TYPE = 2 AND ABS(II) > ABS(SAVE'ATQ'AMT) THEN
+                ENTRY = "Refund cannot exceed Credit Card auth amt of "+STRING'AMT
+                CALL DO'ERR
+                IER1 = 1
+            ENDIF
+        ENDCASE
+        IF II # LIN'ORDER'QTY THEN
+            WGA'SPACE = SPACE               !!This is mandatory!!!
+        ENDIF
+        IF SELECT(|NM|) = 1 OR SELECT(|NM|) = 2 OR XXX'USR'OQTY # 0 THEN
+            CALL EDIT'PIECES
+            ECFLD = 99              !!This'll speed it up
+        ELSE
+            CALL TST'FUNC'KLUDGE
+        ENDIF
+        RETURN
+    ENDIF
+    IF ENTRY[-1,-1] = "#" THEN              !![5] this if
+        II = VAL(ENTRY[1,-2])
+        II = II * LIN'UOM'FACTOR(1)
+        ENTRY = VAL(II)
+        WGA'PIECES(VV) = II
+    ENDIF
+    IF INC'DZ'PIECES # "N" THEN
+        IF PG = 3 THEN
+            VV = INT(ECFLD/2)
+        ELSE
+            \GETFLD |SCREEN| WGA'DOZENS(1) V''TMP
+            VV = INT((ECFLD+1-|V''TMP|)/2)
+        ENDIF
+        IF INX1 = I'TAB THEN
+            IF DOZENS(VV) = 0 THEN
+                WGA'PIECES(VV) = PIECES(VV) MIN 11
+            ELSE
+                PIECES(VV) = 11
+            ENDIF
+            CALL PRE'DSP'DOZENS
+            IER1 = 0
+        ELSE
+            IF WGA'PIECES(VV) >= 12 THEN
+                IF ABS(WGA'DOZENS(VV) + FIX(WGA'PIECES(VV)/12)) > 999 THEN
+                    ENTRY = "You cannot exceed 999 dozen 11 pieces"
+                    CALL DO'ERR
+                    WGA'PIECES(VV) = 0
+                    RETURN
+                ENDIF
+                WGA'DOZENS(VV) = WGA'DOZENS(VV) + FIX(WGA'PIECES(VV)/12)
+                WGA'PIECES(VV) = WGA'PIECES(VV) - FIX(WGA'PIECES(VV)/12) * 12
+                EMAX = 6                !![4] (had dsp here)
+            ENDIF
+        ENDIF
+        IF EMAX # 2 THEN                        !![4]
+            II = VV
+            CALL DSP'DOZENSII
+        ENDIF
+    ELSE
+        IF PG = 3 THEN
+            VV = ECFLD
+        ELSE
+            \GETFLD |ASCREEN| WGA'PIECES(1) V''TMP
+            VV = ECFLD-|V''TMP|+1
+        ENDIF
+        IF INSTR(1,ENTRY,".") # 0 THEN
+           WGA'PIECES(VV) = INT(ENTRY) * 12 + ENTRY[INSTR(1,ENTRY,".")+1,-1]
+        ENDIF
+        IF INSTR(1,ENTRY,"/") # 0 THEN
+           WGA'PIECES(VV) = INT(ENTRY) * 12 + ENTRY[INSTR(1,ENTRY,"/")+1,-1]
+        ENDIF
+    ENDIF
+    IF ZZZW'DOZENS(VV) # WGA'DOZENS(VV) THEN EFCHG = 1
+    IF ZZZW'PIECES(VV) # WGA'PIECES(VV) THEN EFCHG = 1
+    IF EFCHG # 0 CALL UPDATE'DOZENS'PIECES
+    IF AUTO'DXL # 0 AND XXX'ORDER'QTY = 0 GOTO CHG'ODD'TRK'NO
+    CIF WGA'PRGNAM="OE1WGA" THEN
+        IF (lastchb = 20 OR lastchb = 18 OR INX2 = FN'11 OR INX1 = I'HME OR &
+                            lastchb = 5) AND PG = 2 AND EDSPSW = 0 THEN
+            GOTO E'BOTTOMS
+        ENDIF
+    ENDCIF
+
+    CIF USE'CAP = "Y" THEN
+        SYMBOL CAPKLUDGE = "INC'TS'SUBI"
+    CELSE
+        SYMBOL CAPKLUDGE = "5"
+    ENDCIF
+    IF LIN'UOM'FACTOR(1) = 0 THEN
+        ENTRY = "Line invalid:  UOM'FACTOR=0"
+        GOTO DO'ERR
+    ENDIF
+    IF (VV = LAST'GAFR'II OR XXX'USR'OQTY # 0) AND &
+((((INT(XXX'USR'OQTY/LIN'UOM'FACTOR(1))*LIN'UOM'FACTOR(1))#XXX'USR'OQTY) AND &
+                            |CAPKLUDGE| # 4) OR XXX'USR'OQTY = 0) AND &
+                            INX2 # FN'7 AND INX2 # FN'12 AND &
+                            (VV # FIRST'GAFR'II OR INX1 # I'UA) AND &
+                            INX2 # FN'Y THEN
+        IF INX1 # I'UA THEN
+TST'FUNC'KLUDGE:
+            IF XXX'USR'OQTY = 0 THEN
+                ENTRY = "MUST enter an order quantity"
+            ELSE
+                ENTRY = "Order quantity must be a factor of "+STR(LIN'UOM'FACTOR(1))
+            ENDIF
+            IF TST'FUNC = 1 THEN
+                ENTRY = ENTRY + " Ctrl-Z to DELETE!"
+            ENDIF
+            CALL DO'ERR
+        ELSE
+            IER1 = 0
+        ENDIF
+        IF INC'DZ'PIECES # "N" THEN
+            \GOTO |SCREEN| WGA'DOZENS(1)
+        ELSE
+            \GOTO |ASCREEN| WGA'PIECES(1)
+        ENDIF
+        IF INX1 = 3 AND INX2 = 0 THEN
+            ECFLD = ECFLD - 1
+        ELSE
+            ECFLD = ECFLD + 1
+            INX1 = I'RT
+            INX2 = 0
+        ENDIF
+        RETURN                                  !!KLUDGE
+    ENDIF
+
+    CASE
+    IF SAVE'ATQ'AMT # 0 AND ABS(HDR'LIN'TOTAL) > ABS(SAVE'ATQ'AMT) THEN
+        STRING'AMT = SAVE'ATQ'AMT/100 USING "##,###,###.##-"
+        \STRIP STRING'AMT 3
+        ENTRY = "*** Refund exceeds CC authorization of "+STRING'AMT
+        CALL DO'ERR
+!!      IER1 = 1        !!will let it continue to next field after error
+    ELSE
+    IF SAVE'ORG'INV'AMT # 0 AND ABS(HDR'LIN'TOTAL) > ABS(SAVE'ORG'INV'AMT) THEN
+        STRING'AMT = SAVE'ORG'INV'AMT/100 USING "##,###,###.##-"
+        \STRIP STRING'AMT 3
+        ENTRY = "Credit cannot exceed invoice amount of "+STRING'AMT
+        CALL DO'ERR
+!!      IER1 = 1        !!will let it continue to next field after error
+    ENDCASE
+
+    GOTO EDIT'PIECES
+RETURN
+
+CIF WGA'PRGNAM="OE1WGA" THEN
+   E'BOTTOMS:
+       IF INX2 = FN'11 THEN
+!!if oe1wga'dsploca # "N" or oe1wga'dspcola # "N"
+           IF ENVSTR[6;2] # "N" OR ENVSTR[8;2] # "N" THEN
+               ?TAB(24,1);TAB(-1,A'NORM);"Enter selection ";
+               IF INC'MULTI'LOC = "Y" THEN
+                   IF ENVSTR[6;2] = "N" THEN    !!oe1wga'dsploca = "N"
+                       ? "(F11 for locations):";
+                   ELSE
+                       ? "(F11 for colors):";
+                   ENDIF
+               ELSE
+                   ? ":";
+               ENDIF
+               EROW = 24 : ECOL = 77 : EMAX = 2 : ETYP = E'NUM + E'FAST
+               EMIN = 0
+               XCALL GIN,2,FNO,EDT
+               ?TAB(24,1) ; TAB(-1,9) ;
+               CASE
+               IF INX2 = FN'11 THEN
+                   IF ENVSTR[6;2] = "N" THEN        !!oe1wga'dsploca = "N"
+                       ENVSTR[6;2] = ENVSTR[10;2]   !!oe1wga'dsploca = oe1wga'orgloca
+                       ENVSTR[8;2] = "N"            !!oe1wga'dspcola = "N"
+                   ELSE
+                       ENVSTR[8;2] = ENVSTR[12;2]   !!oe1wga'dspcola = oe1wga'orgcola
+                       ENVSTR[6;2] = "N"            !!oe1wga'dsploca = "N"
+                   ENDIF
+                   CALL DSP'BOTTOMS'L25
+                   CALL PRE'DSP'WGA'AVAIL
+               ELSE
+               IF INX1 = I'HME OR lastchb = 5 OR lastchb = 18 OR &
+                                                    lastchb = 20 THEN
+                   CALL E'BOTTOMS
+                   INX2 = FN'11
+                   GOTO E'BOTTOMS
+               ELSE
+               IF INX1 = I'RT THEN
+                   LIN'XXX'OVR = XXX'REC
+                   CALL PRE'UPDATE2
+                   SF = 1
+                   IF ENVSTR[6;2] = "N" THEN    !!oe1wga'dsploca = "N"
+                       IF VAL(ENTRY) >= 1 AND VAL(ENTRY) <= 12 AND &
+                                                            INX1 = I'RT THEN
+                           LIN'TRK'NO = DSP'TRK'NO((DSP'TRK'PAGE*12)+VAL(ENTRY))
+                           DSP'TRK'NO(1) = LIN'TRK'NO
+                           DSP'TRK'NO((DSP'TRK'PAGE*12)+VAL(ENTRY)) = ORG'TRK'NO
+                           CALL FIND'PRH
+                           SF = 0
+                        ENDIF
+                   ELSE
+                       FOR QQ = 1 TO |MAX'ALOC|
+                           IF ALOC'NO(QQ) = VAL(ENTRY) THEN SF = 0
+                       NEXT QQ
+                       IF SF = 0 THEN
+                           LIN'LOC'NO = VAL(ENTRY)
+                       ENDIF
+                   ENDIF
+                   IF SF = 0 THEN
+                       IF LIN'SUB'COUNT # 0 THEN
+                           CALL REL2
+                           LIN2'REC = LIN'REC
+                           CALL SET'HIGH'VALUES2
+                           CALL PRE'SET'USE2
+                           CALL PRE'GETPRV2
+                           LAST'TRX'FIELD2 = LIN'NO
+                           LIN'REC = LIN2'REC
+                           CALL DO'DUP2
+                           LIN'NO = LAST'TRX'FIELD2 + 10
+                           LIN'LOC'NO = LIN2'LOC'NO
+                           LIN'TRK'NO = LIN2'TRK'NO
+                           CALL SET'KEY2
+                           CALL ADD'RECORD2
+                           CALL POST'PRE'READ2
+                           BO'FLAG = 0
+                           CALL UPDATE'2ND'KEYS2
+                           ? TAB(5,10) ; LEFT(STR(LIN'NO)+SPACE(4),4);
+                           BOTTOM'AFU = 2
+                       ENDIF
+                       XLN = 0
+                       IF ENVSTR[6;2] = "N" THEN        !!oe1wga'dsploca = "N"
+                           CALL DO'DSPPRH
+                           ? TAB(7,10) ; PRH'FORMATTED ;
+                           ENTRY = PRH'DESC
+                           CALL DSP'PRH'DESC
+                       ELSE
+                           CALL FIND'LOC
+                           ? TAB(6,10) LEFT(STR(LIN'LOC'NO)+SPACE(4),4);
+                           CALL DSP'LOC'DESC'LIN
+                       ENDIF
+                       WGA'SPACE = SPACE
+                       CHG'QTY'KEY = 1
+                       CALL CHANGED'PART
+                       DPS'REC = DP'REC            !!Save new
+                       CALL PRE'UPDATE2
+                   ENDIF
+               ENDCASE
+           ENDIF
+       ELSE
+           IF ENVSTR[8;2] # "N" THEN            !!oe1wga'dspcola # "N"
+               IF lastchb = 18 THEN    !!Page up
+                   IF DSP'TRK'PAGE = 0 THEN
+                       DSP'TRK'PAGE = 25
+                   ENDIF
+                   DSP'TRK'PAGE = DSP'TRK'PAGE - 1
+                   IF DSP'TRK'NO((DSP'TRK'PAGE*12)+1) = 0 THEN
+                       DSP'TRK'PAGE = 24
+                   ENDIF
+                   DO WHILE DSP'TRK'NO((DSP'TRK'PAGE*12)+1) = 0 AND &
+                                            DSP'TRK'PAGE > 1
+                       DSP'TRK'PAGE= DSP'TRK'PAGE - 1
+                   LOOP
+               ELSE
+                   IF lastchb = 20 THEN    !!Page down
+                        DSP'TRK'PAGE = DSP'TRK'PAGE + 1
+                   ELSE
+                       IF INX1 = I'HME THEN    !!Home
+                           DSP'TRK'PAGE = 0
+                       ELSE                    !!Ctrl-e (end) lastchb = 5
+                           DSP'TRK'PAGE = INT((DSP'TRK'CNT-1)/12)
+                       ENDIF
+                   ENDIF
+                   IF DSP'TRK'PAGE > 24 THEN DSP'TRK'PAGE = 0
+                   IF DSP'TRK'NO((DSP'TRK'PAGE*12)+1) = 0 THEN
+                       DSP'TRK'PAGE = 0
+                   ENDIF
+               ENDIF
+               IF DSP'TRK'NO((DSP'TRK'PAGE*12)+1) # 0 THEN
+                   CALL DSP'BOTTOMS'SETUP
+                   FOR QQ = 1 TO |MAX'ALOC|
+                       LIN'TRK'NO = DSP'TRK'NO((DSP'TRK'PAGE*12)+QQ)
+                       IF LIN'TRK'NO # 0 THEN
+                           CALL DSP'BOTTOMS
+                       ENDIF
+                   NEXT QQ
+                   XLN = 0
+                   LIN'TRK'NO = ORG'TRK'NO
+                   CALL FIND'PRH
+                   CALL DO'DSPPRH
+               ENDIF
+           ENDIF
+       ENDIF
+       IER1 = 0
+   RETURN
+ENDCIF
+
+UPDATE'DOZENS'PIECES:
+        EFCHG = 0
+        IF ZZZW'DOZENS(VV) # WGA'DOZENS(VV) THEN EFCHG = 1
+        IF ZZZW'PIECES(VV) # WGA'PIECES(VV) THEN EFCHG = 1
+        PG = 3
+        SUB'KNO = VV
+        CIF WGA'PRGNAM="OE1WGA" THEN
+            CALL SEE'IF'HPRICE
+            O'HPRICE = SF
+        ENDCIF
+        IF ZZZW'PIECES(VV) # 0 OR ZZZW'DOZENS(VV) # 0 THEN
+            TMP'RCN(3) = VV
+            CALL PRE'READ3
+            IF WGA'PIECES(VV) # 0 OR WGA'DOZENS(VV) # 0 THEN
+                CALL WGA'EAMT
+                IF INC'DZ'PIECES # "N" THEN
+                    XXX'USR'OQTY = (WGA'DOZENS(VV)*12) + &
+                                                        WGA'PIECES(VV)
+                ELSE
+                    XXX'USR'OQTY = WGA'PIECES(VV)
+                ENDIF
+                XXX'ORDER'QTY = XXX'USR'OQTY
+                PG = |NM|
+                CALL SET'COM'QTY
+                PG = 3
+                CALL SET'COM'BO
+                IF XXX'USR'OQTY < 0 AND LIN'RPROC = 0 THEN
+                    IF HDR'DOC'TYPE # OEC'INT'CR THEN
+                        CALL RPROC'PUSH
+                        LIN'RPROC = XXX'RPROC
+                    ELSE
+                        LIN'RPROC = 2
+                        XXX'RPROC = 2
+                    ENDIF
+                ENDIF
+                CALL PRE'WRITE3
+            ELSE
+                CALL DEL'RECORD3
+                SUB'SPACE = SPACE
+            ENDIF
+        ELSE
+!PIECES'KLUDGE:
+            IF WGA'PIECES(VV) # 0 OR WGA'DOZENS(VV) # 0 THEN
+                CALL WGA'EAMT
+                CALL DO'DUP3
+                CALL SAVTOTAL3
+                ZZZ3'SPACE = SPACE              !!TRICK UPDATE'QTY'REC
+                ZZZX'SPACE = SPACE              !!DITTO
+                        
+                SUB'NO = VV
+                SUB'ATT'NO1 = VV
+                IF INC'DZ'PIECES # "N" THEN
+                    XXX'USR'OQTY = (WGA'DOZENS(VV)*12) + &
+                                                        WGA'PIECES(VV)
+                ELSE
+                    XXX'USR'OQTY = WGA'PIECES(VV)
+                ENDIF
+                XXX'ORDER'QTY = XXX'USR'OQTY
+                PG = |NM|
+                CALL SET'COM'QTY
+                PG = 3
+                CALL SET'COM'BO
+                IF XXX'USR'OQTY < 0 AND LIN'RPROC = 0 THEN
+                    IF HDR'DOC'TYPE # OEC'INT'CR THEN
+                        CALL RPROC'PUSH
+                        LIN'RPROC = XXX'RPROC
+                    ELSE
+                        LIN'RPROC = 2
+                        XXX'RPROC = 2
+                    ENDIF
+                ENDIF
+                IF XXX'ORDER'QTY # 0 THEN
+                    SUB'XXX'OVR = XXX'REC
+                    CALL SET'KEY3
+                    CALL ADD'RECORD3
+                ENDIF
+            ELSE
+                TMP'RCN(3) = VV
+                CALL PRE'READ3
+                IF TMP'CTL(3) = 0 THEN
+                    CALL DEL'RECORD3
+                ENDIF
+                SUB'SPACE = SPACE
+            ENDIF
+        ENDIF
+        ZZZW'REC = WGA'REC
+        PG = |NM|
+        XXX'REC = LIN'XXX'OVR
+        IF EFCHG # 0 OR INX1 = I'TAB THEN
+            CIF WGA'PRGNAM="OE1WGA" THEN
+                CALL HPRICING
+                IF PG = 2 AND PRH'KTD'FLAG = "B" AND &
+                            CHG'QTY'KEY # 0 AND INC'DSPAVL # "N" THEN
+
+                    FOR II = 1 TO 6
+                        IF WGA'TITLES(II) # "" THEN
+                            CALL AVAILABLE
+                            IF INC'DZ'PIECES # "N" THEN
+                                DOZENS(II) = FIX(AVAILABLE/12)
+                                IF DOZENS(II) > 999 THEN
+                                    DOZENS(II) = 999
+                                    PIECES(II) = 99
+                                ELSE
+                                    PIECES(II) = AVAILABLE-(DOZENS(II)*12)
+                                ENDIF
+                            ELSE
+                                PIECES(II) = AVAILABLE
+                            ENDIF
+                        ENDIF
+                    NEXT II
+                    CALL PRE'DSP'WGA'AVAIL
+                ENDIF
+            CELSE
+                IF OEC'QTY'BREAKS # "N" THEN
+                    CALL DO'PRICE
+                ELSE
+                    CALL DSP'PRICING
+                ENDIF
+            ENDCIF
+        ENDIF
+        IF EFCHG # 0 THEN       !!Forced set above if dozens/pieces change
+                CALL PRE'UPDATE|NM|
+        ENDIF
+RETURN
+
+WGA'EAMT:
+        \EAMT TYPE="HDR'DOC'TYPE" FLDNAM=WGA'PIECES(VV) &
+                DOERR="GOTO" APID="AR" DO'TSTFUNC="N"
+        IF INC'DZ'PIECES # "N" THEN
+                \EAMT TYPE="HDR'DOC'TYPE" FLDNAM=WGA'DOZENS(VV) &
+                        DOERR="GOTO" APID="AR" DO'TSTFUNC="N"
+        ENDIF
+RETURN
+
+EDIT'DOZENS:
+        CASE
+        IF EDSPSW = 255 THEN
+            IF ENTRY[1;1]="%" THEN ENTRY = ENTRY[2,-1]
+            ENTRY = ABS(ENTRY) USING "###"
+            IER2 = 0
+        ELSE
+        IF EDSPSW = 2 THEN
+            ENTRY = ABS(ENTRY)
+        ELSE
+            my'ebin = ABS(ENTRY)
+            my'edvf = 1
+            my'emsk = "###"
+        ENDCASE
+RETURN
+
+EDIT'PIECES:
+        IF EDSPSW = 255 THEN
+            arrowc = |EX'EDD| OR arrowc
+            ENTRY = RIGHT(SPACE(6)+ABS(ENTRY),6)
+            IER2 = 0
+        ELSE
+            IF EDSPSW = 2 THEN
+                ENTRY = ABS(ENTRY)
+                IF INC'DZ'PIECES # "N" AND EMAX = 2 THEN
+                    IF PG = 3 THEN
+                        VV = INT(ECFLD/2)
+                    ELSE
+                        \GETFLD |SCREEN| WGA'DOZENS(1) V''TMP
+                        VV = INT((ECFLD+1-|V''TMP|)/2)
+                    ENDIF
+                    IF WGA'DOZENS(VV) = 0 THEN
+                        EMAX = 6
+                        ECOL = ECOL - 4
+                    ENDIF
+                ENDIF
+            ENDIF
+        ENDIF
+RETURN
+
+CIF WGA'PRGNAM="OESHOP" THEN
+        COPYS "WGAWGA"
+ENDCIF
+
+SET'COM'QTY:
+        IF HDR'QUOTE'YN = "Y" GOTO SET'QUOTE
+        IF XXX'ORDER'QTY > 0 THEN
+            II = SUB'ATT'NO1
+            IF INC'DSPAVL = "N" AND PIECES(II) = -1 THEN
+                CALL AVAILABLE
+                IF INC'DZ'PIECES # "N" THEN
+                    DOZENS(II) = FIX(AVAILABLE/12)
+                    IF DOZENS(II) > 999 THEN
+                        DOZENS(II) = 999
+                        PIECES(II) = 99
+                    ELSE
+                        PIECES(II) = AVAILABLE-(DOZENS(II)*12)
+                    ENDIF
+                ELSE
+                    PIECES(II) = AVAILABLE
+                ENDIF
+            ENDIF
+            IF INC'DZ'PIECES # "N" THEN
+                AVAILABLE = DOZENS(II) * 12 + PIECES(II)
+            ELSE
+                AVAILABLE = PIECES(II)
+            ENDIF
+!!Why does it set available to ordered and then test never is true?  !!delwin
+!!          CALL AVAILABLE   !!faster test and check if BO allowed
+                             !!but confusing to user and rare so no for now
+                             !!use the "cannot reserve" code in linwga
+            IF XXX'ORDER'QTY > AVAILABLE THEN
+!!              CIF WGA'PRGNAM="OESHOP" THEN
+!!                  MAP1 BO'ONE'TIME,S,1
+!!              ENDCIF
+                CASE
+                IF (HDR'BO'YN = "N" OR (PRH'ACTIVE # "Y"  AND     &
+                            (ENVSTR[19;1] # "Y" AND PRH'ACTIVE = "O"))) AND &
+                            (PG = 2 AND AVAILABLE <= 0 AND BO'FLAG = 0 AND &
+                                                        LIN'OVERIDE = 0) THEN
+                    ENTRY = "No Stock available, no backorders allowed"
+                    CALL DO'ERR
+                    II = 2
+                ELSE
+!!ENVSTR[4;1] = BO_OTHERS (in etc/environment)
+!(PRH'ACTIVE = "X" AND ENVSTR[4;1] # "Y") OR   &
+CIF USED AND NOT USED THEN
+                IF PRH'ACTIVE = "X" THEN
+                    XCALL GETENV,"LOC"+STR(HDR'LOC'NO)+"_PATH",ENTRY
+                    IF HDR'LOC'NO = LIN'LOC'NO AND ENTRY = "" THEN
+                        CALL SET'EXCEEDS
+                        ENTRY = ENTRY + "Can't B/O"
+                        CALL DO'ERR
+                        II = 3
+                    ELSE
+                    IF HDR'LOC'NO # LIN'LOC'NO THEN
+                        XCALL GETENV,"LOC"+STR(LIN'LOC'NO)+"_PATH",ENTRY
+                        IF ENTRY = "" THEN
+                            CALL SET'EXCEEDS
+                            ENTRY = ENTRY + "Can't backorder"
+                            CALL DO'ERR
+                            II = 3
+                        ELSE
+                            \PUSHEDT
+                            CIF WGA'PRGNAM="OE1WGA" THEN
+                                DSP OE3WGA
+                            CELSE
+                                DSP WGAWGA
+                            ENDCIF
+                            CALL SET'EXCEEDS
+                            CALL DSP'EXCEED'AVAILABLE       !!OE3WGA.S
+                            DO
+                                CASE
+                                IF PRH'INVENTORY = "O" THEN
+                                    ENTRY = "5"
+                                ELSE
+                                IF OEC'BO'FLAG # "" THEN
+                                    ENTRY = OEC'BO'FLAG
+                                ELSE
+                                ENTRY = "4"
+                                ENDCASE
+                                CALL GET'EXCEED'AVAILABLE
+                                II = ENTRY
+                                IF INX2 # FN'7 EXIT
+                            LOOP
+                            \POPEDT
+                            ?TAB(24,1);TAB(-1,11);TAB(-1,9);TAB(-1,12);
+                        ENDIF
+                    ENDIF
+                    ENDIF
+                ELSE
+ENDCIF
+                IF PRH'ACTIVE = "I" OR PRH'ACTIVE = "Q" OR    &
+                          (PRH'ACTIVE = "M" AND ENVSTR[4;1] # "Y") OR   &
+                          (PRH'ACTIVE = "C" AND ENVSTR[4;1] # "Y") OR   &
+                          (PRH'ACTIVE = "D" AND ENVSTR[4;1] # "Y") OR   &
+                          (PRH'ACTIVE = "Z" AND ENVSTR[4;1] # "Y") OR   &
+                          (PRH'ACTIVE = "S" AND ENVSTR[4;1] # "Y") OR   &
+                          (HDR'BO'YN = "N" AND PG = 2 AND BO'FLAG = 0 &
+                           AND LIN'OVERIDE = 0) THEN
+                    CALL SET'EXCEEDS
+                    ENTRY = ENTRY + "Cannot Backorder"
+                    CALL DO'ERR
+                    II = 3
+
+                ELSE
+                    \PUSHEDT
+                    CIF WGA'PRGNAM="OE1WGA" THEN
+                        DSP OE3WGA
+                    CELSE
+                        DSP WGAWGA
+                    ENDCIF
+                    CALL SET'EXCEEDS
+                    CALL DSP'EXCEED'AVAILABLE       !!OE3WGA.S
+                    ENTRY = "Type"+STR(HDR'DOC'TYPE)+"LOC_NO"
+                    \DG GETVALUE _OESETUP ENTRY TMP'LOC'NO TAGVAR="Y"
+                    DO
+                        CASE
+                        IF DG'CTL = 0 AND TMP'LOC'NO # 0 THEN
+                            ENTRY = "5"
+                        ELSE
+                        IF PRH'INVENTORY = "O" THEN
+                            ENTRY = "5"
+                        ELSE
+                        IF OEC'BO'FLAG # "" THEN
+                            ENTRY = OEC'BO'FLAG
+                        ELSE
+                            ENTRY = "4"
+                        ENDCASE
+                        CALL GET'EXCEED'AVAILABLE
+                        II = ENTRY
+                        IF INX2 # FN'7 EXIT
+                    LOOP
+                    \POPEDT
+                    ?TAB(24,1);TAB(-1,11);TAB(-1,9);TAB(-1,12);
+                ENDCASE
+                LIN'OVERIDE = 0
+                CASE
+                IF II = 1 THEN
+                    XXX'COM'QTY = 0
+                ELSE
+                IF II = 2 THEN
+                    XXX'USR'OQTY = 0
+                    XXX'ORDER'QTY = 0
+                    XXX'COM'QTY = 0
+                    IF INC'DZ'PIECES # "N" THEN
+                        WGA'DOZENS(VV) = FIX(XXX'ORDER'QTY/12)
+                        WGA'PIECES(VV) = XXX'ORDER'QTY-WGA'DOZENS(VV)*12
+                    ELSE
+                        WGA'PIECES(VV) = XXX'ORDER'QTY
+                    ENDIF
+                    CIF WGA'PRGNAM="OE1WGA" THEN
+                        CALL REDISPLAY'DOZENS           !![2]
+                    ENDCIF
+                    IER1 = 0
+                ELSE
+                IF II = 3 THEN
+                    XXX'ORDER'QTY = AVAILABLE
+                    XXX'USR'OQTY = AVAILABLE
+                    XXX'COM'QTY = AVAILABLE
+                    IF INC'DZ'PIECES # "N" THEN
+                        WGA'DOZENS(VV) = FIX(XXX'ORDER'QTY/12)
+                        WGA'PIECES(VV) = XXX'ORDER'QTY-WGA'DOZENS(VV)*12
+                    ELSE
+                        WGA'PIECES(VV) = XXX'ORDER'QTY
+                    ENDIF
+                    CIF WGA'PRGNAM="OE1WGA" THEN
+                        CALL REDISPLAY'DOZENS           !![2]
+                    ENDCIF
+                    IER1 = 0
+                ELSE
+                IF II = 4 THEN
+                    XXX'COM'QTY = AVAILABLE
+                    IF INC'DZ'PIECES # "N" THEN
+                        WGA'DOZENS(VV) = FIX(XXX'ORDER'QTY/12)
+                        WGA'PIECES(VV) = XXX'ORDER'QTY-WGA'DOZENS(VV)*12
+                    ELSE
+                        WGA'PIECES(VV) = XXX'ORDER'QTY
+                    ENDIF
+                ELSE
+                IF SPWASTR[8;1] # "Y" THEN
+                        ENTRY = "You do not have security to override"
+                        CALL DO'ERR
+                ELSE
+                    LIN'OVERIDE = 1
+                    XXX'COM'QTY = XXX'ORDER'QTY
+                ENDCASE
+            ELSE
+                XXX'COM'QTY = XXX'ORDER'QTY
+            ENDIF
+        ELSE
+            XXX'COM'QTY = XXX'ORDER'QTY
+        ENDIF
+RETURN
+
+CIF WGA'PRGNAM="OE1WGA" THEN
+    REDISPLAY'DOZENS:
+        IF VV = 1 THEN
+            CALL DSP'WGA'DOZENS1
+        ELSE
+        IF VV = 2 THEN
+            CALL DSP'WGA'DOZENS2
+        ELSE
+        IF VV = 3 THEN
+            CALL DSP'WGA'DOZENS3
+        ELSE
+        IF VV = 4 THEN
+            CALL DSP'WGA'DOZENS4
+        ELSE
+        IF VV = 5 THEN
+            CALL DSP'WGA'DOZENS5
+        ELSE
+        IF VV = 6 THEN
+            CALL DSP'WGA'DOZENS6
+        ENDIF
+        ENDIF
+        ENDIF
+        ENDIF
+        ENDIF
+        ENDIF
+    RETURN
+ENDCIF
+
+SET'EXCEEDS:
+    ENTRY = "ORDERED EXCEEDS AVAILABLE BY        :"
+    IF INC'DZ'PIECES # "N" THEN
+        II = XXX'ORDER'QTY - AVAILABLE
+        ENTRY[30;3] = (FIX(II/12) USING "###")
+        ENTRY[33;1] = "/"
+        ENTRY[34;2] = LEFT((II - FIX(II/12)*12)+SPACE(2),2)
+    ELSE
+        ENTRY[30;6] = STR(XXX'ORDER'QTY - AVAILABLE)
+    ENDIF
+RETURN
+
+SHOW'BO'S:
+        IF (WGA'BDOZENS(SUB'NO) + WGA'BPIECES(SUB'NO)) # 0 THEN
+            IF INC'DZ'PIECES # "N" THEN
+                DZPC(SUB'NO) = (ABS(WGA'BDOZENS(SUB'NO)) USING "###")+"/"+ABS(WGA'BPIECES(SUB'NO))
+            ELSE
+                DZPC(SUB'NO) = WGA'BPIECES(SUB'NO)
+            ENDIF
+        ELSE
+            DZPC(SUB'NO) = SPACE(6)
+        ENDIF
+        CIF WGA'PRGNAM="OE1WGA" THEN
+           IF REAL'PG = |NM| THEN               !!12/03/90 ESE  
+                ON SUB'NO CALL DSP'BO1,DSP'BO2,DSP'BO3,DSP'BO4,DSP'BO5,DSP'BO6
+           ENDIF
+        ENDCIF
+RETURN
+
+E'EXCEED'AVAILABLE:
+        \TABEDTC OELOST ENTRY
+RETURN
