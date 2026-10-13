@@ -1,7 +1,7 @@
-! @#$^&* 7369 0 7392 0 0 0 0 0 0 0 0 0 7380 *&^$#@ 
+! @#$^&* 7385 0 7375 0 0 0 0 0 0 0 0 0 15240 *&^$#@ 
+!*! Updated on Tue Oct 13 17:03:58 2026 by Saul Medrano 1 times 
 !*! Updated on Thu Oct  8 12:33:44 2026 by Saul Medrano 3 times 
 !*! Updated on Wed Oct  7 17:05:12 2026 by Saul Medrano 2 times
-!*! Updated on Fri Oct  2 15:41:50 2026 by Will Carroll 1 times 
 !!
 !!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
 !!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
@@ -7368,19 +7368,24 @@ UPDATE'CC'LINE:
 RETURN
 
 !!SHL stores all the locations for a split order
+MAP1 MILL'DIR'BO'STOP,S,1
 ADD'SHL:
         TIME'CSV = "ADD'SHL:" : \TIME'CSV
         TMP'TOTAL = TMP'TOTAL + LIN'NET
-!*************
-XCALL GIN,"HDR'LOC'NO="+HDR'LOC'NO+" LIN'LOC'NO="+LIN'LOC'NO  !!remove later
-        IF HDR'LOC'NO > 1 AND HDR'LOC'NO = LIN'LOC'NO THEN  !!Mill Direct Location
+        !!Company policy: All locations greater than 1 are Mill Direct locations
+        IF FIRST'LOC'NO > 1 AND FIRST'LOC'NO = LIN'LOC'NO THEN  !!Mill Direct Location
             SPLIT'LOC = "N"
-            SPLIT'BO = "N"
-!************
-XCALL GIN,"Set SPLIT'LOC and SPLIT'BO to N"    !!remove later
+!!          SPLIT'BO = "N"    GitHub says I should not do this
+            MILL'DIR'BO'STOP = "Y"
+        ELSE
+            MILL'DIR'BO'STOP = "N"
         ENDIF
 
-        IF (SPLIT'BO # "N" AND LIN'ORDER'QTY # 0) OR LIN'COM'QTY # 0 THEN
+!!OLD   IF (SPLIT'BO # "N" AND LIN'ORDER'QTY # 0) OR LIN'COM'QTY # 0 THEN
+!!NEW below - GitHub look here.  I added MILL'DIR'BO'STOP
+        IF MILL'DIR'BO'STOP # "Y" OR (SPLIT'BO # "N" AND LIN'ORDER'QTY # 0) &
+                                OR LIN'COM'QTY # 0 THEN
+!!NEW above - GitHub look above for new code
             CALL SET'SPLIT'LOC
             IF SPLIT'LOC = "Y" THEN
                 SHL'LOC'NO = FIRST'LOC'NO
@@ -15234,10 +15239,9 @@ MAP1 SPLIT'LOC'NO,B,2
 
 SET'SPLIT'LOC:            !!Preserves LOC'REC and makes sure it is Y or N
     TIME'CSV = "SET'SPLIT'LOC:" : \TIME'CSV
-
-!!If this is a Mill Direct Order and Header Location and Line Location are
-!!both greater than location 1 then do not allow split order.
-!!
+    IF FIRST'LOC'NO > 1 AND FIRST'LOC'NO = LIN'LOC'NO THEN  !!Mill Direct Location
+        SPLIT'LOC = "N"
+    ENDIF
 
     IF BOUNCE'LOC'NO = LIN'LOC'NO THEN
         SPLIT'LOC = "N"
