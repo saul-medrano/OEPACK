@@ -1,0 +1,445 @@
+! @#$^&* 166 0 361 0 0 0 0 0 0 0 0 0 1 *&^$#@ 
+!*! Updated on Thu Dec 19 10:53:48 2024 by Benito Medrano 1 times 
+!*! Updated on Thu Nov  4 13:32:17 2021 by Cheryl Eberhard  1 times 
+!*! Updated on Thu Feb 18 13:03:45 2021 by Cheryl Eberhard  1 times 
+PROGRAM POL870,8.0(1) !!Order Status
+!!
+!!                          V. I. C. S.
+!!                       of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!              2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!              (928) 567-3727
+!!
+!!
+!!Revision History:
+!!
+!!
+
+MAP1 STARTED,B,1
+MAP1 MY'TRK'NO,B,3
+MAP1 LNAME,S,200
+MAP1 SENTRY,S,132
+MAP1 EMAIL'ADMIN,S,20
+MAP1 EMAIL'COMMAND,S,80
+MAP1 EMAIL'FILE'NAME,S,50
+MAP1 MY'BLF'VERSION,S,3,"1.0"
+MAP1 MY'UOM,B,2
+MAP1 SAV'MSG,B,3
+MAP1 CHANGED'PP,B,1
+MAP1 OENDDTT,S,8
+MAP1 CENDDTT,S,8
+MAP1 OSEDTT,S,8
+MAP1 CSEDTT,S,8
+MAP1 SDAYS,F
+MAP1 MY'PURPOSE,S,2
+MAP1 EASI'SENDER'ID,S,15
+MAP1 TMP1,S,10
+MAP1 TMP2,S,10
+MAP1 TWO'NAME,S,128,"/logs/pol870.DAILY"
+MAP1 MY'STORE,S,8
+MAP1 MY'TRACKING'ID,S,45
+MAP1 QTYCNT,B,3
+MAP1 ECNT,B,3
+MAP1 CMD,S,300
+MAP1 FNAME,S,300
+MAP1 FNAME2,S,300
+MAP1 X,F
+MAP1 REC'TYPE,S,4
+MAP1 TYPE'OF'DOCUMENT,S,3
+MAP1 II,F
+MAP1 TMP,S,1000
+MAP1 BASE,S,128
+MAP1 DIR,S,128
+MAP1 MY'TRX'TYPE,S,3,"870"
+
+COPY "CVTMAP"
+COPYF "CMNFIL[SY]",NOAFR
+COPYF "MSGFIL[SY]",NOAFR
+\COPYF INT IN
+\COPYF DDD PO
+\COPYF UCC PO
+\COPYF BLF PO
+\COPYF HDR PO
+\COPYF LIN PO
+\COPYF LOC IN
+\COPYF LIN PO LIN2
+
+\READCTL APP="PO" GL="Y"
+\READCTL APP="IN" GL="Y"
+\READCTL APID="SA" GL="N"
+
+FNAME = "/tmp/proc.PID"
+XCALL ABUTIL,46,FNAME,FNAME
+XCALL ABUTIL,46,TWO'NAME,TWO'NAME
+
+LNAME = "/logs/870_error.DAILY"
+XCALL ABUTIL,46,LNAME,LNAME
+
+XCALL ABSPEC,ENTRY               !!pol870 executed in crontab
+IF ENTRY = "" THEN
+    ENTRY = "No directory!"
+    CALL DO'ERRL
+    GOTO ABORT
+ENDIF
+
+!!cronjob dbshell -a PO -s 1 -c 1 run po1870 /hanes~766369~0001~480
+!!The UCC is the vendor sending, store ID, blf format
+
+\PARSE STRING="ENTRY" DEL="~" BASE UCC'KNO UCD'KSTORE'ID BLF'KNO
+
+USE UCC INTO UCC'REC KEY UCC'KEY
+IF UCC'CTL # 0 THEN
+    ENTRY = "Cannot find ucc number"
+    \KERROR UCC MODE="KEY" APID="PO" CNO="N"
+    \LABLOGGER ENTRY LNAME
+    GOTO ABORT
+ENDIF
+
+USE BLF INTO BLF'REC KEY BLF'KEY
+IF BLF'CTL # 0 THEN
+    ENTRY = "Cannot find BLF format"
+    \KERROR BLF MODE="KEY" APID="PO" CNO="N"
+    \LABLOGGER ENTRY LNAME
+    GOTO ABORT
+ENDIF
+
+DIR = BASE + "/in/"
+
+ENTRY = "find "+DIR+" -name '870*.txt' -prune -print 2>" + &
+                                                TWO'NAME +" 1>"+FNAME
+XCALL SYSTEM,ENTRY
+
+LOOKUP FNAME,II
+MAP1 NO'FILES'FOUND,B,1,0
+IF II # 0 THEN
+    OPEN #23,FNAME,INPUT
+    DO
+        INPUT LINE #23,ENTRY
+        IF EOF(23) # 0 EXIT
+                !!Important, do before fixing so caps are correct
+        II = INSTR(1,ENTRY,"/in/")
+        TMP1 = "/in/"
+        TMP2 = "work"
+        CALL FIX'FILE
+        FNAME2 = ENTRY[1,II] + "done" + ENTRY[II+3,-1]
+        LOOKUP FNAME2,II
+        IF II # 0 THEN
+            KILL ENTRY
+            REPEAT
+        ENDIF
+        CALL MOVE'FILE
+        CALL PROCESS'FILE
+        ENTRY = FNAME2
+        TMP1 = "/work/"
+        TMP2 = "done"
+        CALL MOVE'FILE
+    LOOP
+ELSE
+    NO'FILES'FOUND = 1
+ENDIF
+
+ABORT:
+    IF NO'FILES'FOUND # 1 THEN   !! 1 MEANS NO FILES FOUND TO PROCESS
+        IF STARTED = 1 THEN
+            ECNT = ECNT + 1
+            CALL EMAIL'FILE
+            CALL SEND'EMAIL
+        ENDIF
+        IF STARTED = 0 THEN
+            ENTRY = "SEVERE ERROR: Program aborted badly!"
+            \LABLOGGER ENTRY LNAME
+            CALL EMAIL'FILE
+            CALL SEND'EMAIL
+            GOTO FINAL'END
+        ENDIF
+    ENDIF
+END
+
+FINAL'END:
+END
+
+FIX'FILE:
+    IF ENTRY # LCS(ENTRY) THEN
+        XCALL SYSTEM,"mv " + ENTRY + " " + LCS(ENTRY)
+        ENTRY = LCS(ENTRY)
+    ENDIF
+RETURN
+
+MOVE'FILE:
+    II = INSTR(1,ENTRY,TMP1)
+    IF II = 0 THEN
+        ENTRY = "Invalid file name " + ENTRY + "("+TMP1+")"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+    FNAME2 = ENTRY[1,II] + TMP2 + ENTRY[II+LEN(TMP1)-1,-1]
+    ENTRY = "mv "+ ENTRY + " " + FNAME2
+    XCALL SYSTEM,ENTRY
+    LOOKUP FNAME2,II
+    IF II = 0 THEN
+        ENTRY = "Failed to move file " + FNAME2
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+RETURN
+
+PROCESS'FILE:
+    OPEN #2001,FNAME2,INPUT
+    DO
+        INPUT LINE #2001, TMP
+        IF EOF(2001) # 0 EXIT
+        \STRIP TMP
+        IF TMP = "" REPEAT
+        LAST'POS = 1
+        CALL GET'VALUE
+        REC'TYPE = VALUE
+
+        IF REC'TYPE = "EASI " REPEAT    !!Routing header
+
+        CASE
+        IF REC'TYPE = "01" THEN
+            CALL PROCESS'HEADER
+        ELSE
+        IF REC'TYPE = "02" AND MY'PURPOSE = "00" THEN        !!Original
+            CALL PROCESS'DETAIL'A
+        ELSE
+        IF REC'TYPE = "02" AND MY'PURPOSE = "07" THEN        !!Duplicate
+            CALL PROCESS'DETAIL'A
+        ELSE
+        IF REC'TYPE = "02" AND MY'PURPOSE = "CO" THEN        !!Corrected
+            CALL PROCESS'DETAIL'A
+        ELSE
+        IF REC'TYPE = "03" THEN
+            CALL PROCESS'DETAIL'B
+        ELSE
+        IF REC'TYPE = "04" THEN
+            CALL PROCESS'DETAIL'C
+        ELSE
+        IF REC'TYPE = "09" THEN
+            CALL PROCESS'TRAILER
+            STARTED = 0
+        ELSE
+        IF REC'TYPE = "EASX" THEN
+            CALL CLOSE'FILES
+            EXIT
+        ELSE
+            ENTRY = "Invalid record type: "+REC'TYPE
+            \LABLOGGER ENTRY LNAME
+        ENDCASE
+    LOOP
+RETURN
+
+CLOSE'FILES:
+    CLOSE #2001
+    IF ECNT = 0 THEN
+        ENTRY = "Processed 870 "+QTYCNT+" perfectly!"
+    ELSE
+        ENTRY = "Processed 870 " +QTYCNT+" with "+ECNT+" errors!"
+    ENDIF
+    \LABLOGGER ENTRY LNAME
+RETURN
+
+PROCESS'HEADER:
+    STARTED = 1
+    CALL GET'VALUE                        !!Transaction Type
+    IF VALUE # MY'TRX'TYPE THEN
+        ENTRY = "Invalid file, transaction type was "+VALUE+" not "+MY'TRX'TYPE+"!"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+
+    CALL GET'VALUE                        !!Transaction Set Purpose
+    IF VALUE # "00" AND VALUE # "07" AND VALUE # "CO" THEN
+        ENTRY = "Invalid transaction set purpose was "+VALUE
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ELSE
+        MY'PURPOSE = VALUE
+    ENDIF
+
+    CALL GET'VALUE                        !!Version Number
+    IF VALUE # MY'BLF'VERSION THEN
+        ENTRY = "Version mismatch, found "+VALUE+" and program is for "+MY'BLF'VERSION
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+
+    CALL GET'VALUE                        !!Account Number
+
+    CALL GET'VALUE                        !!Store ID
+    UCD'KUCC'NO = UCC'KNO
+    UCD'KSTORE'ID = VALUE
+    USE UCD INTO UCD'REC KEY UCD'KEY
+    IF UCD'CTL # 0 THEN
+        ENTRY = "Cannot find store number"
+        \KERROR UCD MODE="KEY" APID="PO" CNO="N"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ELSE
+        LOC'SPACE = SPACE
+        LOC'KNO = UCD'LOC'NO
+        USE LOC INTO LOC'REC KEY LOC'KEY
+        IF LOC'CTL # 0 THEN
+            ENTRY = "Cannot find location"
+            \KERROR LOC MODE="KEY" APID="IN" CNO="N"
+            \LABLOGGER ENTRY LNAME
+            GOTO ABORT
+        ENDIF
+    ENDIF
+
+    CALL GET'VALUE                        !!As of Date
+
+    CALL GET'VALUE                        !!As of Time
+RETURN
+
+PROCESS'DETAIL'A:
+    CALL GET'VALUE                  !!PO Number
+    HDR'SPACE = SPACE
+    HDR'KDOC'TYPE = 1
+    HDR'KNO = VALUE
+    USE HDR INTO HDR'REC KEY HDR'KEY
+    IF HDR'CTL # 0 THEN
+        ENTRY = "Cannot find po number"
+        \KERROR HDR MODE="KEY" APID="PO" CNO="N"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+
+    CALL GET'VALUE                  !!Release Number
+    CALL GET'VALUE                  !!PO Date
+    CALL GET'VALUE                  !!PO Time
+    CALL GET'VALUE                  !!Contract Number
+
+    CALL GET'VALUE                  !!UOM
+    MY'UOM = VALUE
+
+    CALL GET'VALUE                  !!Requested Ship Date
+RETURN
+
+PROCESS'DETAIL'B:
+    CALL GET'VALUE                  !!Line Item number
+
+    CALL GET'VALUE                  !!GTIN
+    CALL LOOKUP'GTIN
+
+    CALL GET'VALUE                  !!Line Item Status
+    CALL GET'VALUE                  !!Quantity Ordered
+    CALL GET'VALUE                  !!Quantity Shipped
+    CALL GET'VALUE                  !!Quantity to be Shipped
+    CALL GET'VALUE                  !!Expected Date to be Shipped
+RETURN
+
+PROCESS'DETAIL'C:
+    LIN'SPACE = SPACE
+    LIN'DOC'TYPE = HDR'DOC'TYPE
+    LIN'HDR'NO = HDR'NO
+    LIN'NO = 0
+    \SETKEY LIN MODE="KEY" ALTKEY="LIN2"
+    USE LIN2 INTO LIN'REC KEY LIN2'KEY
+    GETNXT LIN2 INTO LIN'REC
+    LIN2'KEY = LIN2'KEY2
+    IF LIN2'CTL = 0 THEN
+        DO
+            IF MY'TRK'NO = LIN2'TRK'NO THEN
+                CALL GET'VALUE                   !!Available to Ship Date
+                IF VALUE # 0 THEN
+                    RDLOCK LIN LIN2'RCN INTO LIN'REC
+                    IF LIN'CTL = 0 THEN
+                        DTT = VALUE
+                        CALL CNV'DTT
+                        YDAYS = YDAYS + VAL(POC'EOFF)
+                        CALL UCNV'DTT
+                        LIN'PROM'DTT = DTT
+                        WRITE LIN FROM LIN'REC
+                        QTYCNT = QTYCNT + 1
+                    ELSE
+                        ENTRY = "Cannot find line number for update"
+                        \KERROR LIN MODE="KEY" APID="PO" CNO="N"
+                        \LABLOGGER ENTRY LNAME
+                        REL LIN
+                        ECNT = ECNT + 1
+                    ENDIF
+                ENDIF
+            ENDIF
+            CALL GET'VALUE                   !!Quantity
+            CALL GET'VALUE                   !!Pick up Time
+            CALL GET'VALUE                   !!Time Zone
+        LOOP UNTIL LIN'TRK'NO = MY'TRK'NO
+    ENDIF
+RETURN
+
+LOOKUP'GTIN:
+    \STRIP VALUE 3
+    INT'SPACE = SPACE
+    INTV'KTYPE = "V"
+    INTV'KNAM'NO = UCC'INT'VEN'NO
+    INTV'KPART = VALUE
+    INTV'RCN = 0
+    USE INTV INTO INT'REC KEY INTV'KEY
+    GETNXT INTV INTO INT'REC
+    \CHKKEY INTV APID="IN" LASTFIX="PART"
+    IF INTV'CTL # 0 THEN
+        ENTRY = "GTIN not found in interchange file "+VALUE
+        \LABLOGGER ENTRY LNAME
+    ELSE
+        MY'TRK'NO = INT'TRK'NO
+    ENDIF
+RETURN
+
+PROCESS'TRAILER:
+    FOR II = 1 TO 5                           !!File Creation Date
+        CALL GET'VALUE                        !!File Creation Time
+    NEXT II                                   !!Total Records
+RETURN
+
+EMAIL'FILE:
+    EMAIL'FILE'NAME = "/tmp/email.PID"
+    XCALL ABUTIL,46,EMAIL'FILE'NAME,EMAIL'FILE'NAME
+    OPEN #7234,EMAIL'FILE'NAME,OUTPUT
+
+    PRINT #7234,"To: ";SAC'BP'EMAIL
+    PRINT #7234,"Subject: Order Status Changes"
+
+    EMAIL'ADMIN = "Background Process"
+
+    PRINT #7234,"From: ";EMAIL'ADMIN
+
+    PRINT #7234,"Dear System Administrator:"
+    PRINT #7234
+    PRINT #7234,SPACE(5)+"The promise dates have been updated on PO: "+ HDR'NO
+    PRINT #7234
+    PRINT #7234,SPACE(5)+" from information sent from the mill"
+    PRINT #7234
+    PRINT #7234,"This message was sent to you via an automated email system!"
+    PRINT #7234
+    CLOSE #7234
+RETURN
+
+SEND'EMAIL:
+    XCALL GETENV,"LOCAL_SENDMAIL",ENTRY
+    IF ENTRY # "" THEN
+        EMAIL'COMMAND = "aroot "+ENTRY
+    ELSE
+        EMAIL'COMMAND = "aroot sendmail"
+    ENDIF
+    EMAIL'COMMAND = EMAIL'COMMAND + " -t < "+EMAIL'FILE'NAME
+    XCALL SYSTEM,EMAIL'COMMAND
+RETURN
+
+COPY "FORMAT"
+COPY "BASERR"
+COPY "POLOAD"                             !!GET'VALUE:
+COPY "CVTDTT"
+
+

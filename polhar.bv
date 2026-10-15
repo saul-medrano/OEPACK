@@ -1,0 +1,674 @@
+! @#$^&* 501 9 273 0 0 0 0 0 0 0 0 0 468 *&^$#@ 
+!*! Updated on Fri May  8 12:38:09 2026 by Will Carroll 1 times 
+!*! Updated on Fri May  8 08:30:03 2026 by Will Carroll 4 times 
+!*! Updated on Thu May  7 19:28:28 2026 by Will Carroll 11 times 
+GLOBAL V''LINKEE="Y"
+PROGRAM POLHAR,8.0
+!!Hartwell shippment confirmation file
+!!                      V. I. C. S.
+!!              2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!!
+START'POLHAR:        !! For BPP Tracing
+COPY "FORMAD"
+
+\READCTL APID="OE" GL="N"
+\READCTL APID="IN" GL="N"
+\READCTL APID="AR" GL="N"
+\READCTL APID="MC" GL="N"
+\READCTL APID="PO" GL="N"
+\READCTL APID="SA" GL="N"
+
+\COPYF MSG SY
+\COPYF VEN AP
+\COPYF UCC PO
+\COPYF HDR PO
+\COPYF HHS PO
+\COPYF HDR OE OEHDR
+\COPYF BOX OE OEBOX
+\COPYF TAD OE MODE="PRI"
+\COPYF DDD PO
+
+COPY "CVTMAP"
+COPYF "OC2FIL[OE]",NOAFR
+
+MAP1 DOING'856,B,1
+MAP1 DOING'945,B,1
+MAP1 DOING'EASI,B,1
+MAP1 EMAIL'COMMAND,S,80
+MAP1 ENCODE'COMMAND,S,80
+MAP1 EMAIL'ADMIN,S,20
+MAP1 ENAME,S,100
+MAP1 LBOX,B,2
+MAP1 PACKAGE'WGT,S,30
+MAP1 TRACKING,S,25
+MAP1 MANIFESTED'ORDER,S,1
+MAP1 SKIP'FLAG,B,1
+MAP1 HOB'STARTED,B,1
+MAP1 LNAME,S,132
+MAP1 PO'STARTED,B,1
+MAP1 ECNT,B,3
+MAP1 QTYCNT,B,3
+MAP1 ORDER,S,80
+MAP1 MY'HDR'NO,B,3
+MAP1 CLIENT'ID,S,6
+MAP1 EASI'VERSION,S,4
+MAP1 BASE,S,128
+MAP1 X,F
+MAP1 TMP,S,512
+MAP1 TMP1,S,512
+MAP1 TMP2,S,512
+MAP1 REC'TYPE,S,5
+MAP1 LAST'REC'TYPE,S,5
+MAP1 SKIP'TO'NEXT,B,1
+MAP1 FOUND,F
+MAP1 II,F
+MAP1 FNAME,S,128
+MAP1 FNAME2,S,128
+MAP1 FNAME'DEL,S,128
+MAP1 TWO'NAME,S,128,"/logs/polhar.DAILY"
+MAP1 PERR,B,2
+MAP1 DIR,S,40
+MAP1 MY'DOC'TYPE,B,1
+MAP1 TRACKING'856(100),S,25    !! 856/02 capture Shipment Tracking number for each box
+MAP1 BB,B,1,0                  !! Box counter for 856 Tracking Numbers
+
+!! Fixed width record layouts for 856 version 2
+MAP1  EASI'REC,X
+    MAP2  EASI'REC'TYP,S,4
+    MAP2  EASI'ASN'VER,S,7
+    MAP2  EASI'SENDER'QUAL,S,7
+    MAP2  EASI'SENDER'ID,S,15
+    MAP2  EASI'RECEIVER'QUAL,S,9
+    MAP2  EASI'RECEIVER'ID,S,15
+    MAP2  EASI'FILE'DATE,S,15
+    MAP2  EASI'FILE'TIME,S,14
+    MAP2  EASI'TIME'ZONE,S,5
+    MAP2  EASI'FILE'STATUS,S,6
+    MAP2  EASI'TRANS'SET,S,10
+    MAP2  EASI'FILE'CTRL'NBR,S,19
+
+MAP1  HDR1'REC,X
+    MAP2  HDR1'REC'TYP,S,1
+    MAP2  HDR1'ASN'VER,S,10
+    MAP2  HDR1'SHP'ID,S,23
+    MAP2  HDR1'TXN'PURPOSE,S,8
+    MAP2  HDR1'ASN'DATE,S,14
+    MAP2  HDR1'ASN'TIME,S,12
+    MAP2  HDR1'MFG'CODE,S,11
+    MAP2  HDR1'BILL'TO,S,7
+    MAP2  HDR1'SHP'TO'STORE,S,8
+    MAP2  HDR1'SHP'TO'NAME,S,13
+    MAP2  HDR1'SHP'TO'ADDR,S,25
+    MAP2  HDR1'SHP'TO'CITY,S,18
+    MAP2  HDR1'SHP'TO'STATE,S,4
+    MAP2  HDR1'SHP'TO'ZIP,S,13
+    MAP2  HDR1'CARRIER,S,28
+    MAP2  HDR1'PRO'NBR,S,31
+    MAP2  HDR1'SHP'DATE,S,14
+
+MAP1  DTL2'REC,X
+    MAP2  DTL2'REC'TYP,S,1
+    MAP2  DTL2'SSTD'IND,S,8
+    MAP2  DTL2'CASE'SSCC,S,25
+    MAP2  DTL2'PO'NBR,S,12
+    MAP2  DTL2'GTIN,S,16
+    MAP2  DTL2'MSTR'STYLE,S,10
+    MAP2  DTL2'DTAIL'STYLE,S,12
+    MAP2  DTL2'COLOR,S,16
+    MAP2  DTL2'SIZE,S,9
+    MAP2  DTL2'UOM,S,15
+    MAP2  DTL2'QTY,S,8
+    MAP2  DTL2'MFG'ORD'NBR,S,24
+
+MAP1  TRL9'REC,X
+    MAP2  TRL9'REC'TYP,S,1
+    MAP2  TRL9'TOT'CASES,S,8
+    MAP2  TRL9'TOT'WEIGHT,S,10
+    MAP2  TRL9'REC'COUNT,S,6
+
+MAP1  EASX'REC
+    MAP2  EASX'REC'TYP,S,4
+    MAP2  EASX'FILE'CTRL'NBR,S,18
+    MAP2  EASX'TOT'SHIPMENTS,S,3
+
+
+
+ENTRY = "/logs/har_error.DAILY"
+XCALL ABUTIL,46,ENTRY,ENTRY
+LNAME = ENTRY
+
+USE OC2 UB'CNO INTO OC2'REC
+IF OC2'CTL # 0 THEN
+    ENTRY = "Cannot read OC2!"
+    \LABLOGGER ENTRY LNAME
+    CALL DO'ERRL
+    GOTO ABORT
+ENDIF
+
+FNAME = "/tmp/proc.PID"
+XCALL ABUTIL,46,FNAME,FNAME
+XCALL ABUTIL,46,TWO'NAME,TWO'NAME
+
+ON ERROR GOTO ERTRAP
+
+XCALL ABSPEC,ENTRY           !!polshc is excuted in a crontab job
+IF ENTRY = "" THEN
+    ENTRY = "No directory!"
+    CALL DO'ERRL
+    \LABLOGGER ENTRY LNAME
+    GOTO ABORT
+ENDIF
+!!cronjob dbshell -a PO -s 1 -c 1 run polhar /hartwell~766369~TRK
+!!file name is TRKyyyymmddhhnnss.txt
+
+\PARSE STRING="ENTRY" DEL="~" BASE UCC'NO CLIENT'ID EASI'VERSION
+
+DIR = BASE + "/in/"
+
+ENTRY = "'"+CLIENT'ID+"*.txt'"
+
+ENTRY = "find "+DIR+" -name "+ENTRY+" -prune -print 2>" + &
+                                                TWO'NAME +" 1>"+FNAME
+XCALL SYSTEM,ENTRY
+
+LOOKUP FNAME,II
+SENTRY = ENTRY + " II="+II
+\LABLOGGER SENTRY LNAME
+
+IF II # 0 THEN
+!!this is the file with all the names, proc.pid
+    OPEN #23,FNAME,INPUT
+    DO
+        INPUT LINE #23,ENTRY
+        IF EOF(23) # 0 EXIT
+        XCALL DB,22,HOB'PKT
+                !!Important, do before fixing so caps are correct
+        II = INSTR(1,ENTRY,"/in/")
+        FNAME'DEL = ENTRY[1,II] + "delete" + ENTRY[II+3,-1]
+        TMP1 = "/in/"
+        TMP2 = "work"
+        CALL FIX'FILE
+        FNAME2 = ENTRY[1,II] + "done" + ENTRY[II+3,-1]
+        LOOKUP FNAME2,II
+        SENTRY = "Lookup done="+FNAME2+" II="+II
+        \LABLOGGER SENTRY LNAME
+        IF II # 0 THEN
+            KILL ENTRY
+            REPEAT
+        ENDIF
+        CALL MOVE'FILE
+
+        IF CLIENT'ID = "856" AND EASI'VERSION = "2.0" THEN
+            !!Inbound 856 older version 2.0 - Big Accessories
+            CALL PROCESS'FILE'V2
+        ELSE
+            !!Inbound processing for 856 version 5.0 or higher
+            !!Or alternate documents 945 or TRK
+            CALL PROCESS'FILE
+        ENDIF
+
+        ENTRY = FNAME2
+        TMP1 = "/work/"
+        TMP2 = "done"
+        CALL MOVE'FILE
+                !!This will schedule it for delete (use touch to keep caps)
+        XCALL SYSTEM,"touch "+FNAME'DEL+ "> /dev/null"
+    LOOP
+ENDIF
+
+FINAL'END:
+!!  CLOSE #23
+END
+
+FIX'FILE:
+    IF ENTRY # LCS(ENTRY) THEN
+        XCALL SYSTEM,"mv " + ENTRY + " " + LCS(ENTRY)
+        ENTRY = LCS(ENTRY)
+    ENDIF
+RETURN
+
+MOVE'FILE:
+    II = INSTR(1,ENTRY,TMP1)
+    IF II = 0 THEN
+        ENTRY = "Invalid file name " + ENTRY + "("+TMP1+")"
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+    FNAME2 = ENTRY[1,II] + TMP2 + ENTRY[II+LEN(TMP1)-1,-1]
+    ENTRY = "mv "+ ENTRY + " " + FNAME2
+    XCALL SYSTEM,ENTRY
+    LOOKUP FNAME2,II
+    SENTRY = "Move file="+FNAME2+" II="+II
+    \LABLOGGER SENTRY LNAME
+    IF II = 0 THEN
+        \LABLOGGER ENTRY LNAME
+        ENTRY = "Failed to move file " + FNAME2
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+RETURN
+
+COPY "HARSUB"
+
+PROCESS'FILE:
+    DOING'945 = 0
+    DOING'856 = 0
+    DOING'EASI = 0
+
+    SENTRY = "Start process file fname2="+FNAME2+" UCC="+UCC'NO
+    \LABLOGGER SENTRY LNAME
+
+    SKIP'FLAG = 0
+    CALL CLOSE'FILES
+
+    OPEN #1005,FNAME2,INPUT
+    DO
+        INPUT LINE #1005,TMP
+        IF EOF(1005) # 0 THEN
+            CLOSE #1005
+            EXIT
+        ENDIF
+
+        \STRIP TMP
+        IF TMP = "" REPEAT
+
+        LAST'POS  = 1
+
+        CALL GET'VALUE          !!Get first field from record or PO Number from TRK File
+        ENTRY = "II: "+"1"+" VALUE: "+VALUE
+        \LABLOGGER ENTRY LNAME
+
+        IF VALUE = "EASI" THEN
+            DOING'EASI = 1
+            REPEAT
+        ELSE
+            IF DOING'EASI # 1 THEN
+                DOING'EASI = 0
+                MY'HDR'NO = VALUE
+            ENDIF
+        ENDIF
+
+        !!Check Record Type - HEADER
+        IF DOING'EASI = 1 AND VALUE = "01" THEN
+            CALL GET'VALUE
+            ENTRY = "DOING'EASI="+DOING'EASI+" VERSION: "+VALUE
+            \LABLOGGER ENTRY LNAME
+            !! Check Document type - 945
+            IF VALUE = "945" THEN
+                DOING'945 = 1
+                FOR II = 1 TO 4
+                    CALL GET'VALUE
+                    ENTRY = "II: "+II+" VALUE: "+VALUE
+                    \LABLOGGER ENTRY LNAME
+                NEXT II
+                MY'HDR'NO = VALUE
+                ENTRY = "PO Number: "+MY'HDR'NO
+                \LABLOGGER ENTRY LNAME
+                REPEAT
+            ELSE
+            !! Check Document type - 856 version 5.0
+                DOING'856 = 1
+                CALL GET'VALUE    !Set Purpose
+                CALL GET'VALUE    !Version
+                MAP1 VERSION,S,4
+                VERSION = VALUE
+                ENTRY = "Version: "+VERSION
+                \LABLOGGER ENTRY LNAME
+                IF VERSION = "5.0" THEN
+                    FOR II = 1 TO 17
+                        CALL GET'VALUE
+                        ENTRY = "II: "+II+" VALUE: "+VALUE
+                        \LABLOGGER ENTRY LNAME
+                    NEXT II
+                    TRACKING'856(1) = VALUE
+                    ENTRY = "Tracking: "+TRACKING'856(1)
+                    \LABLOGGER ENTRY LNAME
+                ENDIF
+                REPEAT
+            ENDIF
+        ENDIF
+        IF DOING'856 = 1 AND VALUE = "02" THEN
+            IF VERSION = "6.0" OR VERSION = "7.0" THEN
+                CALL GET'VALUE        !!Tracking #
+                !! Capture 856 Tracking numbers per Detail Record Type (02)
+                BB = BB + 1
+                TRACKING'856(BB) = VALUE
+                CALL GET'VALUE        !!Case #
+                CALL GET'VALUE        !!PO Type
+                CALL GET'VALUE        !!Order Number
+                MY'HDR'NO = VALUE
+                REPEAT
+           ELSE
+               CALL GET'VALUE             !!Line number
+               CALL GET'VALUE             !!Case #
+               CALL GET'VALUE             !!Order Number
+               MY'HDR'NO = VALUE
+               REPEAT
+           ENDIF
+        ENDIF
+        IF DOING'856 = 1 AND VALUE # "09" THEN
+            REPEAT
+        ENDIF
+        IF (DOING'856 = 1 OR DOING'945 = 1) AND VALUE = "09" THEN
+            CALL GET'VALUE            !!Case Count
+            CALL GET'VALUE            !!Qty Shipped
+            CALL GET'VALUE            !!Weight
+            PACKAGE'WGT = VALUE
+        ENDIF
+        IF DOING'945 = 1 AND VALUE = "A" THEN
+            CALL GET'VALUE
+            TRACKING = VALUE
+            ENTRY = "Tracking: "+TRACKING
+            \LABLOGGER ENTRY LNAME
+        ENDIF
+
+        CALL PROCESS'HEADER
+
+        IF SKIP'FLAG = 1 REPEAT
+
+        IF DOING'EASI = 0 THEN
+            FOR II = 1 TO 2                !!Order Date
+                CALL GET'VALUE             !!Ship Date
+            NEXT II
+
+            CALL GET'VALUE                 !!Tracking number
+            TRACKING = VALUE
+
+            CALL GET'VALUE                 !!UCC 128 Number
+
+            CALL GET'VALUE                 !!Carton Weight
+            PACKAGE'WGT = VALUE
+        ENDIF
+        CALL PROCESS'MANIFEST
+
+        SENTRY = "HOB="+HOB'STARTED+" SF="+SKIP'FLAG+" MO="+MANIFESTED'ORDER
+        \LABLOGGER SENTRY LNAME
+
+        IF HOB'STARTED = 1 AND SKIP'FLAG = 0 AND MANIFESTED'ORDER = "Y" THEN
+            CALL POST'ORDER
+            REL OEHDR
+            IF ECNT = 0 THEN                !!Will leave in HOB if not posted
+                IF HOB'MSGNO # 0 THEN
+                    DELMSG HOB'MSGNO "POMSG"
+                ENDIF
+                \SETKEY HOB MODE="ALL"
+                \DELKEY HOB MODE="ALL"
+                DELETE HOB
+            ELSE
+                ENTRY = "Failed to post order"
+                \LABLOGGER ENTRY LNAME
+                CALL HOB'ERROR
+            ENDIF
+            HOB'STARTED = 0
+        ELSE
+            ECNT = 1
+            IF SKIP'FLAG = 1 THEN
+                ENTRY = "Did not post order"
+                \LABLOGGER ENTRY LNAME
+                CALL HOB'ERROR
+                CALL DO'EMAIL
+                CALL SEND'EMAIL
+            ENDIF
+            !!If we receive a shipment confirmation without 1z numbers
+            IF MANIFESTED'ORDER # "Y" THEN
+                ENTRY = "Order cancelled at shipping facility; no tracking numbers found"
+                \LABLOGGER ENTRY LNAME
+                \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+                CALL HOB'ERROR
+            ENDIF
+        ENDIF
+        REL HOB
+        REL HDR
+        REL BOX
+        CASE
+        IF ECNT = 0 THEN
+            ENTRY = "Posted order:"
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            \LABLOGGER ENTRY LNAME
+            PO'STARTED = 1
+        ELSE
+        IF ECNT = 2 THEN
+            ENTRY = "Failed to post order:" + CMN'FRM'PRGNAM
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            \LABLOGGER ENTRY LNAME
+        ELSE
+            ENTRY = "No errors but did not post"
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            \LABLOGGER ENTRY LNAME
+        ENDCASE
+    LOOP
+RETURN
+
+PROCESS'FILE'V2:
+    DOING'945 = 0
+    DOING'856 = 0
+    DOING'EASI = 0
+
+    SENTRY = "Start process file V2 fname2="+FNAME2+" UCC="+UCC'NO
+    \LABLOGGER SENTRY LNAME
+
+    SKIP'FLAG = 0
+    CALL CLOSE'FILES
+
+    IF CLIENT'ID = "856" AND EASI'VERSION = "2.0" THEN
+        !! Process Fixed Width Record Layouts
+        SENTRY = "Processing 856v2 Fixed Width File..."
+        \LABLOGGER SENTRY LNAME
+    ENDIF
+    OPEN #1005,FNAME2,INPUT
+    DO
+        INPUT LINE #1005,TMP
+        IF EOF(1005) # 0 THEN
+            CLOSE #1005
+            EXIT
+        ENDIF
+
+        !! Process Fixed Width Record Layouts
+        CASE
+        IF INSTR(1,TMP,"EASI") > 0 THEN
+            EASI'REC = TMP
+            SENTRY = "... EASI'REC="+EASI'REC
+            \LABLOGGER SENTRY LNAME
+
+            \STRIP EASI'ASN'VER 3
+            ENTRY = "EASI'ASN'VER= ["+EASI'ASN'VER+"]"
+            IF EASI'VERSION # EASI'ASN'VER THEN
+                SENTRY = "... File version mismatch EASI'ASN'VER="+EASI'ASN'VER
+                \LABLOGGER SENTRY LNAME
+                GOTO ABORT
+            ENDIF
+            DOING'856 = 1
+            REPEAT
+        ELSE
+        IF TMP[1,1] = "1" THEN
+            HDR1'REC = TMP
+
+            SENTRY = "... HDR1'REC="+HDR1'REC
+            \LABLOGGER SENTRY LNAME
+
+            \STRIP HDR1'PRO'NBR 3
+            TRACKING'856(1) = HDR1'PRO'NBR  !! Set UPS Tracking number
+            ENTRY = "Tracking: "+TRACKING'856(1)
+            \LABLOGGER ENTRY LNAME
+            REPEAT
+        ELSE
+        IF TMP[1,1] = "2" THEN
+            DTL2'REC = TMP
+
+            SENTRY = "... DTL2'REC="+DTL2'REC
+            \LABLOGGER SENTRY LNAME
+
+            \STRIP DTL2'PO'NBR 3
+            MY'HDR'NO = VAL(DTL2'PO'NBR)     !! VICS PO Number
+            ENTRY = "PO Number: "+MY'HDR'NO
+            \LABLOGGER ENTRY LNAME
+            REPEAT
+        ELSE
+        IF TMP[1,1] = "9" THEN
+            TRL9'REC = TMP
+            SENTRY = "... TRL9'REC="+TRL9'REC
+            \LABLOGGER SENTRY LNAME
+            REPEAT
+        ELSE
+        IF INSTR(1,TMP,"EASX") > 0 THEN
+            EASX'REC = TMP
+            SENTRY = "... EASX'REC="+EASX'REC
+            \LABLOGGER SENTRY LNAME
+        ENDCASE
+
+        CALL PROCESS'HEADER
+
+        IF SKIP'FLAG = 1 REPEAT
+
+        CALL PROCESS'MANIFEST
+
+        SENTRY = "HOB="+HOB'STARTED+" SF="+SKIP'FLAG+" MO="+MANIFESTED'ORDER
+        \LABLOGGER SENTRY LNAME
+
+        IF HOB'STARTED = 1 AND SKIP'FLAG = 0 AND MANIFESTED'ORDER = "Y" THEN
+            CALL POST'ORDER
+            REL OEHDR
+            IF ECNT = 0 THEN                !!Will leave in HOB if not posted
+                IF HOB'MSGNO # 0 THEN
+                    DELMSG HOB'MSGNO "POMSG"
+                ENDIF
+                \SETKEY HOB MODE="ALL"
+                \DELKEY HOB MODE="ALL"
+                DELETE HOB
+            ELSE
+                ENTRY = "Failed to post order"
+                \LABLOGGER ENTRY LNAME
+                CALL HOB'ERROR
+            ENDIF
+            HOB'STARTED = 0
+        ELSE
+            ECNT = 1
+            IF SKIP'FLAG = 1 THEN
+                ENTRY = "Did not post order"
+                \LABLOGGER ENTRY LNAME
+                CALL HOB'ERROR
+                CALL DO'EMAIL
+                CALL SEND'EMAIL
+            ENDIF
+            !!If we receive a shipment confirmation without 1z numbers
+            IF MANIFESTED'ORDER # "Y" THEN
+                ENTRY = "Order cancelled at shipping facility; no tracking numbers found"
+                \LABLOGGER ENTRY LNAME
+                \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+                CALL HOB'ERROR
+            ENDIF
+        ENDIF
+        REL HOB
+        REL HDR
+        REL BOX
+        CASE
+        IF ECNT = 0 THEN
+            ENTRY = "Posted order:"
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            \LABLOGGER ENTRY LNAME
+            PO'STARTED = 1
+        ELSE
+        IF ECNT = 2 THEN
+            ENTRY = "Failed to post order:" + CMN'FRM'PRGNAM
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            \LABLOGGER ENTRY LNAME
+        ELSE
+            ENTRY = "No errors but did not post"
+            \KERROR HOB APID="PO" MODE="KEY" CNO="N"
+            \LABLOGGER ENTRY LNAME
+        ENDCASE
+    LOOP
+RETURN
+
+CLOSE'FILES:
+    IF EOF(1005) = 0 THEN
+        CLOSE #1005
+    ENDIF
+    ECNT = 0
+RETURN
+
+ABORT:
+    IF PO'STARTED = 1 THEN
+        ECNT = ECNT + 1
+        PERR = 1
+    ENDIF
+    IF PO'STARTED = 0 THEN
+        ENTRY = "SEVERE ERROR: Program aborted badly!"
+        \LABLOGGER ENTRY LNAME
+        GOTO FINAL'END
+    ENDIF
+RETURN
+
+COPYF "CMNFIL[SY]"
+
+POST'ORDER:
+    OEHDR'ACTION = "P"
+    OEHDR'PQU'STAT = "Q"
+    WRITE OEHDR FROM OEHDR'REC
+    CMN'SPACE = SPACE
+    CMN'TO'PRGNAM = "OERCTL"
+    CMN'FRM'PRGNAM = "POLHAR"
+    CMN'SAV'RCN(1) = OEHDR'RCN
+    \EXPROG OERCTL COMMON="CMN'REC" APID="OE" LFA="L"
+    RDLOCK HOB INTO HOB'REC
+    IF CMN'FRM'PRGNAM = "GOOD" THEN
+        ECNT = 0
+    ELSE
+        ENTRY = "Bad Link to OERCTL: "+ CMN'FRM'PRGNAM + "-" + CMN'OTHER
+        \LABLOGGER ENTRY LNAME
+        CALL HOB'ERROR
+        ECNT = 2
+    ENDIF
+RETURN
+
+DO'EMAIL:
+        ENAME = "/tmp/email.PID"
+        XCALL ABUTIL,46,ENAME,ENAME
+
+        OPEN #9234, ENAME, OUTPUT
+        PRINT #9234,"To: ";SAC'BP'EMAIL
+
+        PRINT #9234,"Subject: Badger invoicing errors"
+
+        EMAIL'ADMIN = "Background Process"
+
+        PRINT #9234,"From: ";EMAIL'ADMIN
+
+        PRINT #9234,"Dear System Administrator:"
+        PRINT #9234
+        PRINT #9234,SPACE(5)+"The attached file contains the reason why a."
+        PRINT #9234
+        PRINT #9234,SPACE(5)+"Badger order did not invoice."
+        PRINT #9234
+        PRINT #9234,"This message was sent to you via an automated email system!"
+        CLOSE #9234
+RETURN
+
+SEND'EMAIL:
+        ENCODE'COMMAND = "uuencode "+LNAME+" "+LNAME+" >>"+ENAME
+        XCALL SYSTEM,ENCODE'COMMAND
+        XCALL GETENV,"LOCAL_SENDMAIL",ENTRY
+        IF ENTRY # "" THEN
+            EMAIL'COMMAND = "aroot "+ENTRY
+        ELSE
+            EMAIL'COMMAND = "aroot sendmail"
+        ENDIF
+        EMAIL'COMMAND = EMAIL'COMMAND + " -t < "+ENAME
+        XCALL SYSTEM,EMAIL'COMMAND
+RETURN
+
+COPY "FORMAT"
+COPY "BASERR"
+COPY "POLOAD"
+
+
+

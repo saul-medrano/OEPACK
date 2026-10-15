@@ -1,0 +1,594 @@
+! @#$^&* 92 34 491 0 0 0 0 0 0 0 0 0 66 *&^$#@ 
+!*! Updated on Fri Jun  7 18:59:14 2024 by Saul Medrano 1 times 
+!*! Updated on Thu Nov  4 13:32:25 2021 by Cheryl Eberhard  1 times 
+!*! Updated on Thu Feb 18 13:03:21 2021 by Cheryl Eberhard  1 times 
+PROGRAM POL856,8.0(1) !!ASN ASCII load - EASI new format type 856
+!!
+!!                          V. I. C. S.
+!!                       of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!              2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!              All rights reserved.
+!!
+!!
+!!Revision History:
+!!
+!![0] 03/20/03 ESE    Created
+!!
+COPY "CVTMAP"
+COPYF "CMNFIL[SY]"
+COPYF "MSGFIL[SY]",NOAFR
+\COPYF INT IN
+\COPYF DDD PO
+\COPYF PRH IN
+\COPYF ROT IN MODE="PRI"
+\COPYF BOD PO
+\COPYF BOL PO
+\COPYF VEN AP
+COPYF "BODFIL",=BOD2,NOAFR
+COPYF "BODKEY",=BOD2
+\COPYF BLC PO
+\COPYF MEA IN
+
+MAP1 SAV'BOD'QTY,B,5
+MAP1 BOD'COUNT,B,5
+MAP1 BOD'TOTAL,B,5
+MAP1 LNAME,S,132
+MAP1 UPDATE'PROM,B,1
+MAP1 FD,S,80
+MAP1 FNAME,S,80
+MAP1 NEXT'BOD'NO,B,2
+MAP1 SIZE,S,3
+MAP1 PART,S,20
+MAP1 INVOICE,B,5
+MAP1 ORDER,S,15
+MAP1 PO,B,5
+MAP1 TMP,S,256
+MAP1 LINES,B,5
+MAP1 TLINES,B,5
+MAP1 DOZENS,B,5
+MAP1 TDOZENS,B,5
+MAP1 HBOL,B,5
+MAP1 BOL,B,5
+MAP1 SKIP'BOL,B,5
+MAP1 LAST'REC'TYPE,B,1
+MAP1 REC'TYPE,B,1
+
+MAP1 ROT'CNT,B,1
+MAP1 U12'RCN,B,4
+MAP1 ELSE'RCN,B,4
+MAP1 FF,F
+MAP1 XX,B,4
+MAP1 ROTPTR,X,30
+MAP1 PRHPTR,X,30
+MAP1 X,F
+MAP1 Y,F
+MAP1 CASE'ID'LEN,B,1
+MAP1 MY'TRX'TYPE,S,3,"856"
+MAP1 CMD,S,500
+MAP1 FOPEN,B,1
+
+BEGIN:
+        GETCMN CMN'REC
+
+        ENTRY = "/tmp/proc.PID"
+        XCALL ABUTIL,46,ENTRY,ENTRY
+        OPEN #12, ENTRY, OUTPUT
+        FOPEN = 1
+
+        IF UCS(CMN'TO'PRGNAM) # ("POL"+MY'TRX'TYPE) THEN
+            ENTRY = "This program cannot be run directly (got "+CMN'TO'PRGNAM+")"
+            CALL PRE'DO'ERR
+            GOTO ABORT
+        ENDIF
+
+        BLF'KNO = CMN'SAV'RCN(1)
+        USE BLF INTO BLF'REC KEY BLF'KEY
+        IF BLF'CTL # 0 THEN
+            ENTRY = "Unable to find EASI format "+BLF'KNO
+            CALL PRE'DO'ERR
+            GOTO ABORT
+        ENDIF
+
+        \READCTL APP="PO" GL="Y"
+        \READCTL APP="IN" GL="Y"
+        MSG'DID = "POMSG"
+
+        MAP1 POBOL2'TSIZE,S,1
+        MAP1 POL856'GILDAN,S,1
+        IF V''SYSTEM = "UNIX" THEN
+            XCALL GETENV,"POBOL2_TSIZE",POBOL2'TSIZE
+            XCALL GETENV,"POL856_GILDAN",POL856'GILDAN
+        ENDIF
+
+        IF CMN'MODE = 1 THEN                !!All files
+            CMD = "ls -1 "+BLF'FILE'NAME + "/in/"+MY'TRX'TYPE+"_*.txt"
+            \POPEN FD CMD INPUT
+            DO
+                \PINPUT FD FNAME
+                IF P''CTL # 0 EXIT
+                CALL PROCESS
+            LOOP
+        ELSE
+            CALL GET'FILE'NAME
+            LOOKUP FNAME,X
+
+            ENTRY = "/logs/856_error.DAILY"
+            XCALL ABUTIL,46,ENTRY,ENTRY
+            LNAME = ENTRY
+
+            IF X # 0 THEN
+                ENTRY = "Cannot find "+FNAME
+                \LABLOGGER ENTRY LNAME
+                GOTO ABORT
+            ENDIF
+            CALL PROCESS
+        ENDIF
+        ?TAB(24,1) ; TAB(-1,9) ;
+        CALL ANYEXT
+        CMN'FRM'PRGNAM = "GOOD"
+        GOTO ENDIT
+ABORT:
+        CMN'FRM'PRGNAM = "ABORT"
+        IF FNAME # "" THEN
+            LOOKUP FNAME,X
+            IF X # 0 THEN
+                ?TAB(23,1) "Filename "+FNAME+" located. "; TAB(-1,10);
+                X = INSTR(1,FNAME,"/work/")
+                IF X # 0 THEN
+                    ENTRY = FNAME[1,X] + "error" + FNAME[X+5,-1]
+                    CMD = "mv "+FNAME+" "+ENTRY
+                    XCALL SYSTEM,CMD
+                    LOOKUP ENTRY,X
+                    IF X # 0 THEN
+                        FNAME = ENTRY
+                        ?"Moved to ";FNAME;".";
+                    ELSE
+                        ENTRY = FNAME + " could NOT be moved to " + ENTRY + " during abort."
+                        ? ENTRY;".";
+!!                      CALL PRE'PRE'DO'ERRL
+                    ENDIF
+                ELSE
+                    ?"Left in place.";
+                ENDIF
+            ENDIF
+        ENDIF
+        CALL ANYEXT
+ENDIT:
+        IF FOPEN = 1 THEN
+            CLOSE #12
+        ENDIF
+        SNDCMN CMN'REC
+        END
+
+
+GET'FILE'NAME:
+        \WINDOW TLR="9" ACTION="GET'FILE'NAME2" RESTORE="N" REPAINT="Y"
+RETURN
+
+GET'FILE'NAME2:
+        CMD = BLF'FILE'NAME + "/in/"+MY'TRX'TYPE+"_*.txt"
+        \VFLIST FNAME FNAME="CMD" TLR="9" TLC="2" BRR="23" &
+                        BRC="78" MFILES="1000"   &
+                        SEL'TEXT="Enter file to process"
+        IF FNAME = "" THEN
+            ENTRY = "No file selected!"
+            GOTO ABORT
+        ENDIF
+RETURN
+
+DO'PROM'DTT:
+    IF BOL'SHIP'DTT # 0 AND POC'EOFF # "N" THEN
+        DTT = BOL'SHIP'DTT
+        CALL CNV'DTT
+        YDAYS = YDAYS + VAL(POC'EOFF)
+        CALL UCNV'DTT
+        BOL'PROM'DTT = DTT
+    ELSE
+        BOL'PROM'DTT = BOL'SHIP'DTT
+    ENDIF
+RETURN
+
+\COPYF PRH IN MODE="PRI"
+
+BOD'PROM:
+    IF POC'EOFF # "N" AND BOD'PROM'DTT # 0 THEN
+        PRH'KTRK'NO = BOD'TRK'NO
+        \VUSE PRH
+        IF BLF'TYPE = "B" THEN
+            IF PRH'CTL = 0 THEN
+                \UPDPRM
+            ENDIF
+        ENDIF
+    ENDIF
+RETURN
+
+COPY "CVTDTT"
+
+PROCESS:
+    ?TAB(23,1) "Filename "+FNAME+" located. "; TAB(-1,10);
+    X = INSTR(1,FNAME,"/in/")
+    IF X = 0 THEN
+        ENTRY = FNAME + " is an invalid filename (1)"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+    ENTRY = FNAME[1,X] + "work" + FNAME[X+3,-1]
+    CMD = "mv "+FNAME+" "+ENTRY
+    XCALL SYSTEM,CMD
+    LOOKUP ENTRY,X
+    IF X # 0 THEN
+        FNAME = ENTRY
+        ?"Moved to ";FNAME;".";
+    ELSE
+        ENTRY = FNAME + " could NOT be moved to " + ENTRY + " so file not processed."
+        \LABLOGGER ENTRY LNAME
+        GOTO PRE'DO'ERR
+    ENDIF
+
+    BOD'CASE'ID  = SPACE(100)
+    CASE'ID'LEN = LEN(BOD'CASE'ID)
+    BOD'SPACE = SPACE
+
+    LINES = 0
+    BOL'SPACE = SPACE
+    BOL'RCN = 0
+
+    \TCOUNT'START XX "Loading ASCII file"
+    BOL'RCN = 0
+    OPEN #7, FNAME, INPUT
+    DO
+        INPUT LINE #7, TMP
+        IF EOF(7) # 0 EXIT
+        \TCOUNT XX
+        \STRIP TMP
+        IF TMP = "" REPEAT
+        LAST'POS = 1
+        CALL GET'VALUE
+        IF VALUE = "EASI " REPEAT    !!Routing stuff
+        IF VALUE = "EASX " REPEAT
+        REC'TYPE = VALUE
+        IF REC'TYPE # 1 AND BOL'RCN = 0 THEN
+            CLOSE #7
+            ENTRY = "Invalid ASCII file - Missing Header record "+VALUE
+            CALL PRE'DO'ERR
+            GOTO ABORT
+        ENDIF
+        CASE
+        IF REC'TYPE = 1 THEN
+            SKIP'TO'NEXT = 0
+            CALL PROCESS'HEADER
+            BOD'SPACE = SPACE
+        ELSE
+        IF REC'TYPE = 2 THEN
+            IF SKIP'TO'NEXT = 0 THEN
+                CALL PROCESS'DETAIL
+            ENDIF
+        ELSE
+        IF REC'TYPE = 9 THEN
+            IF SKIP'TO'NEXT = 0 THEN
+                CALL PROCESS'TRAILER
+            ENDIF
+        ELSE
+            ENTRY = "Invalid record type: "+REC'TYPE
+            CALL DO'ERR
+        ENDCASE
+        LAST'REC'TYPE = REC'TYPE
+    LOOP
+    CLOSE #7
+    \TCOUNT'END XX
+    IF LAST'REC'TYPE # 9 AND BOL'RCN # 0 THEN
+        ENTRY = "Error - ASCII file did not end with a trailer."
+        CALL PRE'DO'ERR
+        WRITE BOL
+    ELSE
+        REL BOL
+    ENDIF
+    ?TAB(23,1) "Filename "+FNAME+" located. "; TAB(-1,10);
+    X = INSTR(1,FNAME,"/work/")
+    IF X = 0 THEN
+        ENTRY = FNAME + " is an invalid filename (2)"
+        CALL PRE'DO'ERR
+        GOTO ABORT
+    ENDIF
+    ENTRY = FNAME[1,X] + "done" + FNAME[X+5,-1]
+    CMD = "mv "+FNAME+" "+ENTRY
+    XCALL SYSTEM,CMD
+    LOOKUP ENTRY,X
+    IF X # 0 THEN
+        FNAME = ENTRY
+        ?"Moved to ";FNAME;".";
+    ELSE
+        ENTRY = FNAME + " could NOT be moved to " + ENTRY + " but did finish!"
+        ? ENTRY;".";
+        CALL PRE'DO'ERRL
+    ENDIF
+RETURN
+
+COPY "POLOAD"
+
+MAP1 SKIP'TO'NEXT,B,1
+MAP1 BILL'TO,S,12
+
+KERROR'KBOL:
+    ENTRY = ENTRY + " BOL:"
+    \KERROR BOL CNO="N" MODE="K"
+    ENTRY = ENTRY + " SSCC:"
+    \KERROR BOLU CNO="N" MODE="K"
+RETURN
+
+PROCESS'HEADER:
+    BOL'SPACE = SPACE
+    BOL'BLF'NO = BLF'NO
+    IF BLF'VERSION = "5.0" THEN
+        CALL GET'VALUE                    !!Transaction Type
+        IF VALUE = "856" THEN
+            CALL GET'VALUE                !!Transaction Set Purpose
+            BOL'PURPOSE = VALUE           !!00=Original, 01-Retransmit
+            CALL GET'VALUE                !!ASN Version
+            IF VALUE[1;3] # BLF'VERSION[1;3] THEN
+                ENTRY = "Version mismatch, found "+VALUE+" and program is for "+BLF'VERSION
+                CALL PRE'DO'ERR
+                GOTO ABORT
+            ENDIF
+            CALL GET'VALUE                !!Shipment Number
+            BOL'SSCC = VALUE
+        ELSE
+            ENTRY = "The transacation type must be 856 and file is: "+ VALUE
+            CALL PRE'DO'ERR
+            GOTO ABORT
+        ENDIF
+    ELSE
+        CALL GET'VALUE                        !!ASN Version
+        IF VALUE # BLF'VERSION THEN
+            ENTRY = "Version mismatch, found "+VALUE+" and program is for "+BLF'VERSION
+            CALL PRE'DO'ERR
+            GOTO ABORT
+        ENDIF
+        CALL GET'VALUE                        !!ASN Shipment Identification
+        BOL'SSCC = VALUE
+        CALL GET'VALUE                        !!Transaction Set Purpose
+        BOL'PURPOSE = VALUE                   !!00=Original, 01-Retransmit
+    ENDIF
+    CALL GET'VALUE                        !!Creation Date
+    CALL VALUE'TO'DTT
+
+    BOL'CRDTT = DTT
+    CALL GET'VALUE                        !!Creation Time
+    CALL VALUE'TO'HMS
+    BOL'CRHMS = HMS
+    CALL GET'VALUE                        !!Manufacturers UCC
+    BOL'UCC'NO = VALUE
+    UCC'KNO = UCS(BOL'UCC'NO)
+    USE UCC INTO UCC'REC KEY UCC'KEY
+    IF UCC'CTL # 0 THEN
+        ENTRY = "Invalid UCC number: "+UCC'KNO
+        CALL PRE'DO'ERR
+        GOTO ABORT
+    ENDIF
+    CALL GET'VALUE                        !!Bill to Account
+    BILL'TO = UCS(VALUE)
+    CALL GET'VALUE                        !!Ship to Account Store ID
+    BOL'STORE'ID = UCS(VALUE)
+    UCD'KUCC'NO = UCC'NO
+    UCD'KSTORE'ID = BOL'STORE'ID
+    IF (POL856'GILDAN = "Y" AND UCC'NO = "00821780") OR &
+            (POL856'GILDAN = "Y" AND UCC'NO = "0821780") THEN
+        UCD'KSTORE'ID = BOL'STORE'ID[4;5]
+    ENDIF
+    USE UCD INTO UCD'REC KEY UCD'KEY
+    IF UCD'CTL # 0 THEN
+        ENTRY = "Invalid Store ID number: "+UCD'KSTORE'ID
+        CALL PRE'DO'ERR
+        GOTO ABORT
+    ENDIF
+    IF UCD'BILL'TO = "" THEN UCD'BILL'TO = UCC'BILL'TO
+
+    VEN'KNO = UCD'BILL'TO
+    USE VEN INTO VEN'REC KEY VEN'KEY
+    IF VEN'CTL # 0 THEN
+        IF VEN'ACCOUNT # BILL'TO THEN
+            ENTRY = "Invalid Bill To: "+BILL'TO+" should be "+VEN'ACCOUNT
+            CALL PRE'DO'ERR
+            GOTO ABORT
+        ENDIF
+    ENDIF
+    CALL GET'VALUE                         !!Company Name
+    CALL GET'VALUE                         !!Address Line 1
+    CALL GET'VALUE                         !!Address Line 2
+    CALL GET'VALUE                         !!City
+    CALL GET'VALUE                         !!State
+    CALL GET'VALUE                         !!Postal Code
+    CALL GET'VALUE                         !!Country ID
+    CALL GET'VALUE                         !!BOL Number
+    BOL'BOL'NO = UCS(VALUE)
+    CALL GET'VALUE                         !!Carrier Name
+    BOL'CARRIER = VALUE
+    CALL GET'VALUE                         !!Trailer ID
+    BOL'TRAILER'ID = VALUE
+    CALL GET'VALUE                         !!PRO#
+    BOL'PRO'UPS = VALUE
+    CALL GET'VALUE                         !!Date of Shipment
+    CALL VALUE'TO'DTT
+    BOL'SHIP'DTT = DTT
+    CALL DO'PROM'DTT
+    BOL'CASE'IDS = BLF'CASE'IDS            !!Case Id's
+    IF BOL'CASE'IDS = "Y" THEN
+        CALL ADD'BLC'RECORDS
+    ENDIF
+    BOL'ELECTRONIC = BLF'ELECTRONIC        !!Electronic
+    BOL'MANUAL = "N"
+    BOL'MODE = "B"                         !!Mode = Bill of Lading
+    \SETKEY BOL MODE="KEY" APID="PO"
+    ADDL BOL FROM BOL'REC KEY BOL'KEY
+    \SETKEY BOL MODE="KY2" APID="PO"
+    IF BOL'CTL = 0 THEN
+        ADDKEY BOLU
+        IF BOLU'CTL # 0 THEN
+            DELETE BOL KEY BOL'KEY
+            ENTRY = "Invalid BOL - unique by format not by UCC!"
+            CALL KERROR'KBOL
+            CALL PRE'DO'ERR
+            GOTO ABORT
+        ENDIF
+        \ADDKEY BOL MODE="KY2" BAD1="BOLU"
+        ENTRY = "Added BOL:"
+        CALL KERROR'KBOL
+        UPDATE'PROM = 1
+    ELSE
+        IF BOL'PURPOSE = "00" THEN
+            ENTRY = "Skipping (duplicate on purpose 00):"
+            CALL KERROR'KBOL
+            SKIP'TO'NEXT = 1
+        ELSE
+            RDLOCK BOL INTO BOL'REC KEY BOL'KEY
+            IF BOL'CTL = 0 THEN
+                \SETKEY BOL MODE="KY2" APID="PO"
+                ENTRY = "Updating BOL:"
+                CALL KERROR'KBOL
+                UPDATE'PROM = 1
+            ELSE
+                ENTRY = "WEIRD: Skipping (not found on purpose 01):"
+                CALL KERROR'KBOL
+                SKIP'TO'NEXT = 1
+            ENDIF
+        ENDIF
+    ENDIF
+    ? #12, ENTRY
+RETURN
+
+PROCESS'DETAIL:
+    NEXT'BOD'NO = NEXT'BOD'NO + 1
+    BOD'SPACE = SPACE
+    BOD'BOL'MODE = BOL'MODE
+    BOD'BOL'BLF'NO = BOL'BLF'NO
+    BOD'BOL'NO = BOL'NO
+    BOD'NO = NEXT'BOD'NO
+
+    CALL GET'VALUE                        !!Indicator - to Standard
+    CALL GET'VALUE                        !!Case Identification (SSCC-18)
+    BOD'CASE'ID = VALUE
+
+    CALL GET'VALUE                        !!Customer PO Number
+    FF = INSTR(1,VALUE,"-")
+    IF FF = 0 THEN
+        BOD'HDR'NO = VALUE
+    ELSE
+        BOD'HDR'NO = VALUE[FF+1,-1]
+    ENDIF
+    CALL GET'VALUE                        !!GTIN Number
+    \STRIP VALUE 3
+    BOD'GTIN = VALUE
+    INT'SPACE = SPACE
+    INTV'KTYPE = "V"
+    IF UCC'NO = "8465030" THEN
+        \DG GETINT _POSETUP potedt_kariban_vendor ENTRY
+        IF DG'CTL = 0 AND ENTRY # 0 THEN
+            INTV'KNAM'NO = ENTRY
+        ELSE
+            INTV'KNAM'NO = UCC'INT'VEN'NO
+        ENDIF
+    ELSE
+        INTV'KNAM'NO = UCC'INT'VEN'NO
+    ENDIF
+    INTV'KPART = BOD'GTIN
+    INTV'RCN = 0
+    USE INTV INTO INT'REC KEY INTV'KEY
+    GETNXT INTV INTO INT'REC
+    \CHKKEY INTV APID="IN" LASTFIX="PART"
+    IF INTV'CTL # 0 THEN
+        ENTRY = "GTIN not found in interchange file "+BOD'GTIN
+        \LABLOGGER ENTRY LNAME
+    ELSE
+        BOD'TRK'NO = INT'TRK'NO
+        BOD'ATT'NO1 = INT'ATT'NO1
+    ENDIF
+
+    CALL GET'VALUE                        !!Master Style
+    BOD'MSTYLE = VALUE
+    CALL GET'VALUE                        !!Detail Style ID
+    BOD'DSTYLE = VALUE
+    CALL GET'VALUE                        !!Color Code
+    BOD'COLOR = VALUE
+    CALL GET'VALUE                        !!Size
+    BOD'SIZE = VALUE
+    CALL GET'VALUE                        !!Revision
+    BOD'REV = VALUE
+    CALL GET'VALUE                        !!UOM
+    BOD'UOM = UCS(VALUE)
+    CALL GET'VALUE                        !!Quantity
+    BOD'QTY = VALUE
+    CASE
+    IF BOD'UOM = "EA" THEN
+        SAV'BOD'QTY = BOD'QTY
+        BOD'QTY = INT(BOD'QTY/12)
+        IF (BOD'QTY * 12) # SAV'BOD'QTY THEN
+            BOD'QTY = SAV'BOD'QTY
+        ENDIF
+    ELSE
+    IF BOD'UOM = "DZ" THEN
+        BOD'QTY = BOD'QTY
+    ELSE
+    IF BOD'UOM = "CS" THEN
+        MEA'KTRK'NO = INT'TRK'NO
+        MEA'KUOM'NO = 1
+        USE MEA INTO MEA'REC KEY MEA'KEY
+        IF MEA'CTL = 0 THEN
+            BOD'QTY = (BOD'QTY * MEA'PC'PER'PKG * MEA'PKG'PER'CS)/12
+        ELSE
+            ENTRY = "Measurement not found "+MEA'KTRK'NO
+            \LABLOGGER ENTRY LNAME
+        ENDIF
+    ENDCASE
+    CALL GET'VALUE                        !!Country of Origin
+    BOD'COU = VALUE
+    CALL GET'VALUE                        !!Manufacturers Order Number
+    BOD'ORDER = VALUE
+    CALL GET'VALUE                        !!Lot
+    BOD'LOT'ID = VALUE
+
+    BOD'PROM'DTT = BOL'PROM'DTT           !!Promise Date
+    BOD'STAT = "U"                        !!Posting Status
+    BOD'REASON = 1                        !!Reason For Post/nopost
+    BOD'CASE'ID = ""                      !!Case ID NUMBER
+    BOD'RECEIVED = "N"                    !!Received?
+    BOD'PRICE = 0                         !!Price
+    \SETKEY BOD MODE="KEY" APID="PO"
+    ADD BOD FROM BOD'REC KEY BOD'KEY
+    IF BOD'CTL = 0 THEN
+        \SETKEY BOD MODE="KY2" APID="PO"
+        \ADDKEY BOD MODE="KY2" APID="PO"
+        BOD'COUNT = BOD'COUNT + 1
+        BOD'TOTAL = BOD'TOTAL + BOD'QTY
+    ENDIF
+RETURN
+
+PROCESS'TRAILER:
+    CALL GET'VALUE                        !!Case Count
+    CALL GET'VALUE                        !!Gross Weight
+    CALL GET'VALUE                        !!Record Count
+    CALL GET'VALUE                        !!Gross Container Weight
+    CALL GET'VALUE                        !!Piece Weight
+    CALL GET'VALUE                        !!Case Volume
+    CALL GET'VALUE                        !!Case Width
+    CALL GET'VALUE                        !!Case Length
+    CALL GET'VALUE                        !!Case Height
+    CALL GET'VALUE                        !!Color Description
+    CALL GET'VALUE                        !!Vendor Name
+RETURN
+
+ADD'BLC'RECORDS:
+    BLC'BOL'NO = BOL'SSCC                 !Shipment SSCC-18
+    BLC'CASE'ID = BOD'CASE'ID             !Case ID SSCC-18
+    BLC'STAT = "U"                        !Status
+    \SETKEY BLC MODE="KEY" APID="PO"
+    ADDL BLC FROM BLC'REC KEY BLC'KEY
+RETURN

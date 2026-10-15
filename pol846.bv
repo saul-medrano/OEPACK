@@ -1,0 +1,830 @@
+! @#$^&* 439 5 385 0 0 0 0 0 0 0 0 0 624 *&^$#@ 
+!*! Updated on Fri Jul 24 09:36:20 2026 by Benito Medrano 1 times 
+!*! Updated on Thu Jul 23 09:47:42 2026 by Benito Medrano 1 times 
+!*! Updated on Wed Jul 22 17:02:19 2026 by Benito Medrano 4 times 
+PROGRAM POL846,8.0(1) !!Inventory Status - EASI new format type 846
+!!
+!!                          V. I. C. S.
+!!                       of Camp Verde, AZ
+!!
+!!Copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!           2933 W Middle Verde Road
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!              All rights reserved.
+!!
+!!
+!!Revision History:
+!!
+!![1] 03/18/03  ESE   Created program.
+!!
+MAP1 TOTAL'RECORDS,B,4
+MAP1 SENTRY,S,20
+MAP1 SKIP'STORE,B,1,0
+MAP1 LNAME,S,132
+MAP1 TMP1,S,10
+MAP1 TMP2,S,10
+MAP1 TWO'NAME,S,128,"/logs/pol846.DAILY"
+MAP1 MY'STORE,S,8
+MAP1 QTYCNT,B,3
+MAP1 ECNT,B,3
+MAP1 CMD,S,300
+MAP1 FNAME,S,300
+MAP1 FNAME2,S,300
+MAP1 X,F
+MAP1 REC'TYPE,S,4
+MAP1 TYPE'OF'DOCUMENT,S,3
+MAP1 EASI'SENDER'ID,S,15
+MAP1 II,F
+MAP1 TMP,S,512
+MAP1 BASE,S,128
+MAP1 DIR,S,128
+MAP1 MY'TRX'TYPE,S,3,"846"
+MAP1 MY'BLF'VERSION,S,3,"1.0"
+MAP1 MY'ON'HAND,B,5
+
+COPY "CVTMAP"
+COPYF "CMNFIL[SY]",NOAFR
+COPYF "MSGFIL[SY]",NOAFR
+\COPYF DDD PO
+\COPYF INT IN
+\COPYF QTY IN
+\COPYF UCC PO
+\COPYF BLF PO
+\COPYF PRH IN
+
+\READCTL APP="PO" GL="Y"
+\READCTL APP="IN" GL="N"
+
+FNAME = "/tmp/proc.PID"
+XCALL ABUTIL,46,FNAME,FNAME
+XCALL ABUTIL,46,TWO'NAME,TWO'NAME
+
+ON ERROR GOTO ERTRAP
+
+XCALL ABSPEC,ENTRY               !!pol846 executed in crontab
+IF ENTRY = "" THEN
+    ENTRY = "No directory!"
+    CALL DO'ERRL
+    GOTO ABORT
+ENDIF
+
+!!cronjob dbshell -a PO -s 1 -c 1 run po1846 /hanes~90463469
+!!The EASI sender id is Hanes DUNS number, 846 format number
+\PARSE STRING="ENTRY" DEL="~" BASE EASI'SENDER'ID BLF'KNO
+
+DIR = BASE + "/in/"
+
+ENTRY = "find "+DIR+" -name '846*.*xt' -prune -print 2>" + &
+                                                TWO'NAME +" 1>"+FNAME
+XCALL SYSTEM,ENTRY
+
+LOOKUP FNAME,II
+MAP1 FILE'OPENED,S,1
+
+IF II # 0 THEN
+!!  ENTRY = "/logs/846_error.DAILY"
+
+    ENTRY = "/logs/846_error_"+BASE[2,-1]+".DAILY"
+    XCALL ABUTIL,46,ENTRY,ENTRY
+    LNAME = ENTRY
+
+    OPEN #65,FNAME,INPUT
+    FILE'OPENED = "Y"
+    DO
+        INPUT LINE #65,ENTRY
+        IF EOF(65) # 0 EXIT
+        TMP1 = "/in/"
+        TMP2 = "work"
+        CALL FIX'FILE
+        CALL MOVE'FILE
+        CALL PROCESS'FILE
+        ENTRY = FNAME2
+        TMP1 = "/work/"
+        TMP2 = "done"
+        CALL MOVE'FILE
+    LOOP
+ENDIF
+
+ABORT:
+    IF FILE'OPENED = "Y" THEN
+        CLOSE #65
+    ENDIF
+END
+
+FIX'FILE:
+    IF ENTRY # LCS(ENTRY) THEN
+        XCALL SYSTEM,"mv " + ENTRY + " " + LCS(ENTRY)
+        ENTRY = LCS(ENTRY)
+    ENDIF
+RETURN
+
+MOVE'FILE:
+    II = INSTR(1,ENTRY,TMP1)
+    IF II = 0 THEN
+        ENTRY = "Invalid file name " + ENTRY + "("+TMP1+")"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+    FNAME2 = ENTRY[1,II] + TMP2 + ENTRY[II+LEN(TMP1)-1,-1]
+    ENTRY = "mv "+ ENTRY + " " + FNAME2
+    XCALL SYSTEM,ENTRY
+    LOOKUP FNAME2,II
+    IF II = 0 THEN
+        \LABLOGGER ENTRY LNAME
+        ENTRY = "Failed to move file " + FNAME2
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ENDIF
+RETURN
+
+PROCESS'FILE:
+    OPEN #1001,FNAME2,INPUT
+    DO
+        INPUT LINE #1001, TMP
+        IF EOF(1001) # 0 EXIT
+        \STRIP TMP
+        IF TMP = "" REPEAT
+        LAST'POS = 1
+        CALL GET'VALUE
+        IF VALUE = "EASI " REPEAT    !!Routing header
+        REC'TYPE = VALUE                    !!Header
+
+        CASE
+        IF REC'TYPE = "01" THEN
+            CALL PROCESS'HEADER
+        ELSE
+        IF REC'TYPE = "02" AND SKIP'STORE # 1 THEN
+            TOTAL'RECORDS = TOTAL'RECORDS + 1
+            CALL PROCESS'DETAIL
+        ELSE
+        IF REC'TYPE = "09" THEN
+            CALL PROCESS'TRAILER
+            SKIP'STORE = 0
+        ELSE
+        IF REC'TYPE = "EASX"
+            CALL CLOSE'FILES
+        ELSE
+            ENTRY = "Invalid record type: "+REC'TYPE
+            \LABLOGGER ENTRY LNAME
+        ENDCASE
+    LOOP
+    CLOSE #1001
+RETURN
+
+CLOSE'FILES:
+    IF ECNT = 0 THEN
+        ENTRY = "Processed 846 for "+ BASE +" loaded: "+QTYCNT+" out of: "+TOTAL'RECORDS
+    ELSE
+        ENTRY = "Processed 846 for "+ BASE + " loaded: " +QTYCNT+" out of: "+TOTAL'RECORDS+" with "+ECNT+" errors!"
+    ENDIF
+    \LABLOGGER ENTRY LNAME
+RETURN
+
+PROCESS'HEADER:
+    MAP1 MULTI'LOC,S,1
+    \DG GETSTRING _POSETUP pol846_multi_loc MULTI'LOC
+    IF DG'CTL # 0 OR MULTI'LOC # "Y" THEN
+        MULTI'LOC = "N"
+    ENDIF
+
+    CALL GET'VALUE                        !!Transaction Type
+    IF VALUE # MY'TRX'TYPE THEN
+        ENTRY = "Invalid file, transaction type was "+VALUE+" not "+MY'TRX'TYPE+"!"
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+
+    CALL GET'VALUE                        !!Transaction Set Purpose
+
+    CALL GET'VALUE                        !!Version Number
+
+    USE BLF INTO BLF'REC KEY BLF'KEY
+    IF BLF'CTL # 0 THEN
+        ENTRY = "Cannot find interface format to process 846!"
+        \KERROR BLF APID="PO" MODE="KEY" CNO="N"
+        \LABLOGGER ENTRY LNAME
+        GOTO ABORT
+    ELSE
+        IF BLF'DOC'TYPE = "846" THEN
+            IF VALUE # BLF'VERSION THEN
+                ENTRY = "Version mismatch, found "+VALUE+" and program is for "+BLF'VERSION
+                \LABLOGGER ENTRY LNAME
+            ENDIF
+        ENDIF
+    ENDIF
+
+    CALL GET'VALUE                        !!Vendor ID (manufacturer's ucc)
+!!Augusta
+    ENTRY = "Mfg UCC: "+VALUE
+    \LABLOGGER ENTRY LNAME
+
+    IF VALUE = "08431051" THEN
+        \DG GETVALUE _POSETUP pol846_shak_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ELSE
+            VALUE = "8431051"
+        ENDIF
+    ENDIF
+    IF VALUE = "0000784371" THEN
+        \DG GETVALUE _POSETUP pol846_augusta_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ELSE
+            VALUE = "784371"
+        ENDIF
+    ENDIF
+!!Citadel
+    IF VALUE = "072346" THEN
+        \DG GETVALUE _POSETUP pol846_citadel_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ELSE
+            VALUE = "72346"
+        ENDIF
+    ENDIF
+!!A4
+    IF VALUE = "764970" THEN
+        \DG GETVALUE _POSETUP pol846_a4_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ELSE
+            VALUE = "76497"
+        ENDIF
+    ENDIF
+!!TCK - Twin City Knitting
+    IF VALUE = "757612" THEN
+        \DG GETVALUE _POSETUP pol846_tck_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ELSE
+            VALUE = "757612"
+        ENDIF
+    ENDIF
+
+
+!!Gildan
+!!Gildan Comfort Colors (One Stop), location 10,American Apparel location 5
+    MAP1 EXCLUDE'AA,S,1
+    MAP1 INCLUDE'CF,S,1
+    MAP1 COMFORT'VEN'NO,B,3
+!!One Stop
+    IF VALUE = "821780" AND MULTI'LOC = "Y" THEN
+        \DG GETVALUE _POSETUP pol846_gildan_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+
+        \DG GETVALUE _POSETUP pol846_gildan_include_CF INCLUDE'CF
+        IF DG'CTL # 0 THEN
+            INCLUDE'CF = "N"
+        ENDIF
+        \DG GETVALUE _POSETUP pol846_gildan_cf_vendor COMFORT'VEN'NO
+        IF DG'CTL # 0 OR COMFORT'VEN'NO = 0 THEN
+            COMFORT'VEN'NO = 0
+        ENDIF
+        ENTRY = "1 UCC is: "+VALUE+" Include="+INCLUDE'CF+" Multi="+MULTI'LOC+" Value="+VALUE+" CVN="+COMFORT'VEN'NO
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+!!Sun
+    IF VALUE = "821780" AND MULTI'LOC = "N" THEN
+        \DG GETVALUE _POSETUP pol846_gildan_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+        \DG GETVALUE _POSETUP pol846_gildan_exclude_AA EXCLUDE'AA
+        IF DG'CTL # 0 THEN
+            EXCLUDE'AA = "N"
+        ENDIF
+        INCLUDE'CF = "N"
+        ENTRY = "2 UCC is: "+VALUE+" Include="+INCLUDE'CF+" Multi="+MULTI'LOC+" Value="+VALUE
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+
+
+!!American Apparel drop ship inventory
+    IF VALUE = "0809778" THEN
+        \DG GETVALUE _POSETUP pol846_gildan_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+        ENTRY = "American  Apparel: "+VALUE
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+!!Lat
+    IF VALUE = "052987" THEN
+        \DG GETVALUE _POSETUP pol846_lat_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+    ENDIF
+!!Jamerica
+    IF VALUE = "008216" THEN
+        \DG GETVALUE _POSETUP pol846_jamerica_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+    ENDIF
+
+    IF VALUE = "010305" THEN
+        \DG GETVALUE _POSETUP pol846_fruit_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+    ENDIF
+
+    IF VALUE = "100135" THEN
+        \DG GETVALUE _POSETUP pol846_awdis_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+    ENDIF
+
+    IF VALUE = "8467980" THEN
+        \DG GETVALUE _POSETUP pol846_indep_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ENDIF
+    ENDIF
+!!Big Accessories
+    !!po/x/posetup.xml
+    !!<pol846_big_ucc>688400</pol846_big_ucc>
+
+    ENTRY = "Mfg UCC: "+VALUE
+    \LABLOGGER ENTRY LNAME
+
+    IF VALUE = "0688400" THEN
+        \DG GETVALUE _POSETUP pol846_big_ucc ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            VALUE = ENTRY
+        ELSE
+            VALUE = "688400"
+        ENDIF
+    ENDIF
+!!Big Accessories
+
+    ENTRY = "Final UCC is: "+VALUE
+    \LABLOGGER ENTRY LNAME
+
+    UCC'KNO = VALUE
+    USE UCC INTO UCC'REC KEY UCC'KEY
+    IF UCC'CTL # 0 THEN
+        ENTRY = "Cannot find UCC manufacturer ID: "+ VALUE
+        \LABLOGGER ENTRY LNAME
+    ENDIF
+
+    FOR II = 1 TO 4                       !!As of Date
+        CALL GET'VALUE                    !!As of Time
+    NEXT II                               !!Time Zone
+                                          !!Next Update in Minutes
+
+    CALL GET'VALUE                        !!Distribution Center
+    \STRIP VALUE 3
+
+    UCD'KSTORE'ID = ""
+    ENTRY = "UCC="+UCC'NO+" value="+VALUE+" multi="+MULTI'LOC
+    \LABLOGGER ENTRY LNAME
+
+    CASE
+!!Big Accessories - VendorID/UCC 0688400
+    IF UCC'NO = "688400" THEN
+        UCD'KUCC'NO = UCC'NO
+        IF VALUE = "DE" THEN UCD'KSTORE'ID = "0002"    !! Distribution Center
+    ELSE
+!!Cotton Heritage - VendorID/UCC 08473230
+    IF UCC'NO = "08473230" THEN
+        UCD'KUCC'NO = UCC'NO
+        IF VALUE = "VA" THEN UCD'KSTORE'ID = "0002"    !! East Coast Distribution Center
+        IF VALUE = "TX" THEN UCD'KSTORE'ID = "0003"    !! Central Distribution Center
+
+!!      Future West Coast Distribution Center  - Location Defined at One Stop
+        IF VALUE = "LA" THEN UCD'KSTORE'ID = VALUE    !! West Coast Distributon Center
+    ELSE
+!Berne UCC 092021
+    IF UCS(VALUE[1;6]) = "OSSIAN" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "OSDS"
+    ELSE
+!Sportsman UCC 0846679
+    IF UCS(VALUE[1;6]) = "LENEXA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "BILLTO"
+    ELSE
+!Bella UCC 8465030
+    IF VALUE = "NV" AND UCC'NO = "8465030" THEN
+        UCD'KUCC'NO = UCC'NO
+!![WC]  UCD'KSTORE'ID = "CA"
+        UCD'KSTORE'ID = "NV"        !![WC] New DC Location in North Las Vegas, Nevada
+    ELSE
+!Independent UCC 846798
+    IF VALUE = "CA" AND UCC'NO = "846798" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "18"
+    ELSE
+!Hanes UCC 766369
+    IF VALUE = "HOB EAST" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "9001"
+    ELSE
+!Lane Seven UCC 8400468
+    IF UCC'NO = "8400468" THEN
+        UCD'KUCC'NO = UCC'NO
+        IF VALUE = "CADC" THEN UCD'KSTORE'ID = "CADC"    !! California
+        IF VALUE = "NCDC" THEN UCD'KSTORE'ID = "NCDC"    !! North Carolina
+    ELSE
+!Blue Generation 00194563
+    IF UCC'NO = "00194563" THEN
+        UCD'KUCC'NO = UCC'NO
+        IF VALUE = "PASSAIC,NJ" THEN UCD'KSTORE'ID = "0010"    !! New Jersey
+    ELSE
+!Hanes UCC 766369
+    IF VALUE = "HOB WEST" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "9002"
+    ELSE
+!Shakawear UCC 8431051
+    IF UCS(VALUE) = "LOS ANGELES CA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "616282781"
+    ELSE
+!Hartwell UCC 730411
+    IF UCS(VALUE) = "HARTWELL, GA" OR VALUE = "HARTWELL,GA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "40753"
+    ELSE
+!Badger UCC 8402350
+    IF UCS(VALUE) = "BADGER SPORT" OR VALUE = "BADGERSPORT" THEN
+        UCD'KUCC'NO = UCC'NO
+        \DG GETSTRING _POSETUP badger_store SENTRY
+        IF DG'CTL # 0 THEN
+            UCD'KSTORE'ID = "OS0001999"
+        ELSE
+            UCD'KSTORE'ID = SENTRY
+            ENTRY = "Badger store is:  "+SENTRY+" UCD="+UCD'KUCC'NO+"-"+UCD'KSTORE'ID
+            \LABLOGGER ENTRY LNAME
+        ENDIF
+    ELSE
+!Badger UCC 8402350
+    IF UCS(VALUE) = "FOUNDER SPORT GROUP" THEN
+        UCD'KUCC'NO = UCC'NO
+        \DG GETSTRING _POSETUP badger_store SENTRY
+        IF DG'CTL # 0 THEN
+            UCD'KSTORE'ID = "OS0001999"
+        ELSE
+            UCD'KSTORE'ID = SENTRY
+            ENTRY = "Badger store is:  "+SENTRY+" UCD="+UCD'KUCC'NO+"-"+UCD'KSTORE'ID
+            \LABLOGGER ENTRY LNAME
+        ENDIF
+    ELSE
+!Inner Harbor UCC 0820599
+    IF UCS(VALUE) = "PAGELAND, SC" OR VALUE = "PAGELAND,SC" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "SC"
+    ELSE
+    IF UCS(VALUE) = "SALT LAKE CITY," THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "UT"
+    ELSE
+!!Red Kap UCC 036394
+    IF UCS(VALUE) = "NAS" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "NAS"
+    ELSE
+!Lat UCC=0052987
+    IF UCS(VALUE) = "CANTON, GA" OR VALUE = "CANTON,GA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "49544"
+    ELSE
+    IF UCS(VALUE) = "GROVETOWN, GA" OR VALUE = "GROVETOWN,GA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "0001"
+    ELSE
+!A4 UCC 764970
+    IF UCS(VALUE) = "AFOUR,CA" OR VALUE = "AFOUR, CA" OR VALUE = "AFOUR CA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "VN"
+    ELSE
+!A4 UCC 764970
+    IF UCS(VALUE) = "AFOUR,MO" OR VALUE = "AFOUR, MO" OR VALUE = "AFOUR MO" THEN
+        UCD'KUCC'NO = UCC'NO
+!!      UCD'KSTORE'ID = "0021"
+        UCD'KSTORE'ID = "KC"
+    ELSE
+    IF UCS(VALUE) = "HAMER,SC" OR VALUE = "HAMER, SC" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "91"
+    ELSE
+!Gildan UCC 00821780
+    IF MULTI'LOC = "N" AND (UCS(VALUE) = "EDEN,NC" OR UCS(VALUE) = "EDEN, NC" OR &
+                   UCS(VALUE) = "EDEN NC") THEN
+         UCD'KUCC'NO = UCC'NO
+         UCD'KSTORE'ID = "AN"
+    ELSE
+    IF MULTI'LOC = "N" AND UCS(VALUE) = "AN WAREHOUSE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "AN"
+    ELSE
+    IF MULTI'LOC = "N" AND UCS(VALUE) = "EN WAREHOUSE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "AN"
+    ELSE
+    IF MULTI'LOC = "N" AND UCS(VALUE) = "NC WAREHOUSE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "AN"
+    ELSE
+    IF MULTI'LOC = "N" AND UCS(VALUE) = "JV WAREHOUSE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "AN"
+    ELSE
+    IF MULTI'LOC = "N" AND UCS(VALUE) = "JX WAREHOUSE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "JX"
+    ELSE
+!!One Stop
+!!Location 12
+!!Twin City Knitting (TCK) UCC 0684516
+    IF MULTI'LOC = "Y" AND UCS(VALUE) = "CONOVER NC" OR UCS(VALUE) = "CONOVER,NC" OR &
+                UCS(VALUE) = "CONOVER, NC" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "DIRECT"
+    ELSE
+!!Location 5
+    IF MULTI'LOC = "Y" AND UCS(VALUE) = "JV WAREHOUSE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "JV"
+    ELSE
+!Gildan UCC 00821780
+    IF MULTI'LOC = "Y" AND UCS(VALUE)[1;13] = "JURUPA VALLEY" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "JVC"
+    ELSE
+!!Location 10
+!!Gildan UCC 00821780
+    IF MULTI'LOC = "Y" AND UCS(VALUE) = "JA WAREHOUSE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "JA"
+    ELSE
+!Qtees UCC 1234567
+    IF UCS(VALUE) = "QTEE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "0005"
+    ELSE
+!Dyenomite UCC 0847363
+    IF UCS(VALUE) = "COLUMBUS, OH" THEN
+        IF UCC'NO = "0847363" THEN
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = "0002"
+        ELSE
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = "80"
+        ENDIF
+    ELSE
+!Bayside UCC 8405211
+    IF UCS(VALUE) = "BREA, CA" OR UCS(VALUE) = "BREA,CA" OR UCS(VALUE) = "BRE, CA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "0013"
+    ELSE
+!J America UCC 08482730
+    IF UCS(VALUE) = "WHOLESALE" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "1111"
+    ELSE
+!MomentecBrands (Augusta) UCC 784371
+    IF UCC'NO = 784371 THEN
+        CASE
+        !MomentecBrands new consolidated DC 190 location Feb 2026
+            !! Kannapolis, NC
+        IF UCS(VALUE) = "KANNAPOLIS DC" THEN
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = "0190"
+        ELSE
+        !MomentecBrands DC 122 - Old Badger DC closing after April 2026
+            !! Statesville, NC
+        IF UCS(VALUE) = "STATESVILLE DC" THEN
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = "0003"
+        ELSE
+        !MomentecBrands DC 110 - Old Holloway(Augusta) DC closing end of Feburary 2026
+            !! Grovetown, GA
+        IF UCS(VALUE) = "HOLLOWAY DC" THEN
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = "0001"
+        ENDCASE
+        !! Report the Store and location
+        ENTRY = "VALUE= ["+UCS(VALUE)+"] Key [UCD'KUCC'NO="+UCD'KUCC'NO+" UCD'KSTORE'ID="+UCD'KSTORE'ID+"] UCD'LOC'NO="+UCD'LOC'NO
+        \LABLOGGER ENTRY LNAME
+    ELSE
+!Liberty UCC 671867
+    IF UCS(VALUE) = "IRWINDALE, CA" OR UCS(VALUE) = "IRWINDALE" OR &
+                VALUE = "01" THEN
+        \DG GETSTRING _POSETUP pol846_liberty ENTRY
+        IF DG'CTL = 0 AND ENTRY # "" THEN
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = ENTRY
+        ELSE
+            UCD'KUCC'NO = UCC'NO
+            UCD'KSTORE'ID = "0015"
+        ENDIF
+    ELSE
+!Fruit UCC 076031
+    IF UCS(VALUE) = "MONTGOMERY" AND UCC'NO = "076031" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "0999"
+    ELSE
+!Vertex UCC 119225637 Location 25
+    IF (UCS(VALUE) = "SPARTANBURG, SC" OR UCS(VALUE) = "SPARTANBURG,SC") AND UCC'NO = "119225637" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "4111"
+    ELSE
+!Boxercraft UCC 0638529
+    IF UCS(VALUE) = "MABLETON,GA" OR UCS(VALUE) = "MABLETON, GA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "DSHIP"
+    ELSE
+!Colortone UCC 8456150
+    IF UCS(VALUE) = "ONESTOP/CT" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "12"
+    ELSE
+!Paragon UCC 051054
+    IF UCS(VALUE) = "CP" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "CP"
+    ELSE
+!Sierra Pacific UCC 808995
+    IF UCS(VALUE) = "CARSON, CA" OR UCS(VALUE) = "CARSON,CA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "8020"
+    ELSE
+!Citadel UCC 72346
+    IF UCS(VALUE) = "KINGSTREE, SC" OR UCS(VALUE) = "KINGSTREE,SC" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "KT"
+    ELSE
+    IF UCS(VALUE) = "SUGAR LAND, TX" OR UCS(VALUE) = "SUGAR LAND,TX" OR &
+            UCS(VALUE) = "SUGARLAND, TX" OR UCS(VALUE) = "SUGARLAND,TX" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "8020"
+    ELSE
+!Citadel UCC 100135
+    IF UCS(VALUE) = "CHARLOTTE LOCAT" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "10"
+    ELSE
+    IF UCS(VALUE) = "CA" THEN
+        UCD'KUCC'NO = UCC'NO
+        UCD'KSTORE'ID = "18"
+    ENDCASE
+
+    USE UCD INTO UCD'REC KEY UCD'KEY
+    IF UCD'CTL # 0 THEN
+        ENTRY = "Stores must be set up in UCC file:  "+UCD'KUCC'NO+"-"+UCD'KSTORE'ID
+        \LABLOGGER ENTRY LNAME
+        SKIP'STORE = 1
+        ENTRY = "Data for "+ VALUE + " will be skipped!"
+        \LABLOGGER ENTRY LNAME
+    ELSE
+        IF UCD'LOC'NO = 0 THEN
+            ENTRY = "Must have location defined to add quantities: "+UCD'KUCC'NO+"-"+UCD'LOC'NO
+            \LABLOGGER ENTRY LNAME
+            SKIP'STORE = 1
+        ENDIF
+    ENDIF
+
+    ENTRY = "Value="+VALUE+" UCC="+UCC'NO+" UCD="+UCD'KSTORE'ID+" UCD'VN="+UCD'VEN'NO+" SS="+SKIP'STORE
+    \LABLOGGER ENTRY LNAME
+RETURN
+
+PROCESS'DETAIL:
+
+    CALL GET'VALUE                          !!Line Item Number
+
+    CALL GET'VALUE                          !!GTIN
+    \STRIP VALUE 3
+    INT'SPACE = SPACE
+    INTV'KTYPE = "V"
+    CASE
+    IF COMFORT'VEN'NO # 0 AND UCD'KSTORE'ID = "JA" THEN
+        INTV'KNAM'NO = COMFORT'VEN'NO
+    ELSE
+    IF UCC'NO = 784371 THEN        !!Augusta UCC for both locations
+        INTV'KNAM'NO = UCD'VEN'NO  !!Use Vendor from Store ID record UCD
+    ELSE
+        INTV'KNAM'NO = UCC'INT'VEN'NO
+    ENDCASE
+    INTV'KPART = VALUE
+    INTV'RCN = 0
+    USE INTV INTO INT'REC KEY INTV'KEY
+    GETNXT INTV INTO INT'REC
+    \CHKKEY INTV APID="IN" LASTFIX="PART"
+    IF INTV'CTL # 0 THEN
+!!      ENTRY = "GTIN not found in interchange file "+VALUE+" for "+MY'STORE
+        ECNT = ECNT + 1
+!!      \LABLOGGER ENTRY LNAME
+        FOR II = 1 TO 3                       !!Current Inventory Level
+            CALL GET'VALUE                    !!UOM
+        NEXT II                               !!Quantity to Arrive
+    ELSE
+        IF UCC'NO = "00821780" AND INCLUDE'CF = "Y" AND UCD'KSTORE'ID = "JA" THEN
+            PRH'KTRK'NO = INT'TRK'NO
+            USE PRH INTO PRH'REC KEY PRH'KEY
+            IF PRH'CTL = 0 AND PRH'PART[1;2] # "CF" THEN
+                RETURN
+            ENDIF
+        ENDIF
+        IF UCC'NO = "00821780" AND EXCLUDE'AA = "Y" AND MULTI'LOC = "N" THEN
+            PRH'KTRK'NO = INT'TRK'NO
+            USE PRH INTO PRH'REC KEY PRH'KEY
+            IF PRH'CTL = 0 AND PRH'PART[1;1] = "A" THEN
+                RETURN                        !!KLUDGE
+            ENDIF
+        ENDIF
+        CALL GET'VALUE                        !!Current Inventory Level
+        MY'ON'HAND = VALUE
+        QTY'SPACE = SPACE
+        QTY'KLOC'NO = UCD'LOC'NO
+        QTY'KTRK'NO = INT'TRK'NO
+        QTY'KATT'NO1 = INT'ATT'NO1
+        QTY'KATT'NO2 = 0
+        RDLOCK QTY INTO QTY'REC KEY QTY'KEY
+        IF QTY'CTL = 0 THEN
+            CALL GET'VALUE                    !!Unit of Measure
+            \STRIP VALUE 3
+            CASE
+
+            ENTRY = ""
+            \KERROR QTY APID="IN" MODE="KEY" CNO="N"
+            ENTRY = "   QTY Update: "+" ["+ENTRY+"]"+" Mill Inv Lvl="+(MY'ON'HAND USING "######")+" UOM="+VALUE
+            ENTRY = ENTRY+" Before: ONH="+QTY'ON'HAND+" COM="+QTY'COMMITTED+" BO="+QTY'BACKORDER+" ONO="+QTY'ON'ORDER
+            \LABLOGGER ENTRY LNAME
+
+            IF UCS(VALUE) = "EA" THEN
+                QTY'ON'HAND = MY'ON'HAND
+                QTYCNT = QTYCNT + 1
+                WRITE QTY
+            ELSE
+            IF UCS(VALUE) = "DZ" THEN
+                QTY'ON'HAND = MY'ON'HAND * 12
+                QTYCNT = QTYCNT + 1
+                WRITE QTY
+            ELSE
+                ENTRY = "1: Unit of measure not defined for " + INTV'KPART
+                \LABLOGGER ENTRY LNAME
+                ECNT = ECNT + 1
+                REL QTY
+            ENDCASE
+        ELSE
+            QTY'SPACE = SPACE
+            QTY'LOC'NO = UCD'LOC'NO
+            QTY'TRK'NO = INT'TRK'NO
+            QTY'ATT'NO1 = INT'ATT'NO1
+            QTY'ATT'NO2 = 0
+            CALL GET'VALUE                    !!Unit of Measure
+            CASE
+            IF UCS(VALUE) = "EA" THEN
+                QTY'ON'HAND = MY'ON'HAND
+            ELSE
+            IF UCS(VALUE) = "DZ" THEN
+                QTY'ON'HAND = MY'ON'HAND * 12
+            ELSE
+                ENTRY = "2: Unit of measure not defined for "+ INTV'KPART
+                ECNT = ECNT + 1
+                \LABLOGGER ENTRY LNAME
+            ENDCASE
+            \SETKEY QTY MODE="KEY" APID="IN"
+            ADDL QTY FROM QTY'REC KEY QTY'KEY
+            IF QTY'CTL = 0 THEN
+                \SETKEY QTY MODE="KY2" APID="IN"
+                \ADDKEY QTY MODE="KY2" APID="IN"
+                REL QTY
+            ENDIF
+            ENTRY = ""
+            QTYCNT = QTYCNT + 1
+
+            \KERROR QTY APID="IN" MODE="KEY" CNO="N"
+            ENTRY = "   QTY Add   : "+" ["+ENTRY+"]"+" Mill Inv Lvl="+(MY'ON'HAND USING "######")+" UOM="+VALUE
+            ENTRY = ENTRY+" CNT="+(QTYCNT USING "######")+" QTY'CTL="+QTY'CTL
+            \LABLOGGER ENTRY LNAME
+
+        ENDIF
+        CALL GET'VALUE                            !!Quantity to Arrive
+    ENDIF
+RETURN
+
+PROCESS'TRAILER:
+    FOR II = 1 TO 3                           !!File Creation Date
+        CALL GET'VALUE                        !!File Creation Time
+    NEXT II                                   !!Total Records
+RETURN
+
+COPY "FORMAT"
+COPY "BASERR"
+COPY "POLOAD"                             !!GET'VALUE:
+
+
+
