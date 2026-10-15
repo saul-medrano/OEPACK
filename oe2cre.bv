@@ -1,0 +1,3241 @@
+! @#$^&* 614 0 996 0 0 0 0 0 0 0 0 0 402 *&^$#@ 
+!*! Updated on Mon Mar  2 18:05:03 2026 by Saul Medrano 3 times 
+!*! Updated on Fri Feb 27 17:28:50 2026 by Saul Medrano 10 times 
+!*! Updated on Thu Feb 26 10:15:12 2026 by Saul Medrano 1 times 
+!%W% %G% %U% - SCCS
+!* Updated on 24-Jun-96 at 1:31 PM by Eric Eberhard; edit time: 0:05:36
+PROGRAM OE2CRE,8.0(22)          !!Cancel/Replace order [7-9-B]
+!!Program to cancel and replace a posted order.
+!!
+!!                      V. I. C. S.
+!!                     of Camp Verde, AZ
+!!
+!!copyright (c) 1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,
+!!              1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,
+!!              2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,
+!!              2022 by
+!!
+!!      VERTICAL INTEGRATED COMPUTER SYSTEMS
+!!            2933 W Middle Verde Rd
+!!              Camp Verde, AZ  86322
+!!               (928) 567-3727
+!!
+!!              Vertical Integrated Computer Systems, Camp Verde, AZ  USA
+!!              All rights reserved.
+!!
+!![1] 09/14/90 ESE      Change customer number if so set up.
+!!                      Correctly set invoice number on credit.
+!!
+!![2] 09/18/90 ESE      Put on QUEUE myself (XCALL PRTQUE broken again).
+!!
+!![3] 09/25/90 ESE      Cancel from manifest in more cases.
+!!
+!![4] 10/04/90 BAP      Modified LINP, LHSP, and Added LHSC and LHSD keys
+!!
+!![5] 10/04/90 ESE      Delete from manifest.
+!!
+!![6] 11/20/90 BAP      Fixes to lhsc and lhsd keys, and mapped variables
+!!                              for mapped compile. Fixed alternate address
+!!                              defaulting.
+!!
+!![7] 12/19/90 ESE      Disallow double cancel/replacing of an order!
+!!
+!![8] 12/27/90 ESE      If not cancel/replace customer, apply credits.
+!!
+!![9] 12/28/90 ESE      Handle non-replacements and refunds to A/P.
+!!                      No charge replacements, more applications
+!!                      such as apply to new order - essentially a
+!!
+!![10] 01/08/91 ESE     Screwed up quantities big time.
+!!
+!![11] 01/17/91 ESE     Add to COD credits need an "auto" bit set.
+!!
+!![12] 03/20/91 ESE     Made to handle case where OEPDOC waits till EOD.
+!!
+!![13] 04/08/91 ESE     Add some security to canceling paid invoices.
+!!
+!![14] 04/08/91 ESE     "Split" application of credit between previous
+!!                      and next COD.
+!!
+!![15] 04/11/91 ESE     Add some security to applying credit to next COD.
+!!
+!![16] 04/22/91 ESE     Copy messages to new invoice.
+!!
+!![17] 06/17/91 ESE     Allow cancel/replace to work if AUTOMAN.
+!!
+!![18] 06/21/91 ESE     Cleaned up an error message.
+!!
+!![19] 07/03/91 ESE     Remove bogus error messages if skipping OEPDOC.
+!!
+!![21] 07/11/91 ESE     Get rid of general DB release.
+!!
+!![22] 07/12/91 ESE     Delete bad applications.
+!!
+!![23] 07/24/91 ESE     Cannot cancel/replace shop order/transfer.
+!!
+!![24] 08/09/91 HLB     Not handling backorders correctly.
+!!
+!![25] 08/12/91 HLB     [24] not right for garment interface.
+!!
+!![26] 08/22/91 HLB     Problem with signs of credit for garment interface.
+!!
+!![27] 08/26/91 ESE     Use new VICQTY.SBR.
+!!
+!![28] 08/28/91 HLB     One more modification to [24]
+!!
+!![29] 09/10/91 HLB     Bug in APL deletion. Was getting no lock error.
+!!
+!![30] 01/29/92 ESE     Did not handle fast A/R correctly.
+!!
+!![31] 02/07/92 ESE     Automatically deal with free freight.
+!!
+!![32] 03/13/92 ESE     Deal with task manager.
+!!
+!!7.3a 03/18/92 ESE     New WGP, SUB, & LIN stuff.
+!!
+!![33] 04/17/92 ESE     We need a picking ticket on the DR.
+!!
+!![34] 04/17/92 HLB     Add msg information showing original, credit, & new
+!!
+!![35] 04/21/92 ESE     Use new COMNET.MAC
+!!
+!![36] 04/21/92 ESE     Default order type from
+!!
+!![37] 04/21/92 ESE     Apply invoice when it is posted ...
+!!
+!![38] 04/22/92 ESE     Fixed generation of invalid invoices.
+!!
+!![39] 05/06/92 ESE/HLB COMNET.MAC was wrong (invalid invoice/distribution).
+!!
+!![40] 06/12/92 HLB     The cancel/replace messages were being added
+!!                      to the incorrect order in certain cases.
+!!
+!![41] 07/15/92 HLB     FIX: Under certain circumstances when using
+!!                      end-of-day batch processing, the fast AR
+!!                      was incorrectly updated.
+!!
+!![42] 07/27/92 ESE     NEW: Made autopost work even if no BGP jobs.
+!!
+!![43] 07/29/92 ESE     FIX: Really made autopost work w/out BGP jobs.
+!!
+!![44] 08/28/92 HLB     FIX: Make it stop for a return if autoposting
+!!                      w/out BGP jobs.
+!!
+!![45] 09/21/92 ESE/HLB FIX: Make link errors go away in UNIX.
+!!
+!![46] 11/06/92 ESE     NEW:  Disable new VICQTY.SBR.
+!!
+!![47] 12/16/92 ESE     FIX: Stop stack overflow in credit posting (AM only).
+!!
+!![48] 12/29/92 ESE     NEW: Allow FLiP to credit or order after it is
+!!                           generated!
+!!
+!![49] 01/13/93 ESE     NEW: true 7.3 edition.
+!!
+!![50] 03/03/93 ESE     NEW: link in UNIX, FLiP in AMOS because of locking
+!!                      problems in UNIX vs. stack overflow in AMOS.
+!!
+!![51] 03/30/93 HLB     FIX: Added additional checks to insure that the
+!!                      correct message file was used.  This may have been
+!!                      a non-problem.
+!!
+!![52] 05/17/93 ESE     FIX: link to add a vendor was wrong?
+!!
+!![53] 06/10/93 HLB     FIX: When an order had a credit approval history on it,
+!!                      and it was replaced, the replacement did not
+!!                      have the credit approval history on it.
+!!
+!![54] 05/03/94 ESE     NEW: use new HHSP key (see NEWHHS.TXT).
+!!
+!![55] 06/09/94 ESE     NEW: put credits 1st on queue.
+!!
+!![56] 07/20/94 HLB     NEW: Credit Card handling.  Need OE2CRE.S
+!!
+!![57] 08/10/94 ESE     NEW: Auto post even if cancel/replace customer
+!!                      not used.
+!!
+!![58] 08/12/94 ESE     FIX: credits for credit cards.
+!!
+!![59] 08/31/94 ESE/HLB FIX: set company number correctly.
+!!
+!![60] 09/06/94 ESE/HLB FIX: change some ATQ key stuff.
+!!
+!![61] 09/23/94 HLB     Was scanning through the whole file to find the
+!!                      next available sequence number for credit cards!!
+!!                      In CCCARD.CPY
+!!
+!!7.4 01/06/95 ESE      NEW: Implement "slip" pricing (see OEC'SLIP'PRICE).
+!!
+!![1] 03/02/95 HLB      FIX: Undocumented improvements to credit card handling.
+!!                      Send with OEPDOC, OERCTL, and OE1WGA.
+!!
+!![2] 03/10/95 ESE      NEW: changes for claims dept.
+!!
+!![3] 03/22/95 ESE      FIX: claims department only.
+!!
+!![4] 03/23/95 HLB      FIX: Remove refund question for credit card orders.
+!!                      CROECH.CPY
+!!
+!![5] 05/02/95 HLB      FIX: More credit card stuff.
+!!
+!![6] 09/06/95 HLB      FIX: Another attempt at correcting occasional message
+!!                      problems.
+!![7] 09/11/95 HLB      NEW: OEPACK  See CREOCH[2]
+!!
+!![8] 10/13/95 ESE      NEW: Copy CD messages to new orders/credits.
+!!
+!![9] 11/16/95 ESE      NEW: Re-write vendor adding.
+!!
+!![10] 12/07/95 ESE     FIX: Make edit [9] work.
+!!
+!![11] 12/14/95 ESE     FIX: Link error on Alpha started on Unix.
+!!
+!![12] 12/19/95 ESE     FIX: For OEPACK.
+!!
+!![13] 12/20/95 ESE - FIX: was smashing ATQT key on credit memos.
+!!
+!![14] 01/05/96 ESE - NEW: Don't allow COD apply with credit cards.
+!!
+!![15] 03/20/96 ESE - NEW: Credit cards for non T-Shirt.
+!!
+!![16] 06/14/96 SLM/ROM - NEW: Remove spaces on F8 message to allow printing
+!!                             two more characters for order header.
+!!
+!![17] 06/24/96 ESE     NEW: Do not change original user's create ID.
+!!
+!![18] 06/26/96 ESE     NEW: Do not apply credit cards DR to CR!
+!!                      MUST have matching AR1OEU.RUN also!!!
+!!
+!![19] 09/16/96  ESE   NEW: Support new location stuff.
+!!
+!!8.0  03/31/97 CAE     New version created
+!!
+!![20] 03/31/97 CAE     NEW: Changes for year 2000.
+!!
+!![21] 06/10/97  ESE   FIX: write/nolock error fixed in vics.mac
+!!
+!![22] 06/23/97  ESE   NEW: don't do credit cards to cancel/replace customer.
+!!
+!MAP1    GETPROFILE'TMP,S,200
+
+DEFINE GETPROFILE
+    GETPROFILE'TMP = ""
+    |2 = ""
+    XCALL ABUTIL,41,|0,|1,GETPROFILE'TMP
+    |2 = GETPROFILE'TMP
+ENDMACRO
+COPY    "FORMAD"
+COPY    "CVTMAP"
+\COPYF OC2 OE
+\COPYF WCS WB
+\COPYF WRH NOAFR="N"
+\COPYF LOC IN
+\COPYF IN2 IN
+\COPYF TAD
+\COPYF TAD OE TAD2
+\COPYF WLQ WL
+\COPYF TAD
+\COPYF HHS
+\COPYF HDR
+\COPYF HDR OE HDR2 MODE="DTA"
+\COPYF LHS
+\COPYF LIN
+\COPYF SHS
+\COPYF SUB
+COPYF "CMNFIL[SY]",NOAFR
+\COPYF QTY IN
+\COPYF TRH AR MODE="PRI"
+\COPYF OCH CD MODE="PRI"
+\COPYF OCD CD MODE="PRI"
+\COPYF CAN
+\COPYF ORD
+MAP1 MY'DATE,S,12
+MAP1 ZZ,F
+MAP1 TODAY,F
+MAP1 RCNS,S
+        MAP2 RCN(2),B,3
+MAP1 DO'APL,B,1
+MAP1 MAN'CAN,B,1
+MAP1 II,F
+MAP1 NOPLACE,B,1
+MAP1 QNO,B,4
+MAP1 BGP'PRI,B,1
+MAP1 CAN'LST'NO,B,3             !!Canceled order LST number
+MAP1 REAL'LST'NO,B,3            !!Actual customer's LST number
+MAP1 WRK'LST'NO,B,3             !!Work VAR
+MAP1 SAV'RCN,B,4                !!For message work.
+MAP1 SAV'RCN2,B,4               !!For message work.
+MAP1 SIGN,F
+MAP1 XX,F
+MAP1 SAV'SHIP'TO,B,2
+MAP1 SAV'SHP'NO,B,3
+MAP1 SET'FROM'SAV,B,1
+MAP1 MESSAGE,S,80               !![34]
+MAP1 SAVE'MESSAGE,S,80          !!Malvern
+MAP1 RCNS(3),B,4                !![34]
+MAP1 OCD'FLAG,B,1
+MAP1 MAKORD,B,1
+MAP1 OCD'MODE,B,1
+MAP1 ADD'TO'CANCEL,S,1            !!(bdl)
+MAP1 CHECK'DATE,S,12           !!(bdl)
+\COPYF MSG SY
+
+SYMBOL SCREEN="OE2CRE"
+
+        ON ERROR GOTO ERTRAP
+OE2CRE:
+BEGIN:
+        GETCMN WRH'REC
+        IF WRH'OCD'PRGNAM = "CD1OCH" THEN
+                OCD'FLAG = 1
+                LDUSR
+                PWASTR = "YYYYYYYY"             !!Security in CD1OCH
+                CALL RDLOCK'OCH
+                IF OCH'CTL # 0 THEN
+                        ENTRY = "Invalid OCH passed in! "+OCH'RCN
+                        CALL DO'ERR
+                        GOTO ABORT
+                ENDIF
+        ELSE
+                CMN'REC = WRH'REC
+                IF CMN'TO'PRGNAM = "OE2CRE" THEN
+                    LDUSR
+                    PWASTR = "YYYYYYYY"             !!Security in CD1OCH
+                    IF CMN'FRM'PRGNAM = "MAKORD" THEN
+                        MAKORD = 1
+                        CALL USE'POHDR
+                        IF POHDR'CTL # 0 THEN
+                            ENTRY = "Cannot read POHDR/POHHS: "+CMN'SAV'RCN(1)+"-"+CMN'SAV'RCN(2)+"-"+CMN'SAV'RCN(3)
+                            CALL DO'ERRL
+                            GOTO ABORT
+                        ENDIF
+                    ELSE
+                        ENTRY = "Invalid link to oe2cre: "+CMN'FRM'PRGNAM
+                        CALL DO'ERRL
+                        GOTO ABORT
+                    ENDIF
+                ELSE
+                    WRH'SPACE = SPACE
+                    \DOPASS
+                ENDIF
+        ENDIF
+        \READCTL APP="MC" GL="N"
+        \READCTL APP="OE" GL="N"
+        \READCTL APP="IN" GL="N"
+        \READCTL APP="AR" GL="N"
+        \READCTL APP="AP" GL="N"
+        USE OC2 OEC'RCN INTO OC2'REC
+        IF OC2'UPSONL'YN = "Y" THEN
+            \READCTL APP="UP" GL="N"
+        ENDIF
+
+        USE IN2 UB'CNO INTO IN2'REC
+        IF IN2'CTL # 0 THEN
+            ENTRY = "IN2 not found - aborting!"
+            CALL DO'ERR
+            GOTO ABORT
+        ENDIF
+        CALL SET'USE'CC                 !![56]
+        IF OEC'INT'CR = 0 AND OCD'FLAG = 0 THEN
+                ENTRY = "Must have an internal credit type - See control record."
+                CALL DO'ERR
+                GOTO ABORT
+        ENDIF
+        IF OEC'TASK'YN = "Y" THEN
+                PQU'DID = "OEQUE"
+                PQU'KID = "OEQUE"
+        ENDIF
+        IF INC'INTERFACE = 5 AND INC'AUTOPACK = "Y" THEN
+                PROMPT = "Post"                 !!Kayman posts
+        ELSE
+!!But, mostly we want to pick an order after we create it
+                PROMPT = "Pick"
+        ENDIF
+
+MAP1 FROM'OE2CRE,S,1
+                FROM'OE2CRE = "Y"
+                XCALL PUTENV,"FROM_OE2CRE="+FROM'OE2CRE !!used in OEPDOC
+
+        IF OCD'FLAG # 0 OR MAKORD # 0 THEN
+                IF MAKORD # 0 THEN
+                    LOC'KNO=POHDR'LOC'NO                      !! use the secondary locations LST to get CUS defaults
+                    USE LOC INTO LOC'REC KEY LOC'KEY
+                    IF LOC'CTL # 0 THEN
+                        ENTRY="Location number "+POHDR'LOC'NO+" not found"
+                        CALL DO'ERRL
+                        GOTO ABORT
+                    ENDIF
+                    CUS'KNO = LOC'LST'NO
+                ELSE
+                    CUS'KNO = OCH'CUS'NO
+                ENDIF
+                USE CUS INTO CUS'REC KEY CUS'KEY
+                IF CUS'CTL # 0 THEN
+                        ENTRY = "Invalid customer: "+STR(CUS'KNO)+"!"
+                        CALL DO'ERRL
+                        GOTO ABORT
+                ENDIF
+                WRH'INV'ONLY = "N"                      !!No replace
+                CASE
+                IF MAKORD # 0 THEN
+                    CALL FILL'HHS'FROM'POHDR
+                    OCD'MODE = 1                        !!DR only
+                    WRH'AUTO'POST = "N"
+                ELSE
+                IF OCH'C'COUNT = 0 THEN
+                        IF OCH'O'NO = 0 THEN
+                                CALL FILL'HHS'FROM'OCH
+                        ELSE
+                                CALL FILL'HHS'FROM'O
+                                IF HHS'CTL # 0 GOTO ABORT
+                        ENDIF
+                        OCD'MODE = 1            !!DR only
+                        WRH'AUTO'POST = "N"
+                ELSE
+                IF OCH'O'NO = 0 THEN
+                        CALL FILL'HHS'FROM'OCH
+                        IF OCH'D'COUNT = 0 THEN
+                                OCD'MODE = 2    !!Add CR applied to nothing
+                        ELSE
+                                OCD'MODE = 3    !!Add DR, apply CR to it
+                        ENDIF
+                ELSE
+                        CALL FILL'HHS'FROM'O
+                        IF HHS'CTL # 0 GOTO ABORT
+                        IF OCH'D'COUNT = 0 THEN
+                                OCD'MODE = 4            !!CR the original
+                        ELSE
+                                OCD'MODE = 5            !!Cancel & replace
+                                WRH'INV'ONLY = "Y"      !!replace
+                        ENDIF
+                ENDCASE
+                WRH'LOC'NO = HHS'LOC'NO
+                WRH'DOC'TYPE = HHS'DOC'TYPE
+                WRH'HDR'NO = HHS'NO
+                WRH'EDTT = HHS'SHIPMENT
+                CALL CANCEL'REPLACE'ORDER
+                IF OCD'FLAG # 0 THEN
+                    OCD'FLAG = 2
+                ELSE
+                IF MAKORD # 0 THEN
+                    MAKORD = 2
+                ENDIF
+                ENDIF
+                CALL FLIPPER
+        ELSE
+                DSP |SCREEN|
+                DO
+                        GDB |SCREEN|
+                        CALL TST'FUNC
+                        IF TST'FUNC # 0 EXIT
+                        CALL CANCEL'REPLACE'ORDER
+!![WC]
+                        IF INV'UNSET = "Y" THEN
+                            CALL VOID'INV'UNSET
+                        ENDIF
+
+                        CALL FLIPPER
+                        RCNS = SPACE
+                        IF TST'FUNC # 0 EXIT
+                        WRH'SPACE = SPACE
+                        DDB |SCREEN|
+                        LOC'SPACE = SPACE
+                        HHS'SPACE = SPACE
+                        POST'DATE = SPACE(8)
+                        TOTAL = 0
+                        PAID = 0
+                        BALANCE = 0
+                        LST'SPACE = SPACE
+                        ENTRY = SPACE(12)
+                        CALL DSP'LOC'DESC
+                        CALL DSP'DOC'DESC
+                        CALL DSP'ORDER'TOTAL
+                        CALL DSP'CREDIT'NO
+                        CALL DSP'DEBIT'NO
+                        CALL DSP'PAID
+                LOOP
+                \TCOUNT'START II "Checking for auto applications"
+                CALL APPLY'APL
+        ENDIF
+ABORT:
+        IF OCD'FLAG # 0 THEN
+                IF OCD'FLAG = 2 THEN
+                        WRH'OCD'PRGNAM = "GOOD"
+                ENDIF
+                SNDCMN WRH'REC
+        ELSE
+        IF MAKORD # 0 THEN
+                IF MAKORD = 2 THEN
+                    CMN'FRM'PRGNAM = "GOOD"
+                ENDIF
+                SNDCMN CMN'REC
+        ENDIF
+        ENDIF
+END
+
+\\DUMLBL
+
+APPLY'APL:
+        APL'SPACE = SPACE
+        \SETKEY APL MODE="KEY"
+        \LOOPER PRE="APL" ACTION="DO'APL" OPR="RDCOND" LASTFIX="DUMMY'LABEL"
+        \TCOUNT'END II
+RETURN
+
+        COPY    "FORMAT"
+        COPY    "BASERR"
+        COPYS   "|SCREEN|"
+
+        COPYF "CMNFIL[SY]",NOAFR
+
+        MAP1    FLAG,B,1
+        MAP1 CMN'EXTRA
+                MAP2 XCR'INV'TYPE,B,1
+                MAP2 XCR'INVOICE,B,3
+                MAP2 XDR'INV'TYPE,B,1
+                MAP2 XDR'INVOICE,B,3
+                MAP2 XAPL'AMT,B,5
+                MAP2 XAPL'DTT,B,3
+                MAP2 XAPL'CUS'NO,B,3
+                MAP2 APL'SOURCE,S,2
+
+DO'APL:
+                !!Whenever exiting program we check if there are
+                !!any applications we can create by checking if the
+                !!credits in question have been posted yet.
+
+        \TCOUNT II
+        IF APL'CRINVOICE = 0 THEN
+                HHS'SPACE = SPACE
+                HHS'LOC'NO = APL'HDR'LOC'NO
+                HHS'DOC'TYPE = APL'DOC'TYPE
+                HHS'NO = APL'HDR'NO
+                HHS'SHIPMENT = 1
+                \SETKEY HHS MODE="KEY"
+                USE HHS INTO HHS'REC KEY HHS'KEY
+!![19]          IF HHS'INTERNAL # 0 THEN        !!Yup, posted.
+                IF HHS'INV'YN = "Y" THEN        !![19] Yup, NOW it is posted!
+                        APL'CRINVOICE = HHS'INTERNAL
+                        APL'CRINV'TYPE = HHS'DOC'TYPE
+                ENDIF
+        ENDIF
+        IF APL'CRINVOICE # 0 THEN
+                                !!Check if really in A/R
+                DOCV'KINV'TYPE = APL'CRINV'TYPE
+                DOCV'KINVOICE = APL'CRINVOICE
+                USE DOCV INTO DOC'REC KEY DOCV'KEY
+!!              RDKEY DOCV
+             CASE
+             IF DOCV'CTL # 0 THEN
+                ENTRY = "Cannot find credit in A/R: "   !!Bad news
+                \KERROR DOCV APID="AR" CNO="N" MODE="K"
+                CALL DO'ERRL
+                CALL DEL'APL
+             ELSE
+             IF DOC'AMT = 0 THEN
+                ENTRY = "Amount = 0 on credit - cannot apply: " !!Bad news
+                \KERROR DOC MODE="D" CNO="N" APID="AR"
+                CALL DO'ERRL
+                CALL DEL'APL
+             ELSE
+                TRH'KNO = DOC'TRH'NO    !![18]
+                \VUSE TRH
+                IF TRH'CTP'NO # 0 THEN  !![18] Is on credit card
+                        CALL DEL'APL
+                        DOCV'CTL = 9
+                ELSE
+                                                        !!Do application
+!![19] - check if DR posted if skipping posting ...
+                        IF OEC'SKIPDOC = "Y" THEN
+                                DOCV'KINV'TYPE = APL'DRINV'TYPE
+                                DOCV'KINVOICE = APL'DRINVOICE
+!![18]                          RDKEY DOCV
+                                USE DOCV INTO DOC'REC KEY DOCV'KEY
+                                TRH'KNO = DOC'TRH'NO    !![18]
+                                \VUSE TRH
+                                IF TRH'CTP'NO # 0 THEN  !![18] Is on credit card
+                                        CALL DEL'APL
+                                        DOCV'CTL = 9
+                                ENDIF
+                        ELSE
+                                DOCV'CTL = 0
+                        ENDIF
+                ENDIF
+!![19] - above
+               IF DOCV'CTL = 0 THEN                             !![19]
+                CMN'SPACE = SPACE
+                CMN'TO'PRGNAM = "AR1OEU"
+                CMN'FRM'PRGNAM = "APLTW2"
+                CMN'EXTRA = APL'OVR
+                IF APL'DRINV'TYPE > 10 THEN             !!Special apply
+                        XDR'INV'TYPE = XDR'INV'TYPE - 10
+                ELSE
+                        XAPL'AMT = XAPL'AMT MIN ABS(DOC'AMT)    !!Make sure
+                ENDIF
+                APL'SOURCE = "OE"
+                                                        !!use correct amt
+                CMN'OTHER = CMN'EXTRA
+                XCALL ABUTIL,6,"AR",UB'SYS,"",FLAG
+                IF FLAG # 0 THEN
+                        ENTRY = "Error logging to A/R"
+                        CALL DO'ERR
+                ELSE
+!!This program - AR1OEU - actually does application give CMN'EXTRA data.
+!![45]                  XCALL LINK,1,"AR1OEU",CMN'REC
+                        SNDCMN CMN'REC                          !![45]
+                        XCALL LINK,1,"AR1OEU"                   !![45]
+                        GETCMN CMN'REC                          !![45]
+                        XCALL ABUTIL,6,"OE",UB'SYS,"",FLAG
+                        dspsw = 220
+                        DSP |SCREEN|
+                        IF CMN'TO'PRGNAM # "GOOD" THEN
+                                ENTRY = "Bad link to AR1OEU: "+CMN'TO'PRGNAM
+                                CALL DO'ERRL
+                        ENDIF                           !![22]
+!!ALWAYS get rid of APL records.
+                        CALL DEL'APL
+!![29]                  \SETKEY APL MODE="KEY"
+!!                      DELETE APL KEY APL'KEY
+!!                      \SETKEY APL MODE="KY2"
+!![29]                  \DELKEY APL MODE="KY2"
+                        SF = 1
+                ENDIF
+               ENDIF                                            !![19]
+             ENDCASE
+        ENDIF
+RETURN
+
+MAP1 SAV'MSGNO,B,3                                      !![16]
+MAP1 SAV'MSGNO2,B,3                                     !![16]
+MAP1 BAD'MSGNO,B,3                                      !![16]
+
+COPYF "HHSFIL",=RHHS,NOAFR
+
+CANCEL'REPLACE'ORDER:
+        RHHS'REC = HHS'REC              !!Save real record ...
+        RCNS(1) = 0
+        RCNS(2) = 0
+        RCNS(3) = 0
+        MESSAGE = ""
+        SET'FROM'SAV = 0
+!!below, determine customer numbers to use.
+        SAV'MSGNO = HHS'MSGNO                           !![16]
+        SAV'MSGNO2 = HHS'MSGNO2                         !![16]
+
+        CAN'LST'NO = HHS'NAM'NO
+        REAL'LST'NO = HHS'NAM'NO
+        \USELST REAL'LST'NO
+                                        !!Note MAKORD is OCD'MODE = 1
+        IF OCD'MODE = 1 OR OCD'MODE = 3 THEN
+                WRK'LST'NO = REAL'LST'NO
+                SIGN = 1
+                CALL COPY'HDR
+                IF MAKORD # 0 RETURN                !!KLUDGE
+!!MAKORD does not get here
+                IF OCD'MODE = 1 GOTO PROCESS'FINISHED
+                IF IER1 = 0 THEN
+                        CALL DO'ERR
+                        GOTO ABORT
+                ENDIF
+                IF WRH'AUTO'POSTD = "Y" THEN
+                        RDLOCK HDR RCN(2) INTO HDR'REC
+                        IF HDR'CTL = 0 THEN
+                                CALL QUEUE'IT
+                                HHS'REC = HDR'REC
+                                HHS'SHIPMENT = 1
+                                \SETKEY HHS MODE="KEY"
+                                RDKEY HHS
+                                IF HHS'CTL = 0 THEN             !!They really posted
+                                        WRH'AUTO'POSTD = "X"
+                                ENDIF
+                        ELSE
+                                OCD'MODE = 2    !!Don't apply
+                                WRH'AUTO'POSTD = "N"
+                        ENDIF
+                ELSE
+                        OCD'MODE = 2            !!Don't apply
+                ENDIF
+        ENDIF
+
+!!We have in control record an alternate customer number
+        MAN'CAN = 0
+!!Try to change to cancel/replace customer if set-up and we are
+!!replacing and it has no payments on it.
+        TRH'KNO = HHS'TRH'NO    !![22]
+        \VUSE TRH               !![22] (tested below)
+        IF TRH'CTP'NO = 0 AND &
+           OEC'CAN'LST'NO # 0 AND WRH'INV'ONLY = "Y" AND PAID <= 0 AND &
+                  (OCD'FLAG = 0 OR OCH'O'NO # 0 OR WRH'AUTO'POSTD = "X") THEN
+
+!!Malvern - we not set the HHS'MAN'YN and HHS'MAN'DTT in OEPDOC when we call Malvern. This is now an invalid test.
+!!              IF OCD'FLAG = 0 THEN
+!!                      IF HHS'MAN'DTT # 0 THEN
+!!                              ENTRY = "Already on manifest - cannot file under cancel/replace!"
+!!                              CALL DO'ERR
+!!                              GOTO CANNOT
+!!                      ENDIF
+!!                      IF HHS'MAN'YN = "S" AND OEC'AUTOMAN # "Y" THEN  !![17]
+!!                              ENTRY = "Selected for manifest - cannot file under cancel/replace!"
+!!                              CALL DO'ERR
+!!                              GOTO CANNOT
+!!                      ENDIF
+!!              ENDIF
+                DOCV'KINV'TYPE = HHS'DOC'TYPE
+                DOCV'KINVOICE = HHS'INTERNAL
+                RDLOCK DOCV INTO DOC'REC KEY DOCV'KEY
+                IF DOCV'CTL # 0 AND OEC'SKIPDOC = "Y" THEN  !![12]
+                        DOC'SPACE = SPACE
+                        DOC'STAT = "U"
+                        DOC'INV'TYPE = HHS'DOC'TYPE
+                        DOC'INVOICE = HHS'INTERNAL
+                        IF OCD'FLAG # 0 THEN
+                                DOC'AMT = OCH'C'TOTAL
+                        ELSE
+                                DOC'AMT = TOTAL - OTHER
+                        ENDIF
+                        DOC'CUS'NO = HHS'NAM'NO                 !![41]
+                        DOCV'CTL = 99
+                        SKIPPED = 1
+                        IF OCD'FLAG = 0 THEN
+                                CAN'LST'NO = OEC'CAN'LST'NO             !![40]
+                        ENDIF
+                ELSE
+                        SKIPPED = 0
+                ENDIF                                   !![12]
+                IF DOCV'CTL = 0 OR DOCV'CTL = 99 THEN
+                        IF DOC'STAT = "U" THEN
+!!And A/R is still unposted ...
+!![41]  Moved below        IF DOCV'CTL # 99 THEN        !![12]
+!![30] - below
+                                \COPYF CUS AR MODE="PRI"
+                                IF (DOC'INTERUPT = "X" OR DOCV'CTL = 99) & !![41]
+                                                AND OEC'CRL'FLAG = 5 THEN  !![41]
+                                        CUS'KNO = DOC'CUS'NO
+                                        RDLOCK CUS INTO CUS'REC KEY CUS'KEY
+                                        IF CUS'CTL = 0 THEN
+                                                CUS'FAST'AR = CUS'FAST'AR - DOC'AMT
+                                                WRITE CUS FROM CUS'REC
+                                        ENDIF
+                                        DOC'INTERUPT = "N"
+                                ENDIF
+!![30] - above
+                           IF DOCV'CTL # 99 AND OCD'FLAG = 0 THEN       !![41]
+                                DOC'RCN = DOCV'RCN
+                                \SETKEY DOCA MODE="KEY" APID="AR"
+                                DELKEY DOCA
+                                \SETKEY DOCI MODE="KEY" APID="AR"
+                                DELKEY DOCI
+                                CAN'LST'NO = OEC'CAN'LST'NO
+                                DOC'CUS'NO = CAN'LST'NO
+                                \SETKEY DOCA MODE="KEY" APID="AR"
+                                ADDKEY DOCA
+                                \SETKEY DOCI MODE="KEY" APID="AR"
+                                ADDKEY DOCI
+                                MSG'DID = "ARMSG"
+                                MSG'SPACE = SPACE
+                                CALL SET'MSG'DATA
+                                ADD MSG
+                                IF MSG'CTL = 0 THEN     !![6]
+                                        IF DOC'MSGNO = 0 THEN
+                                                DOC'MSGNO = MSG'RCN
+                                        ELSE
+                                                SAV'RCN = MSG'RCN
+                                                USE MSG DOC'MSGNO INTO MSG'REC
+                                                IF MSG'CTL = 0 THEN
+                                                        CALL ADD'TO'MSG
+                                                ELSE
+                                                        DOC'MSGNO = SAV'RCN
+                                                ENDIF
+                                        ENDIF
+                                ELSE
+                                        ENTRY = "Unable to add DOC message "+MSG'CTL
+                                        CALL DO'ERRL
+                                ENDIF
+                                WRITE DOCV FROM DOC'REC
+                           ENDIF
+                           IF OCD'FLAG = 0 THEN
+                                MAP1 FIX'NAM'NO,B,3
+                                RDLOCK HHS
+                                \SETKEY HHS MODE="KY2"
+                                \DELKEY HHS MODE="KY2"
+                                FIX'NAM'NO = HHS'NAM'NO
+                                HHS'NAM'NO = CAN'LST'NO
+                                SAV'SHIP'TO = HHS'SHIP'TO
+                                SAV'SHP'NO = HHS'SHP'NO
+                                SET'FROM'SAV = 1
+                                HHS'SHIP'TO = 0
+                                HHS'SHP'NO = 0
+                                HHS'MAN'YN = "N"
+                                MAN'CAN = 1
+                                \COMPLETE
+                                \SETKEY HHS MODE="KY2"
+                                \ADDKEY HHS MODE="KY2"
+                                IF OEC'LHSC'YN = "Y" OR OEC'LHSD'YN = "Y" THEN
+                                        CALL FIX'UP'LHS
+                                ENDIF
+                                MSG'DID = "OEMSG"
+                                MSG'SPACE = SPACE
+                                CALL SET'MSG'DATA
+                                ADD MSG
+                                IF MSG'CTL = 0 THEN             !![6]
+                                        BAD'MSGNO = MSG'RCN     !![16]
+                                        IF HHS'MSGNO = 0 THEN
+                                                HHS'MSGNO = MSG'RCN
+                                        ELSE
+                                                SAV'RCN = MSG'RCN
+                                                USE MSG HHS'MSGNO INTO MSG'REC
+                                                IF MSG'CTL = 0 THEN
+                                                        CALL ADD'TO'MSG
+                                                ELSE
+                                                        HHS'MSGNO = SAV'RCN
+                                                ENDIF
+                                        ENDIF
+                                ELSE
+                                        ENTRY = "Unable to add archive order message "+MSG'CTL
+                                        CALL DO'ERRL
+                                ENDIF
+                                WRITE HHS FROM HHS'REC
+                            ENDIF
+                        ELSE
+                                IF OCD'FLAG = 0 THEN
+                                        REL DOCV
+                                        ENTRY = "A/R invoice posted - not filed under cancel/replace!"
+                                        CALL DO'ERR
+                                ENDIF
+                        ENDIF
+                ELSE
+                        IF OCD'FLAG = 0 THEN
+                                ENTRY = "Cannot find A/R invoice - not filed under cancel/replace!"
+                                CALL DO'ERR
+                        ENDIF
+                ENDIF
+        ENDIF
+        CUS'SPACE = SPACE
+        CUS'KNO = DOC'CUS'NO
+        USE CUS INTO CUS'REC KEY CUS'KEY
+
+        RCNS(1) = HHS'RCN
+        IF OCD'FLAG # 0 THEN
+                MESSAGE = "Claims Department #"+STR(OCH'NO)+"  "
+        ELSE
+!![16]          MESSAGE = "Original Order : "+HHS'LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+HHS'SHIPMENT+"  "
+                MESSAGE = "Orig: "+HHS'LOC'NO+"-"+HHS'DOC'TYPE+"-"+HHS'NO+"-"+HHS'SHIPMENT+"  " !![16]
+        ENDIF
+        MESSAGE = UB'UID + ": " + MESSAGE
+CANNOT:
+        IF HHS'NAM'NO # OEC'CAN'LST'NO AND PWASTR[8;1] # "Y" THEN
+                ENTRY = "You do not have security to cancel this order!"
+                GOTO DO'ERR                             !!KLUDGE !![15]
+        ENDIF
+!!Get rid of manifest key if not gone!
+        IF HHS'MAN'DTT = 0 AND (HHS'MAN'YN = "Y" OR HHS'MAN'YN = "S") &
+                    AND MAN'CAN = 0 AND OCD'FLAG = 0 THEN
+                RDLOCK HHS
+                \SETKEY HHSP MODE="KEY"
+                HHS'MAN'YN = "N"
+                \COMPLETE
+                IF HHSP'KCOMPLETE # HHS'COMPLETE THEN
+                        DELKEY HHSP
+                        \SETKEY HHSP MODE="KEY"
+                        ADDKEY HHSP
+                ENDIF
+                WRITE HHS FROM HHS'REC
+        ENDIF
+        VIA'SPACE = SPACE
+        \LOOKUP FROM="HHS" ON="VIA" APID="IN"
+
+        APL'SPACE = SPACE
+        APL'DRINV'TYPE = DOC'INV'TYPE
+        APL'DRINVOICE = DOC'INVOICE
+        APL'AMT = DOC'AMT
+        APL'DTT = DATE
+
+        TRH'KNO = HHS'TRH'NO    !![18]
+        \VUSE TRH
+        IF TRH'CTP'NO = 0 THEN  !![18] Is NOT on credit card
+                DO'APL = 1
+        ENDIF                   !![18]
+        SIGN = -1
+        WRK'LST'NO = CAN'LST'NO
+
+!!Copy old order into a credit
+!!Note: make totals = what was actually shipped!!
+
+        CALL COPY'HDR
+MAP1 HDR'MSG'RCN,B,4
+!![16]  MESSAGE = MESSAGE + "Credit : "+HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO+"  "
+        MESSAGE = MESSAGE + "Credit: "+HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO+"  " !![16]
+        RCNS(2) = HDR'MSG'RCN
+        IF DO'APL = 1 THEN                              !![37]
+           MAP1 DO'APL'CAN,S,1
+           IF DO'APL'CAN = "" THEN
+                XCALL GETENV,"OE2CRE_APL_CAN",DO'APL'CAN
+                IF DO'APL'CAN # "Y" THEN DO'APL'CAN = "N"
+           ENDIF
+           MAP1 OE2CRE'USING'ORD,S,1
+           XCALL GETENV,"OE2CRE_USING_ORD",OE2CRE'USING'ORD
+           IF (HDR'NAM'NO # OEC'CAN'LST'NO OR DO'APL'CAN = "Y") AND &
+                                        WRH'APPLY'NEW # "Y" THEN
+!!Apply the credit to this order number ...
+!!              APL'CRINV'TYPE = 0
+!!              APL'CRINVOICE = 0
+                IF OCD'FLAG = 0 THEN
+                        APL'AMT = TOTAL + OTHER
+                ELSE
+                        APL'AMT = OCH'C'TOTAL
+                ENDIF
+                IF APL'AMT # 0 THEN                             !![14]
+                    APL'HDR'LOC'NO = HDR'LOC'NO
+                    APL'DOC'TYPE = HDR'DOC'TYPE
+                    APL'HDR'NO = HDR'NO
+                    APL'CUS'NO = HDR'NAM'NO
+                    \SETKEY APL MODE="KEY"
+                    ADD APL FROM APL'REC KEY APL'KEY
+                    \SETKEY APL MODE="KY2"
+                    \ADDKEY APL MODE="KY2"
+                ENDIF                                           !![14]
+           ENDIF
+        ENDIF
+
+!!Copy old order into a debit
+
+        IF SET'FROM'SAV = 1 THEN
+            HHS'SHP'NO = SAV'SHP'NO
+            HHS'SHIP'TO = SAV'SHIP'TO
+        ENDIF
+
+        IF WRH'INV'ONLY = "Y" THEN
+            SIGN = 1
+            WRK'LST'NO = REAL'LST'NO
+            CALL COPY'HDR
+\COPYF CAP OE
+\COPYF CAP OE CAP2
+            IF OEC'LOG'CRM = "Y" THEN
+                CAP'KHDR'LOC'NO = HHS'LOC'NO
+                CAP'KDOC'TYPE = HHS'DOC'TYPE
+                CAP'KHDR'NO = HHS'NO
+                CAP'KSHIPMENT = HHS'SHIPMENT
+                RDLOCK CAP INTO CAP'REC KEY CAP'KEY
+                IF CAP'CTL = 0 AND CAP'UID[1;1] # "~" THEN
+                    REL CAP
+                    CAP2'REC = CAP'REC
+                    CAP2'HDR'LOC'NO = HDR'LOC'NO
+                    CAP2'DOC'TYPE = HDR'DOC'TYPE
+                    CAP2'HDR'NO = HDR'NO
+                    CAP2'SHIPMENT = HDR'SHIPMENT + 1
+                    \SETKEY CAP ALTPRE="CAP2" ALTKEY="CAP2" MODE="KEY"
+                    ADD CAP2 FROM CAP2'REC KEY CAP2'KEY
+                    IF CAP2'CTL # 0 THEN
+                        ENTRY = "Unable to add credit approval history for the new order. "
+                        \KERROR CAP ALTPRE="CAP2" ALTKEY="CAP2" MODE="DATA" APID="OE"
+                        CALL DO'ERRL
+                    ELSE
+                        \SETKEY CAP ALTPRE="CAP2" ALTKEY="CAP2" MODE="KY2"
+                        \ADDKEY CAP ALTPRE="CAP2" ALTKEY="CAP2" MODE="KY2"
+                    ENDIF
+                ELSE
+                    REL CAP
+                ENDIF
+            ENDIF
+            MESSAGE = MESSAGE + "New: "+HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO !![16]
+            SAVE'MESSAGE = MESSAGE    !!Save for MBX - Shipment 99 message
+            RCNS(3) = HDR'MSG'RCN
+        ENDIF
+
+        IF WRH'MISC = "Y" THEN
+            ERR'F = 0
+            CALL LINK'ADD'AR
+            IF ERR'F = 0 CALL LINK'ADD'AP
+        ENDIF
+MAP1 INV'UNSET,S,1        !![WC] flag unsettled invoice to void authorization
+MAP1 SAVE'ATQ'STATUS,S,1
+
+PROCESS'FINISHED:
+        MSG'DID = "OEMSG"
+        IF RCNS(1) # 0 THEN
+!![WC] Invoiced order
+            RDLOCK HHS RCNS(1)              !![40]
+            IF HHS'CTL = 0 THEN
+                MSG'SPACE = SPACE
+                MSG'DATA = MESSAGE
+                MSG'CH = HHS'MSGNO      !!If no MSG, HHS'MSGNO 0 anyway
+                ADD MSG
+                HHS'MSGNO = MSG'RCN
+                WRITE HHS
+
+                !![WC] Test ATQ for capture/settled
+                \UCNVATQ PRE="HHS" AKEY="Y" VIN="A" APRE="ATQT"
+                USE ATQT INTO ATQ'REC KEY ATQT'KEY
+                IF ATQT'CTL = 0 THEN
+                    IF ATQ'SCODE = "" THEN
+                        !![WC] check for unsettled Invoice
+                        INV'UNSET = "Y"
+                    ENDIF
+                ENDIF
+            ENDIF
+
+!![WC] Credit order
+            MSG'DID = "OEMSG"               !![51]
+            RDLOCK HDR RCNS(2)              !![40]
+            IF HDR'CTL = 0 THEN
+                MSG'SPACE = SPACE
+                MSG'DATA = MESSAGE
+                MSG'CH = HDR'MSGNO      !!If no MSG, HHS'MSGNO 0 anyway
+                ADD MSG
+                HDR'MSGNO = MSG'RCN
+                SIGN = -1               !![40]
+                UPDATE HDR FROM HDR'REC !![40]
+                CALL QUEUE'IT           !![40]
+
+!![WC] Update Credit Settlement Data
+                IF INV'UNSET = "Y" THEN
+                    \UCNVATQ AKEY="Y"
+                    RDLOCK ATQT INTO ATQ'REC KEY ATQT'KEY
+                    ATQ'RCN = ATQT'RCN            !![60]
+                    IF ATQT'CTL = 0 THEN
+                        SAVE'ATQ'STATUS = ATQ'STATUS
+                        ATQ'SDATA = "Not a refund credit/void unsettled auth"
+                        ATQ'STATUS = "P"
+                        ATQ'SACTION = "R"
+                        ATQ'SAPPROVED = "Y"
+                        UPDATE ATQT FROM ATQ'REC
+                        IF ATQT'CTL = 0 THEN
+                            ATQ'STATUS = SAVE'ATQ'STATUS
+                            \SETKEY ATQS MODE="KEY" APID="CV"
+                            \DELKEY ATQS MODE="KEY" APID="CV"
+                            \SETKEY ATQL MODE="KEY" APID="CV"
+                            \DELKEY ATQL MODE="KEY" APID="CV"
+
+                            ATQ'STATUS = "P"
+                            \SETKEY ATQS MODE="KEY" APID="CV"
+                            \ADDKEY ATQS MODE="KEY" APID="CV"
+                            \SETKEY ATQL MODE="KEY" APID="CV"
+                            \ADDKEY ATQL MODE="KEY" APID="CV"
+                        ENDIF
+                        REL ATQT
+                    ENDIF
+                ELSE
+                    INV'UNSET = ""
+                ENDIF
+            ENDIF
+            IF RCNS(3) # 0 THEN
+                MSG'DID = "OEMSG"               !![51]
+                RDLOCK HDR RCNS(3)      !![40]
+                IF HDR'CTL = 0 THEN
+                    MSG'SPACE = SPACE
+                    MSG'DATA = MESSAGE
+                    MSG'CH = HDR'MSGNO !!See above
+                    ADD MSG
+                    HDR'MSGNO = MSG'RCN
+                    SIGN = 1                !![40]
+                    UPDATE HDR FROM HDR'REC !![40]
+                    CALL QUEUE'IT           !![40]
+                ENDIF
+            ENDIF
+        ELSE
+!![57] - this else so that auto posting works ... above only executes if
+!!       messages to copy which only happens if cancel/replace customer
+!!       used.
+                IF RCNS(2) # 0 THEN
+                        RDLOCK HDR RCNS(2)
+                        IF HDR'CTL = 0 THEN
+                                SIGN = -1
+                                CALL QUEUE'IT
+                        ENDIF
+                ENDIF
+                IF RCNS(3) # 0 THEN
+                        RDLOCK HDR RCNS(3)
+                        IF HDR'CTL = 0 THEN
+                                SIGN = 1
+                                CALL QUEUE'IT
+                        ENDIF
+                ENDIF
+        ENDIF
+        IF ADD'TO'CANCEL = "Y" CALL ADD'CAN'RECORD   !!(bdl)
+        IF OE2CRE'USING'ORD = "Y" THEN
+            CALL CHANGE'ORD'RECORD
+        ENDIF
+        IF IN2'WL'YN = "Y" THEN
+            CALL DELETE'WL
+        ENDIF
+        VIA'KNO = HHS'VIA'NO
+        USE VIA INTO VIA'REC KEY VIA'KEY
+        IF VIA'CTL = 0 AND VIA'MTYPE = "F" THEN
+            WRH'SLOC'NO = HHS'LOC'NO
+            IF UPC'FEDEX'ACCT # "" THEN
+                CALL DELETE'SHIPMENT
+            ENDIF
+        ENDIF
+        ENTRY = "Processing Finished"
+        CALL DO'ERR
+
+!!Malvern - HHS'REC was put into RHHS'REC (Save real record ...)
+MAP1 FROM'PRGNAM,S,10,"OE2CRE"
+MAP1 O''VOID'BOX,B,2,0        !! 0 means void all boxes
+
+MALVERN'CANCEL:
+!!      XCALL LINK,1,"mvr023",RHHS'REC,FROM'PRGNAM,O''VOID'BOX  !!Void A Package 023
+        XCALL LINK,1,"oer023",RHHS'REC,FROM'PRGNAM,O''VOID'BOX  !!Void A Package 023
+        CALL ADD'MBX'MSG
+RETURN
+
+VOID'INV'UNSET:
+        IF RCNS(1) # 0 THEN
+            !![WC] Invoiced order
+            RDLOCK HHS RCNS(1)
+            IF HHS'CTL = 0 THEN
+                !![wc] Test ATQ for capture/settled
+                \UCNVATQ PRE="HHS" AKEY="Y" VIN="A" APRE="ATQT"
+                RDLOCK ATQT INTO ATQ'REC KEY ATQT'KEY
+                ATQ'RCN = ATQT'RCN
+                IF ATQT'CTL = 0 THEN
+                    IF ATQ'SCODE = "" THEN
+                        !![WC] HHS into HDR
+                        HDR'REC = HHS'REC
+                        CALL VOID'CREDIT'CARD
+                        REL ATQT
+                    ENDIF
+                ENDIF
+            ENDIF
+            REL HHS
+
+            IF RCNS(2) # 0 THEN
+                !![WC] Credit Order
+                RDLOCK HDR RCNS(2)
+                IF HDR'CTL = 0 THEN
+                    \UCNVATQ AKEY="Y"
+                    RDLOCK ATQT INTO ATQ'REC KEY ATQT'KEY
+                    ATQ'RCN = ATQT'RCN
+                    IF ATQT'CTL = 0 THEN
+                        ATQ'RCN = ATQT'RCN
+                        ATQ'SDATA = "Not a refund credit/void unsettled auth"
+                        WRITE ATQT FROM ATQ'REC
+                        REL ATQT
+                    ENDIF
+                ENDIF
+                REL HDR
+            ENDIF
+        ENDIF
+        INV'UNSET = ""
+RETURN
+
+MAP1 ERR'F,B,1
+MAP1 OK'TO'CLOSE,S,1,"Y"
+MAP1 LOCPTR,X,30
+
+COPY'HDR:
+        \TCOUNT'START XX
+        HDR'REC = HHS'REC
+        HDR'INTERNAL = 0
+        HDR'NAM'NO = WRK'LST'NO
+        IF HDR'NAM'NO # REAL'LST'NO THEN
+            HDR'SHIP'TO = 0
+            HDR'SHP'NO = 0
+        ENDIF
+        IF SIGN = -1 THEN
+            HDR'DOC'TYPE = WRH'EORD'TYPE
+            IF OCD'FLAG # 0 THEN
+                IF HDR'DOC'TYPE = 0 THEN
+                    HDR'DOC'TYPE = 2
+                ENDIF
+            ENDIF
+        ELSE
+            HDR'DOC'TYPE = WRH'DOC'TYPE
+        ENDIF
+        HDR'MAKE'PO = "N"
+
+        HDR'SHIPMENT  = 0               !Shipment Number
+
+        IF OCD'FLAG # 0 OR MAKORD # 0 THEN
+                IF MAKORD = 0 THEN
+                    HDR'SOURCE = "CD"
+                    IF SIGN = -1 THEN
+                        HDR'LIN'TOTAL = OCH'C'TOTAL     !Line Total
+                        HDR'FREE'FRT = "N"
+                    ELSE
+                        HDR'LIN'TOTAL = OCH'D'TOTAL     !Line Total
+                        HDR'FREE'FRT = OCH'FREE'FRT
+                    ENDIF
+                ELSE
+                    HDR'SOURCE = "PO"
+                    HDR'LIN'TOTAL = 0
+                    HDR'FREE'FRT = "N"
+                ENDIF
+                HDR'LIN'DISC  = 0
+                HDR'SHP'TOTAL = HDR'LIN'TOTAL
+                IF OEC'PPRGNAM # "OEPACK" THEN
+                        HDR'SHP'DISC  = 0
+                        HDR'SHP'RETRO = 0
+                ENDIF
+        ELSE
+                MAP1 OE2CRE'SET'SOURCE,S,1
+                XCALL GETENV,"OE2CRE_SET_SOURCE",OE2CRE'SET'SOURCE
+                IF OE2CRE'SET'SOURCE = "Y" AND HHS'SOURCE = "WB" AND &
+                        HHS'CRID = "WBWHAP" THEN
+                    HDR'SOURCE = "WB"
+                ELSE
+                    HDR'SOURCE    = "OE"
+                ENDIF
+                HDR'LIN'TOTAL = SIGN * HDR'SHP'TOTAL    !Line Total
+                HDR'LIN'DISC  = SIGN * HDR'SHP'DISC     !Discount Total
+                HDR'SHP'TOTAL = SIGN * HDR'SHP'TOTAL    !Shippable Total
+                IF OEC'PPRGNAM # "OEPACK" THEN
+                        HDR'SHP'DISC  = SIGN * HDR'SHP'DISC     !Shippable Line Discount
+                        HDR'SHP'RETRO = SIGN * HDR'SHP'RETRO    !Shippable Retroactive Disc
+                ENDIF
+        ENDIF
+!![31] - below
+        IF OEC'PPRGNAM # "OEPACK" THEN
+                DEFINE VIADISC
+                        IF |0 # 0 AND TBL'DISC'PERC # 0 AND HDR'FREE'FRT = "Y" THEN
+                                \FROUND |0*(TBL'DISC'PERC/10000) |1
+                        ELSE
+                                |1 = 0
+                        ENDIF
+                ENDMACRO
+                \COPYF TBL IN MODE="PRI"
+                MAP1 WRK,B,5
+                MAP1 DISC'FREIGHT,B,5
+                DISC'FREIGHT = 0
+                IF SIGN = 1 AND HDR'FREE'FRT = "Y" THEN
+                        FOR II = 1 TO INC'MAX'VIA
+                                TBL'KNO = VIA'TBL'NO(II)
+                                IF TBL'KNO # 0 THEN
+                                        TBL'SPACE = SPACE
+                                        USE TBL INTO TBL'REC KEY TBL'KEY
+                                        \VIADISC HDR'SHP'VTTL(II) WRK
+                                        DISC'FREIGHT = DISC'FREIGHT + WRK
+                                ENDIF
+                        NEXT II
+                        HDR'SHP'ODISC = (HDR'SHP'ODISC - DISC'FREIGHT) MAX 0
+                ELSE
+                IF OCD'FLAG # 0 AND SIGN = 1 AND HDR'FREE'FRT # "Y" THEN
+                        HDR'SHP'ODISC = 0
+                ENDIF
+                ENDIF
+        ELSE
+                IF OCD'FLAG = 0 AND SIGN = -1 THEN !!note MAKORD always SIGN=1
+                        HDR'VIA'SUM(1) = -HDR'VIA'SUM(1)
+                        HDR'VIA'SUM(2) = -HDR'VIA'SUM(2)
+                        HDR'CD(1) = -HDR'CD(1)
+                        HDR'CD(2) = -HDR'CD(2)
+                        HDR'CD(3) = -HDR'CD(3)
+                        HDR'CD(4) = -HDR'CD(4)
+                        HDR'CD(5) = -HDR'CD(5)
+                        HDR'CD(6) = -HDR'CD(6)
+                ENDIF
+        ENDIF
+!![31] - above
+MAP1 COD'AMT,B,5
+        COD'AMT = 0
+        HDR'OLD'CASH = 0                        !Old cash Applied
+        HDR'OLD'DR   = 0                        !Old DR Applied
+        HDR'MAN'FLAG = 0                        !![13]
+        IF OCD'FLAG # 0 THEN
+                \SETBIT HDR'MAN'FLAG 32                 !!Free freight
+        ENDIF
+        IF WRH'APPLY'NEW = "Y" AND SIGN = 1 THEN
+                HDR'OLD'CR = PAID               !Old CR Applied
+                IF PAID # 0 THEN
+                        \SETBIT HDR'MAN'FLAG 1          !![14] (Manual CR)
+                        \SETBIT HDR'MAN'FLAG 2          !![14] (Cash auto)
+                        \SETBIT HDR'MAN'FLAG 8          !![14] (DR auto)
+!![14]                  \SETBIT HDR'MAN'FLAG 4
+                ENDIF
+                IF OEC'PPRGNAM # "OEPACK" THEN
+                        FOR II = 1 TO INC'MAX'VIA               !![31] was to 7
+                                IF VIA'TBL'FLAG(II) = 2 THEN
+                                        COD'AMT = COD'AMT + HDR'SHP'VTTL(II)
+                                        HDR'SHP'VTTL(II) = 0
+                                ENDIF
+                        NEXT II
+                        HDR'SHP'ODISC = HDR'SHP'ODISC - COD'AMT
+                ENDIF
+        ELSE
+                IF SIGN # 1 THEN                                !![14]
+                        HDR'OLD'CR = 0                  !Old CR Applied
+                ELSE
+                        HDR'OLD'CR = -OTHER             !Old CR Applied !![14]
+                        IF OTHER # 0 THEN                       !![14]
+                                \SETBIT HDR'MAN'FLAG 1          !![14] (Manual CR)
+                                \SETBIT HDR'MAN'FLAG 2          !![14] (Cash auto)
+                                \SETBIT HDR'MAN'FLAG 8          !![14] (DR auto)
+                        ENDIF                                   !![14]
+                ENDIF                                           !![14]
+                IF OEC'PPRGNAM # "OEPACK" THEN
+                        FOR II = 1 TO 7
+                                HDR'SHP'VTTL(II) = SIGN * HDR'SHP'VTTL(II)      !Ship Via Totals
+                        NEXT II
+                        HDR'SHP'ODISC = SIGN * HDR'SHP'ODISC    !Shippable Order Discount
+                ENDIF
+        ENDIF
+!![24]  HDR'LIN'BO    = SIGN * HDR'LIN'BO       !Line BO Count
+        HDR'LIN'BO    = 0               !![24] Can't cancel & replace BO's
+        HDR'MULTI     = 0               !Multiple locations
+        HDR'ORDER'VER = 0               !Order version
+        HDR'PICK'VER  = 0               !Picking Version
+        HDR'ORDER'DTT = DATE            !Order Date
+        HDR'SHIP'DTT  = 0               !Ship Date
+        HDR'PSTDT     = 0               !Posting Date
+        HDR'PSTID     = ""              !Posting user
+        \CNV'DTT DATE HDR'LSTDT
+        HDR'LSTID     = UB'UID          !Creator's ID
+        HDR'CRDT      = DATE            !Creation Date
+        IF OCD'FLAG # 0 THEN                    !![17]
+            HDR'CRID = STR(OCH'NO)
+            IF LEN(HDR'CRID) < 6 THEN
+                HDR'CRID = "#" + HDR'CRID
+            ENDIF
+        ENDIF
+        IF CMN'LEVEL = 6 THEN
+            HDR'CRID = "OE2CRE"
+        ENDIF
+        IF OE2CRE'SET'SOURCE = "Y" AND MAKORD # 1 THEN
+            WCS'KNO = WRK'LST'NO
+            IF HDR'CRID = "WBWHAP" THEN
+                WCS'KSUB'NO = 7
+            ELSE
+                WCS'KSUB'NO = 0
+            ENDIF
+            USE WCS INTO WCS'REC KEY WCS'KEY
+            DO
+                GETNXT WCS
+                \CHKKEY WCS APID="WB"
+                IF WCS'CTL # 0 EXIT
+                IF HDR'CRID = "WBWHAP" THEN
+                    HDR'SUB'NO = WCS'SUB'NO     !Posting ID
+                    EXIT
+                ELSE
+                    HDR'SUB'NO = 0
+                    EXIT
+                ENDIF
+            LOOP
+        ELSE
+            HDR'SUB'NO = 0
+        ENDIF
+        HDR'ACTION    = ""              !Action (For Printing)
+        HDR'PQU'STAT  = "N"             !Print Queue Stat
+        HDR'STX1ABLE  = SIGN * HDR'STX1ABLE     !Line Item Taxable Total
+        HDR'STX1FINAL = SIGN * HDR'STX1FINAL    !Line Item Tax Total
+        HDR'STX2TOTAL = SIGN * HDR'STX2TOTAL    !Order Tax Total
+        HDR'STX2FINAL = SIGN * HDR'STX2FINAL    !Order Tax Total (Shippable)
+        HDR'SHP'DONE  = "N"             !Is Shipping Done?
+!![19]  HDR'PRGNAM    = ""              !Last posted program name
+        HDR'POST'LEVEL = 0              !![19]
+        HDR'SAV'OCASH = 0               !Save Old Cash
+                        !!SIGN always = 1 on MAKORD
+        IF SIGN = 1 OR OCD'FLAG # 0 THEN !!on DR we want new pick ticket
+                HDR'PICK'NEED = "Y"     !Is A Picking Ticket Needed?
+        ELSE
+                HDR'PICK'NEED = "N"     !Is A Picking Ticket Needed?
+        ENDIF
+        HDR'BOX'COUNT = 0               !Box count
+        HDR'ZERO      = ""              !Zero Overlay For HHS
+        HDR'MAN'DTT   = 0               !Manifest date
+!!message the credit.
+        MSG'DID = "OEMSG"               !![51]
+        IF WRK'LST'NO = OEC'CAN'LST'NO AND WRK'LST'NO # REAL'LST'NO THEN
+!![51]          MSG'DID = "OEMSG"
+                MSG'SPACE = SPACE
+                CALL SET'MSG'DATA
+                ADD MSG
+                HDR'MSGNO = MSG'RCN
+        ELSE
+                HDR'MSGNO     = 0               !Message Chain
+        ENDIF
+!![16] - below
+        IF SIGN = 1 THEN
+                !![6]Added APID="OE"
+                IF SAV'MSGNO # 0 THEN
+                        \LOOPMSG PRE="SAV" COPY="HDR" ACTION="SF'SAV'MSGNO" &
+                                APID="OE"
+                ENDIF
+                IF SAV'MSGNO2 # 0 THEN
+                        \LOOPMSG FLDNAM="SAV'MSGNO2" COPY'FLDNAM="HDR'MSGNO2" &
+                                APID="OE"
+                ENDIF
+        ENDIF
+!![16] - above
+
+        HDR'MAN'YN    = "N"                     !Waiting On Manifest?
+
+        LOC'KNO = HDR'LOC'NO
+        RDLOCK LOC INTO LOC'REC KEY LOC'KEY
+
+        IF LOC'CTL # 0 THEN
+                ENTRY = "Invalid location: "+HDR'LOC'NO
+                CALL DO'ERR
+                GOTO ABORT
+        ENDIF
+        LOC'INV'CNT'NO(HDR'DOC'TYPE) = (LOC'INV'CNT'NO(HDR'DOC'TYPE) MAX 1) MIN 9
+        IF OCD'FLAG # 0 THEN
+            CASE
+            IF MAKORD # 0 AND CMN'LEVEL = 6 THEN  !!Transfer
+                HDR'TRH'NO = 0
+                HDR'VIA'NO = 0
+            ELSE
+            IF SIGN = 1 THEN
+                HDR'TRH'NO = OCH'D'TRH'NO
+                HDR'VIA'NO = OCH'D'VIA'NO
+            ELSE
+                HDR'TRH'NO = OCH'C'TRH'NO
+                HDR'VIA'NO = OCH'C'VIA'NO
+            ENDCASE
+            IF OEC'PPRGNAM = "OEPACK" THEN
+                VIA'KNO = HDR'VIA'NO
+                MAP1 VIAPTR,X,30
+                \VUSE VIA
+                CASE
+                IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+                    HDR'BVIA'NO = 0
+                ELSE
+                IF VIA'CVIA'NO = 0 THEN
+                    HDR'BVIA'NO = HDR'VIA'NO
+                ELSE
+                    HDR'BVIA'NO = VIA'CVIA'NO
+                ENDCASE
+            ENDIF
+        ENDIF
+
+        IF MAKORD # 0 AND CMN'ORDER'NO # 0 THEN
+            MAP1 CMN'OVR1,@CMN'OTHER
+                MAP2 CMN'ORDER'NO,B,3
+            HDR'KLOC'NO = CMN'SAV'RCN(4)
+            HDR'KDOC'TYPE = 1
+            HDR'KNO = CMN'ORDER'NO
+            RDLOCK HDR INTO HDR'REC KEY HDR'KEY
+        ELSE
+            DO
+                HDR'NO = LOC'COUNTER(LOC'INV'CNT'NO(HDR'DOC'TYPE ))+1
+                LOC'COUNTER(LOC'INV'CNT'NO(HDR'DOC'TYPE )) = HDR'NO
+                HHS'KLOC'NO = HDR'LOC'NO
+                HHS'KDOC'TYPE = HDR'DOC'TYPE
+                HHS'KNO = HDR'NO
+                HHS'KSHIPMENT = -1
+                RDKEY HHS
+                GETPRV HHS
+                HHS'KEY = HHS'KEY2
+                IF HHS'CTL = 0 AND HHS'KLOC'NO = HDR'LOC'NO AND         &
+                   HHS'KDOC'TYPE = HDR'DOC'TYPE AND HHS'KNO = HDR'NO REPEAT
+                \SETKEY HDR MODE="KEY"
+                ADDL HDR FROM HDR'REC KEY HDR'KEY
+                ENTRY = "Hdr="+HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO+ &
+                        " 1="+HDR'CD(1)+" 2="+HDR'CD(2)+" 3="+HDR'CD(3) + &
+                        " 4="+HDR'CD(4)+" 5="+HDR'CD(5)+" 6="+HDR'CD(6)
+                XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+
+            LOOP UNTIL HDR'CTL = 0
+        ENDIF
+        IF HDR'CTL # 0 THEN
+            IF MAKORD # 0 AND CMN'ORDER'NO # 0 THEN
+                ENTRY = "Could not find order:"
+            ELSE
+                ENTRY = "Could not add order:"
+            ENDIF
+            \KERROR HDR MODE="K" CNO="N" APID="OE"
+            CALL DO'ERRL
+            GOTO ABORT
+        ENDIF
+        IF OCD'FLAG # 0  THEN
+                IF SIGN = -1 THEN
+                        OCH'C'LOC'NO = HDR'LOC'NO
+                        OCH'C'DOC'TYPE = HDR'DOC'TYPE
+                        OCH'C'NO = HDR'NO
+                ELSE
+                        OCH'D'LOC'NO = HDR'LOC'NO
+                        OCH'D'DOC'TYPE = HDR'DOC'TYPE
+                        OCH'D'NO = HDR'NO
+                ENDIF
+                CALL UPDATE'OCH
+        ENDIF
+        IF OCH'MSGNO # 0 THEN
+                \LOOPMSG PRE="HDR" COPY="OCH" APID="CD" APID2="OE"
+                UPDATE HDR FROM HDR'REC
+        ENDIF
+        WRITE LOC FROM LOC'REC
+        IF SIGN = -1 THEN
+                RCN(1) = HDR'RCN
+        ELSE
+                RCN(2) = HDR'RCN
+        ENDIF
+
+        IF CMN'LEVEL # 6 OR CMN'ORDER'NO = 0 THEN
+            IF OCD'FLAG # 0 OR MAKORD # 0 CALL ZTOTAL
+        ENDIF
+
+        IF INC'INTERFACE = 5 AND INC'USE'CV = "Y" THEN
+            IF TRH'NO # HDR'TRH'NO THEN
+                TRH'KNO = HDR'TRH'NO
+                \VUSE TRH
+            ENDIF
+            IF TRH'CTP'NO # 0 THEN
+                \UCNVATQ PRE="HHS" AKEY="Y" VIN="A" APRE="ATQT8"
+                RDLOCK ATQT8 INTO ATQ8'REC KEY ATQT8'KEY
+                ATQ8'RCN = ATQT8'RCN            !![60]
+                IF ATQT8'CTL = 0 THEN
+                    CALL CREATE'ATQ
+                ELSE
+                    IF ATQT8'KSOURCE = "WB" THEN
+                        ATQT8'KSOURCE = "OE"
+                        RDLOCK ATQT8 INTO ATQ8'REC KEY ATQT8'KEY
+                        ATQ8'RCN = ATQT8'RCN
+                        IF ATQT8'CTL = 0 THEN
+                            ENTRY = "Source now "+ATQT'KSOURCE+" on "
+                            \KERROR HHS MODE="D" CNO="N" APID="OE"
+                            CALL DO'ERR
+                            CALL CREATE'ATQ
+                        ELSE
+                            ENTRY = "ERROR - Cannot find original credit card authorization "
+                            \KERROR PRE="HHS" MODE="D" APID="OE"
+                            CALL DO'ERRL
+                        ENDIF
+                    ENDIF
+                ENDIF
+            ENDIF
+        ENDIF
+        IF OCD'FLAG # 0 THEN
+                OCD'KOCH'NO = OCH'NO
+                OCD'KNO = 0
+                \LOOPER PRE="OCD" ACTION="COPY'OCD" APID="CD" OPR="USE"
+        ELSE
+            IF MAKORD # 0 THEN
+!!NOTE - since we are doing this from post po it should be from current
+!!       I left the other code in in case we ever need it.
+                \COPYF LHS PO POLHS MODE="KEY"
+                \COPYF LIN PO POLIN MODE="PRI"
+                \SETBIT HDR'BIT'FLAG 4                  !!recalc price
+                IF CMN'SAV'RCN(1) = 0 THEN
+                    POLHS'KDOC'TYPE = POHDR'DOC'TYPE
+                    POLHS'KHDR'NO = POHDR'NO
+                    POLHS'KSHIPMENT = POHDR'SHIPMENT
+                    POLHS'KNO = 0
+                    USE POLHS INTO POLIN'REC KEY POLHS'KEY
+                    DO
+                        GETNXT POLHS INTO POLIN'REC
+                        IF POLHS'KDOC'TYPE # POLIN'DOC'TYPE OR &
+                            POLHS'KHDR'NO # POLIN'HDR'NO OR &
+                            POLHS'KSHIPMENT # POLIN'SHIPMENT THEN POLHS'CTL=1
+                        IF POLHS'CTL # 0 EXIT
+                        CALL COPY'POLIN
+                    LOOP
+                ELSE
+                    POLIN'KDOC'TYPE = POHDR'DOC'TYPE
+                    POLIN'KHDR'NO = POHDR'NO
+                    POLIN'KNO = 0
+                    USE POLIN INTO POLIN'REC KEY POLIN'KEY
+                    DO
+                        GETNXT POLIN INTO POLIN'REC
+                        IF POLIN'KDOC'TYPE # POLIN'DOC'TYPE OR &
+                            POLIN'KHDR'NO # POLIN'HDR'NO THEN POLIN'CTL = 1
+                        IF POLIN'CTL # 0 EXIT
+                        CALL COPY'POLIN
+                    LOOP
+                ENDIF
+            ELSE
+                LHS'KHDR'LOC'NO = HHS'LOC'NO
+                LHS'KDOC'TYPE = HHS'DOC'TYPE
+                LHS'KHDR'NO = HHS'NO
+                LHS'KSHIPMENT = HHS'SHIPMENT
+                LHS'KNO = 0
+                \LOOPER PRE="LHS" ACTION="COPY'LHS" OPR="USE"
+            ENDIF
+        ENDIF
+        IF HDR'NAM'NO # OEC'CAN'LST'NO AND WRH'APPLY'NEW # "Y"          AND &
+                        SIGN = -1 AND OEC'CR'PO = "Y"                   AND &
+                                ((TOTAL+OTHER) # 0 OR OCD'FLAG # 0)     AND &
+                                OCD'MODE # 2                            AND &
+                                APL'DRINVOICE # 0                       THEN
+                IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+                    HDR'PO = " "
+                ELSE
+                    HDR'PO = STR(APL'DRINV'TYPE)+"-"+STR(APL'DRINVOICE)
+                ENDIF
+                DO'APL = 0
+        ENDIF
+        HDR'TIH'NO = 0                  !!Clear
+        UPDATE HDR FROM HDR'REC         !![40] Make sure nothing's lost
+        IF MAKORD = 0 OR CMN'ORDER'NO = 0 THEN
+            \SETKEY HDR MODE="KY2"
+            \ADDKEY HDR MODE="KY2"
+        ENDIF
+        IF OCD'FLAG # 0 AND SIGN = 1 THEN
+                HHS'REC = HDR'REC                       !!Make it the new 1
+                CALL VERIFY'HHS
+        ENDIF
+        HDR'MSG'RCN = HDR'RCN
+        HDR'RCN = 0 : REL HDR
+        DOCV'RCN = 0 : REL DOCV
+        HHS'RCN = 0 : REL HHS
+        LOC'RCN = 0 : REL LOC
+        QTY'RCN = 0 : REL QTY
+        MSG'RCN = 0 : REL MSG
+
+        \TCOUNT'END XX
+        ENTRY = LEFT(HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO+SPACE(12),12)
+        IF SIGN = -1 THEN
+                CALL DSP'CREDIT'NO
+        ELSE
+                CALL DSP'DEBIT'NO
+        ENDIF
+RETURN
+
+COPY "CCCARD[CV]",READ="N",AONLY="Y",ADDOK="N",APPROVAL'ONLY="Y",SCREEN="OE2CRE"
+                                !!E'CARDNO:, E'EXP:, E'APPROVAL:,
+                                !!E'ATQ'DOC'TYPE:, E'ATQ'INVOICE:
+                                !!CHECK'ATQ:, DO'ATQ:, DO'ATQ8:,
+                                !!UPDATE'ATQ:, VERIFY'ATQ:
+COPY "CCANET[CV]",BLD="AUTH" SOURCE="OE" !![WC] Include ANET'BLD'AUTH'REQUEST subroutine
+
+\COPYF ALA MC
+MAP1    SMALL,X,1200                                                    !![56]
+
+QUEUE'IT:
+        !![56] This IF
+        IF INC'INTERFACE = 5 AND INC'USE'CV = "Y" AND USE'CC = "N" THEN
+                CALL CHECK'ATQ
+                        !!If not authorized, get authorization code.
+                IF TRH'CTP'NO # 0 AND &
+                                (ATQ'STATUS = "U" OR ATQ'STATUS = "") THEN
+                        ORG'TRH'NO = HDR'TRH'NO
+                        ORG'ATQ'CARDNO = ATQ'CARDNO
+                        ORG'ATQ'EXP = ATQ'EXP
+                        ORG'ATQ'APPROVAL = ATQ'APPROVAL
+                        CALL DO'ATQ
+                ENDIF
+                REL ATQT
+        ENDIF
+        CASE
+        IF OCD'FLAG # 0 THEN
+                IF (SIGN = 1 AND WRH'AUTO'POSTD = "Y")          OR &
+                                (SIGN = -1 AND WRH'AUTO'POST = "Y") THEN
+                        IF INC'INTERFACE = 5 AND INC'AUTOPACK = "Y" THEN
+                                HDR'ACTION = "P"
+                        ELSE
+                                HDR'ACTION = "E"
+                        ENDIF
+                        HDR'PQU'STAT = "Q"
+                        WRITE HDR FROM HDR'REC
+                        CALL UPDATE'OCH
+                        CALL FLIP'OEC'PPRGNAM
+                        CALL RDLOCK'OCH
+                ENDIF
+        ELSE
+        IF SIGN = -1 THEN       !!Now put the credit on BGP1 if it exists
+                IF WRH'AUTO'POST = "Y" CALL PUT'HDR'ON'QUEUE
+        ELSE
+                IF WRH'AUTO'POSTD = "Y" THEN
+                        IF INC'INTERFACE = 5 AND INC'AUTOPACK = "Y" THEN
+                                HDR'ACTION = "P"
+                        ELSE
+                                HDR'ACTION = "E"
+                        ENDIF
+                        IF OEC'PPRGNAM # "" OR HDR'ACTION = "P" THEN
+                                HDR'PQU'STAT = "Q"
+                                WRITE HDR FROM HDR'REC
+                                CALL FLIP'OEC'PPRGNAM
+                        ELSE
+                                CALL PUT'HDR'ON'QUEUE
+                        ENDIF
+                ENDIF
+        ENDCASE
+        REL HDR                                         !![40]
+RETURN
+
+SF'SAV'MSGNO:                                           !![16]
+        IF MSG'RCN = BAD'MSGNO THEN SF = 1
+RETURN
+
+MAP1 FF,F
+
+COPY'OCD:
+        IF OCD'DCB = "N" RETURN
+        IF SIGN = -1 AND OCD'DCB = "D" RETURN
+        IF SIGN =  1 AND OCD'DCB = "C" RETURN
+        LHS'SPACE = SPACE
+        LHS'DOC'TYPE = HDR'DOC'TYPE
+        LHS'HDR'LOC'NO = HDR'LOC'NO
+        LHS'HDR'NO = HDR'NO
+        LHS'USR'OQTY = 0
+        LHS'SUB'COUNT = 0
+        FOR FF = 1 TO 6
+                LHS'USR'OQTY = LHS'USR'OQTY + OCD'TCOM'QTY(FF)
+                LHS'SUB'COUNT = LHS'SUB'COUNT + SGN(OCD'TCOM'QTY(FF))
+                LHS'TCOM'QTY(FF) = OCD'TCOM'QTY(FF)
+                LHS'TORDER'QTY(FF) = OCD'TCOM'QTY(FF)
+        NEXT FF
+!!      LHS'USR'BQTY = 0
+        LHS'USR'CQTY = LHS'USR'OQTY
+        LHS'ORDER'QTY = LHS'USR'OQTY
+        LHS'COM'QTY = LHS'USR'OQTY
+!!      LHS'BO'QTY = 0
+!!      LHS'LENGTH = 0
+!!      LHS'WIDTH = 0
+!!      LHS'HEIGHT = 0
+!!      IF SIGN = -1 THEN
+!!              LHS'RPROC = OCD'RPROC
+!!      ELSE
+!!              LHS'RPROC = 0
+!!      ENDIF
+        WRH'SORD'NO = OCD'RPROC         !!Will get
+!!      LHS'KIT'BUILD = "N" !! Don't do this so it creates Cancel/Replace Kits correctly
+        LIN'TRK'NO = OCD'TRK'NO
+        CALL FIND'PRH
+        LHS'QFRACTION = PRH'QFRACTION
+!!      LHS'LFRACTION = 0
+!!      LHS'XFRACTION = 0
+!!      LHS'HFRACTION = 0
+        LHS'LOC'NO = HDR'LOC'NO
+        LHS'PFRACTION = PRH'PFRACTION
+        LHS'NO = OCD'NO
+        LHS'SHIPMENT = HDR'SHIPMENT
+        LHS'SHIP'DTT = 0
+        LHS'TRK'NO = OCD'TRK'NO
+        LHS'UOM'NO = 1
+        FOR FF = 1 TO 3
+                LHS'TPRICE(FF) = OCD'TPRICE(FF)
+                LHS'TCPRICE(FF) = OCD'TCPRICE(FF)
+                LHS'UOM'FACTOR(FF) = OCD'UOM'FACTOR(FF)
+        NEXT FF
+        LHS'NET = OCD'NET
+        IF LHS'ORDER'QTY # 0 THEN
+                \FROUND LHS'NET/LHS'ORDER'QTY LHS'PRICE
+                IF LHS'TPRICE(1) # 0 THEN
+                        \FROUND (LHS'TCPRICE(1)/LHS'TPRICE(1))*OCD'NET LHS'CALC'PRICE
+                ENDIF
+        ENDIF
+!!      LHS'CALC'DISC = 0
+!!      LHS'DISC = 0
+        LHS'PROM'DTT = DATE
+        LHS'PRI'NO1 = HDR'PRI'NO1
+        LHS'PRI'NO2 = HDR'PRI'NO2
+!!      LHS'PACK'FLAG = 0
+!!      LHS'OVERIDE = 0
+        LHS'HOLD'YN = "N"
+        LHS'BATCH'YN = "N"
+!!      LHS'SHPPED'QTY = 0
+        LHS'NET = OCD'NET
+!!      LHS'REQ'DTT = 0
+        LHS'CMG'NO = HDR'CMG'NO
+!!      LHS'EXT'TRK'NO = 0
+!!      LHS'PRV'LOC'NO,B,2              !Previous Location Number
+!!      LHS'PRV'TYPE,B,1                !Previous Order Type
+!!      LHS'PRV'HDR'NO,B,3              !Previous Order Header Number
+!!      LHS'MSGNO,B,3                   !Message Chain
+!!      LHS'KTD'TRK'NO = 0
+        LHS'SLIP'PRICE = OCD'SLIP'PRICE
+        CALL COPY'LHS
+        CALL TOTAL'HDR
+RETURN
+
+COPY'LHS:
+        CALL TCOUNT
+        LIN'REC = LHS'REC
+!![24] Below
+        IF CMN'LEVEL # 6 THEN
+            IF LIN'COM'QTY = 0 THEN                 !! All Backordered.
+                IF HDR'LIN'COUNT > 0 THEN
+                    HDR'LIN'COUNT = HDR'LIN'COUNT - 1
+                ENDIF
+                RETURN
+            ENDIF
+        ENDIF
+!![24] Above
+        LIN'DOC'TYPE  = HDR'DOC'TYPE            !Document Type
+        LIN'HDR'LOC'NO = HDR'LOC'NO             !Location Of Order Header
+        LIN'HDR'NO    = HDR'NO                  !Header Number
+        IF INC'INTERFACE # 5 THEN
+            LIN'USR'OQTY  = SIGN * LIN'USR'CQTY     !User Order QTY
+            LIN'USR'BQTY  = 0                       !User Back Order QTY
+            LIN'USR'CQTY  = SIGN * LIN'USR'CQTY     !User Committed QTY
+            LIN'ORDER'QTY = SIGN * LIN'COM'QTY      !Currently On Order
+            LIN'COM'QTY   = SIGN * LIN'COM'QTY      !Committed Quantity
+        ENDIF
+
+        ENTRY = "COM1="+LIN'COM'QTY
+        XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+
+        LIN'BO'QTY    = 0                           !Back Order Quantity
+
+        IF SIGN = -1 THEN
+            LIN'RPROC = WRH'SORD'NO                 !Return Processing
+        ELSE
+            LIN'RPROC = 0
+        ENDIF
+
+        LIN'SHIPMENT   = 0                      !Shipment Number
+        LIN'SHIP'DTT   = 0                      !Shipment Date
+        LIN'PACK'FLAG  = 0                      !Packing records???
+        LIN'OVERIDE    = 0                      !Overide Available? (1="Y")
+!![24]  LIN'NET = SIGN * LIN'NET                !Net Line Price
+
+        LIN'PRV'LOC'NO = LHS'LOC'NO             !Previous Location Number
+        LIN'PRV'TYPE   = HHS'DOC'TYPE           !Previous Order Type
+        LIN'PRV'HDR'NO = HHS'NO                 !Previous Order Header Number
+        LIN'MSGNO = 0
+
+        ENTRY = "Lin="+LIN'HDR'LOC'NO+"-"+LIN'DOC'TYPE+"-"+LIN'HDR'NO+"-"+LIN'NO+" Trk="+LIN'TRK'NO
+        XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+
+        \SETKEY LIN MODE="KEY"
+        ADDL LIN FROM LIN'REC KEY LIN'KEY
+        \SETKEY LIN MODE="KY2" BAD1="LINB"
+        \ADDKEY LIN MODE="KY2" BAD1="LINB"
+!![27] - moved next 3 lines from [24] below.
+        CALL FIND'PRH
+        \FACTORQTY MODE="Q" PRE="LIN" MASKSET="2"
+        \FACTORQTY MODE="P" PRE="LIN" MASKSET="2"
+        IF INC'INTERFACE # 5 THEN
+            SHS'DOC'TYPE = HHS'DOC'TYPE
+            SHS'HDR'LOC'NO = HHS'LOC'NO
+            SHS'KKEYFLD = SHS'KEYFLD
+            SHS'KHDR'NO = HHS'NO
+            SHS'KSHIPMENT = HHS'SHIPMENT
+            SHS'KLIN'NO = LHS'NO
+            SHS'KNO = 0
+            \LOOPER PRE="SHS" ACTION="COPY'SHS" OPR="USE"
+        ELSE
+            LIN'USR'OQTY  = 0                       !User Order QTY
+            LIN'USR'BQTY  = 0                       !User Back Order QTY
+            LIN'USR'CQTY  = 0                       !User Committed QTY
+            LIN'ORDER'QTY = 0                       !Currently On Order
+            LIN'COM'QTY   = 0                       !Committed Quantity
+            FOR SS = 1 TO 6
+                LIN'TORDER'QTY(SS) = SIGN * LIN'TORDER'QTY(SS)
+                LIN'TCOM'QTY(SS) = SIGN * LIN'TCOM'QTY(SS)
+                LIN'USR'OQTY = LIN'USR'OQTY + LIN'TORDER'QTY(SS)
+                LIN'USR'CQTY = LIN'USR'CQTY + LIN'TCOM'QTY(SS)
+                ENTRY =" Size 2a="+SS+" Ordqty="+LIN'TORDER'QTY(SS)+" Comqty="+LIN'TCOM'QTY(SS)
+                XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+            NEXT SS
+            LIN'ORDER'QTY = LIN'USR'OQTY
+            LIN'COM'QTY = LIN'USR'CQTY
+            LIN'USR'BQTY = LIN'ORDER'QTY - LIN'COM'QTY
+        ENDIF
+!![10]  IF HHS'DOC'TYPE # OEC'INT'CR CALL PROC'QTY
+        IF WRH'EORD'TYPE # OEC'INT'CR THEN
+            LIN'KIT'BUILD = "N"
+            CALL PROC'QTY
+        ENDIF
+        CALL LOOKUP'AND'ADD'TAD
+
+!![28] Added LHS'BO'QTY case below
+!![24] Below
+        CALL COMPUTE'NETS                               !![35]
+        IF OCD'FLAG # 0 THEN
+                IF OCD'MSGNO # 0 THEN
+                        \LOOPMSG PRE="LIN" COPY="OCD" APID="CD" APID2="OE"
+                ENDIF
+        ENDIF
+        WRITE LIN                                               !![24]
+RETURN
+
+COPY'SHS:
+        CALL TCOUNT
+        SUB'REC = SHS'REC
+!![24] Below
+        IF SUB'COM'QTY = 0 THEN                 !![24] All backordered
+                IF LIN'SUB'COUNT > 0 THEN
+                        LIN'SUB'COUNT = LIN'SUB'COUNT - 1
+                ENDIF
+                RETURN
+        ENDIF
+!![24] Above
+        SUB'DOC'TYPE  = HDR'DOC'TYPE            !Document Type
+        SUB'HDR'NO    = HDR'NO                  !Header Number
+        SUB'USR'OQTY  = SIGN * SUB'USR'CQTY     !User Order QTY
+        SUB'USR'BQTY  = 0                       !User Back Order QTY
+        SUB'USR'CQTY  = SIGN * SUB'USR'CQTY     !User Committed QTY
+        SUB'ORDER'QTY = SIGN * SUB'COM'QTY      !Currently On Order
+        SUB'COM'QTY   = SIGN * SUB'COM'QTY      !Committed Quantity
+        SUB'BO'QTY    = 0                       !Back Order Quantity
+        IF SIGN = -1 THEN
+                SUB'RPROC = WRH'SORD'NO         !Return Processing
+        ELSE
+                SUB'RPROC = 0
+        ENDIF
+        SUB'LIN'NO    = LIN'NO                  !Line Item Number
+        SUB'SHIPMENT  = 0                       !Shipment Number
+        SUB'BATCH'YN  = "N"                     !In Batch? (Archive only).
+        SUB'MSGNO = 0                           !Message Chain
+        \SETKEY SUB MODE="KEY"
+        ADD SUB FROM SUB'REC KEY SUB'KEY
+        \SETKEY SUB MODE="KY2"
+        \ADDKEY SUB MODE="KY2"
+RETURN
+
+E'DOC'TYPE:
+        \TSTF
+        IF INX1 # I'TAB THEN
+                TIMES = 0
+                CASE
+                IF WRH'DOC'TYPE < 1 OR WRH'DOC'TYPE > 9 THEN
+                        ENTRY = ENTRY + " Invalid Order type - TAB for help"
+                        CALL DO'ERR
+                ELSE
+                IF WRH'DOC'TYPE = OEC'INT'CR THEN
+                        ENTRY = "Order type may not be an internal credit"
+                        CALL DO'ERR
+                ELSE
+                IF ARC'INV'DR'YN(WRH'DOC'TYPE) # "Y"                    OR &
+                                ARC'INV'CR'YN(WRH'DOC'TYPE) = "Y"       OR &
+                                LOC'TYP'DESC(WRH'DOC'TYPE) = ""         THEN
+                        ENTRY = ENTRY + " Invalid Order type - TAB for help"
+                        CALL DO'ERR
+                ELSE
+                        CALL PRE'DSP'DOC'DESC
+                ENDCASE
+        ELSE
+                WRH'DOC'TYPE = WRH'DOC'TYPE + 1
+                IF WRH'DOC'TYPE > 9 OR WRH'DOC'TYPE < 1 THEN WRH'DOC'TYPE = 1
+                IF WRH'DOC'TYPE = OEC'INT'CR                            OR &
+                                 ARC'INV'DR'YN(WRH'DOC'TYPE) # "Y"      OR &
+                                ARC'INV'CR'YN(WRH'DOC'TYPE) = "Y"       OR &
+                                LOC'TYP'DESC(WRH'DOC'TYPE) = ""         THEN
+                        TIMES = TIMES + 1
+                        IF TIMES > 18 THEN
+                                ENTRY = "No valid types!"
+                                GOTO DO'ERR             !!Kludge
+                        ENDIF
+                        GOTO E'DOC'TYPE                 !!Kludge
+                ENDIF
+                TIMES = 0
+                CALL PRE'DSP'DOC'DESC
+                IER1 = 0
+        ENDIF
+RETURN
+
+PRE'DSP'DOC'DESC:
+        II = WRH'DOC'TYPE
+        CALL DSP'DOC'DESC
+RETURN
+
+E'LOC'NO:
+        \TABC FROM="WRH" ON="LOC" APID="IN"
+RETURN
+
+TCOUNT:
+        \TCOUNT XX
+RETURN
+
+PUT'HDR'ON'QUEUE:
+        IF SIGN = -1 THEN               !![48] this rcn stuff
+                RCN(1) = 0
+        ELSE
+                RCN(2) = 0
+        ENDIF                           !![48] can't change if we posted it!
+        IF HDR'ACTION = "E" THEN
+                BGP'PRI = (LOC'PICK'BGP - VIL'BGP'OFFSET) MAX 0
+        ELSE
+                BGP'PRI = (LOC'INV'BGP - VIL'BGP'OFFSET) MAX 0
+                HDR'ACTION = "P"
+        ENDIF
+        IF BGP'PRI > 0 THEN
+                TST = "C"
+                \COPYF VIL IN MODE="PRI"
+                VIL'SPACE = SPACE
+                VIL'KVIA'NO = HDR'VIA'NO
+                VIL'KLOC'NO = HDR'LOC'NO
+                USE VIL INTO VIL'REC KEY VIL'KEY
+                HDR'PQU'STAT = "Q"
+                UPDATE HDR FROM HDR'REC
+                IF OEC'TASK'YN # "Y" THEN
+                        XCALL PRTQUE,TST
+                ENDIF
+                IF TST # "N" THEN
+                        ENTRY = STR(HDR'NO) USING "#ZZZZZZ"
+                        IF ENTRY[1;1] = "0" THEN
+                                ENTRY[1;1] = STR(HDR'DOC'TYPE)
+                        ENDIF
+                        QNO = ENTRY
+                        IF HDR'SHP'TOTAL <= 0 THEN BGP'PRI = 1  !![55]
+                        \PUTQUE TST """OERCTL""" BGP'PRI HDR'RCN QNO
+                ENDIF
+        ELSE
+!![42] - this else.
+                HDR'PQU'STAT = "Q"
+                WRITE HDR FROM HDR'REC
+                CMN'SPACE = SPACE
+                CMN'SAV'RCN(1) = HDR'RCN
+                CMN'FRM'PRGNAM = "OE2CRE"
+                CMN'TO'PRGNAM = "OERCTL"
+!![11]          IF V''SYSTEM = "AMOS" THEN              !![50]
+                   \WINDOW TLR="23" SCREEN="|SCREEN|" VPRGNAM="CMN'TO'PRGNAM" &
+                                        COMMON="CMN'REC" LFA="F" !![47] - LFA
+!![11]          ELSE
+!!                 \WINDOW TLR="23" SCREEN="|SCREEN|" VPRGNAM="CMN'TO'PRGNAM" &
+!!                                      COMMON="CMN'REC" LFA="A" !![47] - LFA
+!![11]          ENDIF
+                ?TAB(24,1) ; TAB(-1,9) ;
+        ENDIF
+RETURN
+
+E'SHIPMENT:
+        \TSTF
+        HHS'KLOC'NO = WRH'LOC'NO
+        HHS'KDOC'TYPE = WRH'DOC'TYPE
+        HHS'KNO = WRH'HDR'NO
+        HHS'KSHIPMENT = WRH'EDTT
+        USE HHS INTO HHS'REC KEY HHS'KEY
+        CALL VERIFY'HHS
+        CALL CHECK'IF'CANCELED            !!(bdl)
+        IF IER1 = 0 THEN
+                CALL DO'ERR
+        ELSE
+                IF SKIPPED # 1 THEN
+                        \STRDTT DTT="HHS'PSTDT" DDATE="POST'DATE"
+                ELSE
+                        POST'DATE = "Not Post"
+                ENDIF
+                CALL DSP'ORDER'TOTAL
+        ENDIF
+RETURN
+
+ADD'TO'MSG:
+        DO UNTIL MSG'CH = 0 OR MSG'CTL # 0
+                SAV'RCN2 = MSG'RCN
+                USE MSG MSG'CH INTO MSG'REC
+                IF MSG'CTL # 0 THEN
+                        MSG'RCN = SAV'RCN2  !!If invalid replace with new
+                ENDIF
+        LOOP
+        RDLOCK MSG
+        MSG'CH = SAV'RCN            !!The new message to append
+        WRITE MSG
+RETURN
+
+SET'MSG'DATA:
+        MSG'DATA = "Cancel/Replace: "+STR(LST'NO)+"-"+LST'COMPANY+" by: "+UB'UID
+RETURN
+
+FIX'UP'LHS:
+        LHS'SPACE = SPACE
+        LHS'HDR'LOC'NO = HHS'LOC'NO
+        LHS'DOC'TYPE = HHS'DOC'TYPE
+        LHS'HDR'NO = HHS'NO
+        LHS'SHIPMENT = HHS'SHIPMENT
+        \LOOPER PRE="LHS" OPR="USE" ACTION="FIX'UP'LHS'KEYS"
+RETURN
+
+FIX'UP'LHS'KEYS:
+        IF OEC'LHSC'YN = "Y" THEN
+                \SETKEY LHSC
+                LHSC'KNAM'NO = FIX'NAM'NO
+                DELKEY LHSC
+                LHSC'KNAM'NO = HHS'NAM'NO
+                ADDKEY LHSC
+        ENDIF
+        IF OEC'LHSD'YN = "Y" THEN
+                \SETKEY LHSD
+                LHSD'KNAM'NO = FIX'NAM'NO
+                DELKEY LHSD
+                LHSD'KNAM'NO = HHS'NAM'NO
+                ADDKEY LHSD
+        ENDIF
+RETURN
+
+PROC'QTY:
+!![24]  CALL FIND'PRH
+        CALL FIND'UOM
+        IF PRH'CTL = 0 AND UOM'CTL = 0 THEN
+                CASE
+                IF INC'INTERFACE = 5 THEN
+                        FOR SS = 1 TO 6
+                                IF LIN'TCOM'QTY(SS) # 0 THEN
+                                        SUB'KNO = SS
+                                        CALL SET'SUB'REC
+                                        IF SUB'CTL = 0 CALL SUB'PROC'QTY
+                                ENDIF
+                        NEXT SS
+                ELSE
+                IF LIN'SUB'COUNT # 0 THEN
+                        SUB'KHDR'LOC'NO = LIN'HDR'LOC'NO
+                        SUB'KDOC'TYPE = LIN'DOC'TYPE
+                        SUB'KHDR'NO = LIN'HDR'NO
+                        SUB'KLIN'NO = LIN'NO
+                        SUB'KNO = 0
+                        \LOOPER PRE="SUB" ACTION="SUB'PROC'QTY" OPR="USE"
+                ELSE
+                        CALL LIN'PROC'QTY
+                ENDCASE
+        ENDIF
+RETURN
+
+SUB'PROC'QTY:
+        QTY'LOC'NO = LIN'LOC'NO
+        QTY'TRK'NO = LIN'TRK'NO
+        QTY'ATT'NO1 = SUB'ATT'NO1
+        QTY'ATT'NO2 = SUB'ATT'NO2
+        \SETKEY QTY MODE="KEY" APID="IN"
+!![27] - IF test below.
+CIF V''VICQTY="Y" THEN
+        IF INC'VICQTY'YN # "Y" OR PRH'RCN > INC'MAX'VICQTY'NO            OR &
+                                QTY'LOC'NO > INC'MAX'VICQTY'LOC          OR &
+                                QTY'ATT'NO1 < 1 OR QTY'ATT'NO1 > 6       OR &
+                                SIGN = -1                               THEN
+                RDLOCK QTY INTO QTY'REC KEY QTY'KEY
+
+                ENTRY = "QTY: "+QTY'LOC'NO+"-"+QTY'TRK'NO+"-"+QTY'ATT'NO1+"-"+QTY'ATT'NO2+" CTL="+QTY'CTL
+                XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+
+                IF QTY'CTL = 0 THEN
+                        SUB'COM'QTY = SUB'COM'QTY * (UOM'NUNITS/UOM'DUNITS)
+                        IF SIGN = -1 THEN
+                                QTY'RAN = QTY'RAN - SUB'COM'QTY
+                        ELSE
+                                QTY'COMMITTED = QTY'COMMITTED + SUB'COM'QTY
+                                ENTRY = "1: "+HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO+ &
+                                             " T="+ QTY'TRK'NO+ " Q="+QTY'COMMITTED+" S="+SUB'COM'QTY
+                                XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+                        ENDIF
+                        CALL UPDATE'QTY
+                ENDIF
+        ELSE
+!![27] - below
+                VICQTY'NO = PRH'RCN
+                VICQTY'LOC = QTY'LOC'NO
+                VICQTY'SIZE = QTY'ATT'NO1
+                VICQTY'MODE = 3
+                VICQTY'COM'QTY(QTY'ATT'NO1) = SUB'COM'QTY
+                XCALL VICQTY,VICQTY'REC
+                IF VICQTY'CTL # 0 THEN
+                        ENTRY = "Bad CTL in VICQTY - aborting! "+VICQTY'CTL+" COMMIT'QTY"
+                        \KERROR QTY MODE="D" CNO="N" APID="IN"
+                        CALL DO'ERRL
+                        GOTO ABORT
+                ENDIF
+        ENDIF
+!![27] - above
+CELSE
+                RDLOCK QTY INTO QTY'REC KEY QTY'KEY
+
+                ENTRY = "QTY2: "+QTY'LOC'NO+"-"+QTY'TRK'NO+"-"+QTY'ATT'NO1+"-"+QTY'ATT'NO2+" CTL="+QTY'CTL
+                XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+
+                IF QTY'CTL = 0 THEN
+                        SUB'COM'QTY = SUB'COM'QTY * (UOM'NUNITS/UOM'DUNITS)
+                        IF SIGN = -1 THEN
+                                QTY'RAN = QTY'RAN - SUB'COM'QTY
+                        ELSE
+                                QTY'COMMITTED = QTY'COMMITTED + SUB'COM'QTY
+                                ENTRY = "2: "+HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO+ &
+                                                " T="+QTY'TRK'NO+" Q="+QTY'COMMITTED+" S="+SUB'COM'QTY
+                                XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+                        ENDIF
+                        CALL UPDATE'QTY
+                ENDIF
+ENDCIF
+RETURN
+
+LIN'PROC'QTY:
+        QTY'KLOC'NO = LIN'LOC'NO
+        QTY'KTRK'NO = LIN'TRK'NO
+        QTY'KATT'NO1 = 0
+        QTY'KATT'NO2 = 0
+        RDLOCK QTY INTO QTY'REC KEY QTY'KEY
+        IF QTY'CTL = 0 THEN
+                LIN'COM'QTY = LIN'COM'QTY * (UOM'NUNITS/UOM'DUNITS)
+                IF SIGN = -1 THEN
+                        QTY'RAN = QTY'RAN - LIN'COM'QTY
+                ELSE
+                        QTY'COMMITTED = QTY'COMMITTED + LIN'COM'QTY
+                        ENTRY = "3: "+HDR'LOC'NO+"-"+HDR'DOC'TYPE+"-"+HDR'NO+ &
+                                        " T="+QTY'TRK'NO+" Q="+QTY'COMMITTED+" L="+LIN'COM'QTY
+                        XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+                ENDIF
+                CALL UPDATE'QTY
+        ENDIF
+RETURN
+
+UPDATE'QTY:
+        QTY'BACKORDER = QTY'BACKORDER MAX 0
+        QTY'NEW'STOCK = QTY'BACKORDER MIN QTY'NEW'STOCK
+        WRITE QTY FROM QTY'REC
+RETURN
+
+\COPYF PRH IN MODE="PRI"
+
+FIND'PRH:
+        IF PRH'TRK'NO # LIN'TRK'NO OR PRH'CTL # 0 THEN
+                PRH'KTRK'NO = LIN'TRK'NO
+                PRH'SPACE = SPACE
+                USE PRH INTO PRH'REC KEY PRH'KEY
+                IF PRH'CTL # 0 THEN
+                        ENTRY = "CANNOT FILL PART "+LIN'TRK'NO+" PART NOT FOUND!"
+                        CALL DO'ERRL
+                        ENTRY = "CHECK ORDER LINE: "
+                        \LINERR PRE="LIN" APID="OE"
+                        CALL DO'ERRL
+                ENDIF
+        ENDIF
+RETURN
+
+\COPYF UOM IN MODE="PRI"
+MAP1 UOMPTR,X,30
+\COPYF UOM IN MODE="PRI"
+
+FIND'UOM:
+        IF LIN'UOM'NO > 1 THEN
+                IF UOM'NO # LIN'UOM'NO OR UOM'CTL # 0 THEN
+                        UOM'KNO = LIN'UOM'NO
+                        \VUSE UOM
+                        IF UOM'CTL # 0 THEN
+                                ENTRY = "UOM not on File!"
+                                CALL DO'ERRL
+                                ENTRY = "CHECK ORDER LINE: "
+                                \LINERR PRE="LIN" APID="OE"
+                                CALL DO'ERRL
+                        ENDIF
+                ENDIF
+        ELSE
+                UOM'NO = 1
+                UOM'NUNITS = 1
+                UOM'DUNITS = 1
+                UOM'CTL = 0
+        ENDIF
+RETURN
+
+COPY "CREOCH",SCREEN="OE2CRE"           !!E'INV'ONLY:
+                                        !!E'EORD'TYPE:
+                                        !!PRE'DSP'CR'DESC:
+                                        !!GET'BAL:
+                                        !!VERIFY'HHS:
+                                        !!SET'EORD'TYPE:
+                                        !!GET'ATA:
+
+\COPYF DST AR MODE="DTA"
+
+MAP1 SOURCE'REC
+        MAP2 VSOURCE,S,2
+        MAP2 VDESC,S,8
+        MAP2 VOCC,B,1
+
+LINK'ADD'AR:
+        CALL GET'ATA                                            !![36]
+        DOC'SPACE = SPACE
+!!      DOC'CNO,B,1
+!!      DOC'TYPE = 1
+!!      DOC'BATCH = 0
+!!      DOC'TRN = 0
+!!      DOC'PERIOD = 0
+!!      DOC'FDAY = 0
+!!      DOC'YEAR = 0
+        DOC'CUS'NO = HHS'NAM'NO
+!!      DOC'CUS'ALT = 0
+!!      DOC'DTT = DATE
+!!      DOC'ORG'NO = 0
+!!      DOC'ORG'DDTT = 0
+!!      DOC'ORG'DTT = 0
+        DOC'INV'TYPE = ATA'INV'TYPE
+!!      DOC'INVOICE = 0
+        DOC'HDR'LOC'NO = HHS'LOC'NO
+        DOC'DOC'TYPE = HHS'DOC'TYPE
+        DOC'HDR'NO = HHS'NO
+        ENTRY = "R"
+        \KERROR HHS CNO="N" APID="OE"
+        DOC'PO = ENTRY
+!!      DOC'STAT = "U"
+        DOC'AMT = PAID
+!!      DOC'DISC'AMT = 0
+!!      DOC'CKB'NO = 0
+!!      DOC'CKB'CHECK = ""
+        DOC'GRP'NO = ATA'RGRP'NO
+!!      DOC'CMG'NO = 0
+        DOC'TRH'NO = ATA'RTRH'NO
+!!      DOC'AGE'TTL = 0
+!!      DOC'MSGNO = 0
+!!      DOC'CKB'AMT = 0
+!!      DOC'CKB'DTT = 0
+!!      DOC'PRINT'YN = "N"
+!!      DOC'OLD'PERIOD = 0
+!!      DOC'DST'COUNT = 0
+!!      DOC'HOLD'FLAG = ""
+!!      DOC'CHK'SEQ = 0
+!!      DOC'UGL'NO = 0
+!!      DOC'INTERUPT = ""
+        DOC'SHIPMENT = HHS'SHIPMENT
+!!      DOC'CKB'ABA'NO = ""
+
+        DST'SPACE = SPACE
+!!      DST'CNO = UB'CNO
+!!      DST'DOC'NO = 0
+!!      DST'SEQ = 0
+        DST'CAT'NO = ATA'RCAT'NO
+        DST'GL'CNO = UB'CNO
+        DST'MACT = ATA'MACT
+        DST'PTC = ATA'PTC
+        DST'CST = ATA'CST
+        DST'AMT = DOC'AMT
+        DST'APA'NO = ATA'RAPA'NO
+!!      DST'ALH'NO = 0
+!!      DST'CMG'NO = 0
+!!      DST'MSGNO = 0
+!!      DST'EXTERNAL = 0
+
+        VSOURCE = "OE"
+        VDESC = "AR to AP"
+        VOCC = 5
+
+        XCALL ABUTIL,6,"AR",UB'SYS,"",FLAG
+        IF FLAG # 0 THEN
+                ENTRY = "Error logging to A/R"
+                CALL DO'ERR
+        ELSE
+                ENTRY = "AR1ADD"
+                XCALL LINK,1,"AR1ADD",DOC'REC,ENTRY,DST'REC,SOURCE'REC
+                XCALL ABUTIL,6,"OE",UB'SYS,"",FLAG
+                dspsw = 220
+                DSP |SCREEN|
+                IF ENTRY # "GOOD" THEN
+                        ENTRY = "Bad link to AR1ADD: "+ENTRY
+                        ERR'F = 1
+                        GOTO DO'ERRL            !!KLUDGE
+                ENDIF
+                APL'CRINV'TYPE = HHS'DOC'TYPE
+                APL'CRINVOICE = HHS'INTERNAL
+                APL'DRINV'TYPE = DOC'INV'TYPE
+                APL'DRINVOICE = DOC'INVOICE
+                APL'AMT = DOC'AMT
+                APL'DTT = DATE
+                APL'CUS'NO = DOC'CUS'NO
+                APL'HDR'LOC'NO = HHS'LOC'NO
+                APL'DOC'TYPE = HHS'DOC'TYPE
+                APL'HDR'NO = HHS'NO
+                \SETKEY APL MODE="KEY"
+                ADD APL FROM APL'REC KEY APL'KEY
+                \SETKEY APL MODE="KY2"
+                \ADDKEY APL MODE="KY2"
+                CALL APPLY'APL                  !![49] - made subroutine.
+        ENDIF
+RETURN
+
+\COPYF VEN AP MODE="PRI"
+\COPYF DOC AP DDD MODE="DTA"
+\COPYF DST AP DSS MODE="DTA"
+
+LINK'ADD'AP:
+        HHS'REC = RHHS'REC                      !!get real record
+        CALL GET'ATA                                    !![36]
+        VEN'KNO = REAL'LST'NO
+        RDKEY VEN
+        IF VEN'CTL # 0 THEN
+CIF OLD AND NOT OLD THEN
+                XCALL ABUTIL,6,"MC",UB'SYS,"",FLAG
+                IF FLAG # 0 THEN
+                        ENTRY = "Error logging to MC"
+                        CALL DO'ERR
+                ELSE
+                        CMN'SPACE = SPACE
+                        CMN'FRM'PRGNAM = "AP9VEN"
+                        CMN'TO'PRGNAM = "MCXADD"
+                        CMN'SAV'RCN(1) = APC'PRF'NO
+                        CMN'SAV'RCN(2) = HHS'NAM'NO
+                        CMN'SAV'RCN(3) = 99
+                        SNDCMN CMN'REC
+                        XCALL LINK,1,"MCXADD"
+                        GETCMN CMN'REC
+                        XCALL ABUTIL,6,"OE",UB'SYS,"",FLAG
+                        dspsw = 220
+                        DSP |SCREEN|
+                        IF CMN'TO'PRGNAM # "GOOD" THEN  !![52] did test entry?
+                                ENTRY = "Bad link to MCXADD: "+CMN'FRM'PRGNAM
+                                ERR'F = 1
+                                GOTO DO'ERRL            !!KLUDGE
+                        ENDIF
+                ENDIF
+CELSE
+                \\LSTLNKMAPS
+                IF REAL'LST'NO # LST'NO THEN
+                        \USELST REAL'LST'NO
+                ELSE
+                        LSTF'CTL = 0
+                ENDIF
+                IF LSTF'CTL # 0 OR LST'NO = 0 THEN
+                        ENTRY = "Invalid vendor in LINK'ADD'AP, NO="+LST'NO+" CTL="+LSTF'CTL
+                        ERR'F = 1
+                        GOTO DO'ERR
+                ENDIF
+                \COPYF PRF MC MODE="PRI"
+                IF PRF'NO # APC'PRF'NO THEN
+                        PRF'KNO = APC'PRF'NO
+                        USE PRF INTO PRF'REC KEY PRF'KEY
+                ELSE
+                        PRF'CTL = 0
+                ENDIF
+                IF PRF'NO = 0 OR PRF'CTL # 0 THEN
+                        ENTRY = "Invalid profile in LINK'ADD'AP, NO="+PRF'NO+" CTL="+PRF'CTL
+                        ERR'F = 1
+                        GOTO DO'ERR
+                ENDIF
+                ERR'F = 1
+                \ADDLPR ERRORS="A"
+                ERR'F = 0
+                PASS'RCN = LSTF'RCN
+                CMN'FRM'PRGNAM = "MC1LST"
+                PASS'FRM'PRGNAM = "MC1LST"
+                PASS'LST'REC = LST'REC
+                PASS'OLD'REC = LST'REC
+                XCALL ABUTIL,6,"AP",UB'SYS,"",FLAG
+                IF FLAG # 0 THEN
+                        ENTRY = "Error logging to AP"
+                        ERR'F = 1
+                        GOTO DO'ERRL
+                ELSE
+                        SNDCMN PASSING'REC
+                        XCALL LINK,1,"AP9VEN"
+                        GETCMN PASSING'REC
+                        XCALL ABUTIL,6,"OE",UB'SYS,"",FLAG
+                        dspsw = 220
+                        DSP |SCREEN|
+                        IF PASS'SKIP # 0 THEN
+                                ENTRY = "Bad link to AP9VEN: "+PASS'SKIP
+                                ERR'F = 1
+                                GOTO DO'ERRL            !!KLUDGE
+                        ENDIF
+                ENDIF
+ENDCIF
+        ENDIF
+        IF ERR'F = 1 THEN
+                ENTRY = "Nothing added to A/P due to error condition!"
+                GOTO DO'ERR
+        ENDIF
+        DDD'SPACE = SPACE
+!!      DDD'CNO = UB'CNO
+!!      DDD'TYPE = 1
+!!      DDD'BATCH = 0
+!!      DDD'TRN = 0
+!!      DDD'PERIOD = 0
+!!      DDD'FDAY = 0
+!!      DDD'YEAR = 0
+        DDD'VEN'NO = REAL'LST'NO
+!!      DDD'VEN'ALT = 0
+!!      DDD'DTT = DATE
+!!      DDD'ORG'NO = 0
+!!      DDD'ORG'DDTT = 0
+!!      DDD'ORG'DTT = 0
+        DDD'VCH'TYPE = ATA'VCH'TYPE
+!!      DDD'VOUCHER = 0
+!!      DDD'CBH'BATCH = 0
+!!      DDD'DDD'TYPE = 0
+!!      DDD'HDR'NO = 0
+        ENTRY = "R"
+        \KERROR HHS CNO="N" APID="OE"
+        DDD'INVOICE = ENTRY
+!!      DDD'STAT = "U"
+        DDD'AMT = PAID
+!!      DDD'DISC'AMT = 0
+!!      DDD'CKB'NO = 0
+!!      DDD'CKB'CHECK = 0
+        DDD'GRP'NO = ATA'PGRP'NO
+!!      DDD'BUY'NO = 0
+        DDD'TRH'NO = ATA'PTRH'NO
+!!      DDD'AGE'TTL = 0
+!!      DDD'MSGNO = 0
+!!      DDD'CKB'AMT = 0
+!!      DDD'CKB'DTT = 0
+!!      DDD'PRINT'YN = "N"
+!!      DDD'OLD'PERIOD = 0
+!!      DDD'DST'COUNT = 0
+!!      DDD'HOLD'FLAG = ""
+!!      DDD'INTERUPT = ""
+!!      DDD'SHIPMENT = 0
+!!      DDD'BY'APRCHK = "N"
+!!      DDD'CMG'NO = 0
+!!      DDD'UGL'NO = 0
+
+        DSS'SPACE = SPACE
+!!      DSS'CNO = UB'CNO
+!!      DSS'DOC'NO = 0
+!!      DSS'SEQ = 0
+        DSS'CAT'NO = ATA'PCAT'NO
+        DSS'GL'CNO = UB'CNO
+        DSS'MACT = ATA'MACT
+        DSS'PTC = ATA'PTC
+        DSS'CST = ATA'CST
+        DSS'AMT = DDD'AMT
+        DSS'APA'NO = ATA'PAPA'NO
+!!      DSS'ALH'NO = 0
+!!      DSS'SUB'NO = 0                  !Sub Catagory Number
+!!      DSS'MCH'NO = 0
+!!      DSS'MSGNO = 0
+        DSS'1099'YN = "N"
+!!      DSS'CMG'NO = 0
+
+        VSOURCE = "OE"
+        VDESC = "AR to AP"
+        VOCC = 5
+
+        XCALL ABUTIL,6,"AP",UB'SYS,"",FLAG
+        IF FLAG # 0 THEN
+                ENTRY = "Error logging to A/P"
+                CALL DO'ERR
+        ELSE
+                ENTRY = "AP1ADD"
+                XCALL LINK,1,"AP1ADD",DDD'REC,ENTRY,DSS'REC,SOURCE'REC
+                XCALL ABUTIL,6,"OE",UB'SYS,"",FLAG
+                dspsw = 220
+                DSP |SCREEN|
+                IF ENTRY # "GOOD" THEN
+                        ENTRY = "Bad link to AP1ADD: "+ENTRY
+                        ERR'F = 1
+                        GOTO DO'ERRL            !!KLUDGE
+                ENDIF
+        ENDIF
+RETURN
+
+FLIP'OEC'PPRGNAM:
+        CMN'SPACE = SPACE
+        CMN'SAV'RCN(1) = HDR'RCN
+        CMN'FRM'PRGNAM = "OE2CRE"
+        IF HDR'ACTION = "P" THEN
+                CMN'TO'PRGNAM = "OE1SHP"
+        ELSE
+                CMN'TO'PRGNAM = OEC'PPRGNAM
+        ENDIF
+FLIP'CMN:
+        IF V''SYSTEM = "AMOS" THEN                      !![50]
+           \WINDOW FULL="Y" SCREEN="|SCREEN|" VPRGNAM="CMN'TO'PRGNAM" &
+                                        COMMON="CMN'REC" LFA="F"
+        ELSE
+           \WINDOW FULL="Y" SCREEN="|SCREEN|" VPRGNAM="CMN'TO'PRGNAM" &
+                                        COMMON="CMN'REC" LFA="A"
+        ENDIF
+RETURN
+
+FLIP'OE1HDR:
+        IF RCN(XX) # 0 THEN
+                USE HDR RCN(XX) INTO HDR'REC
+                IF HDR'CTL # 0 THEN RCN(XX) = 0
+        ENDIF
+        IF RCN(XX) = 0 THEN
+                ENTRY = "Nothing to change (not created or its posted)!"
+                GOTO DO'ERR                     !!KLUDGE
+        ENDIF
+        CMN'SPACE = SPACE
+        CMN'SAV'RCN(1) = RCN(XX)
+        CMN'TO'PRGNAM = "OE1HDR"
+        CMN'FRM'PRGNAM = "EXTRNL"
+        CALL FLIP'CMN
+RETURN
+
+!![25] Below
+MAP1 TTL'QTY,F,6
+MAP1 QQ,F,6
+
+COMPUTE'NETS:
+        \COMNET PRE="LIN"
+RETURN
+!![25] Above
+
+DEL'APL:
+        \SETKEY APL MODE="KEY"
+        DELETE APL KEY APL'KEY
+        \SETKEY APL MODE="KY2"
+        \DELKEY APL MODE="KY2"
+RETURN
+
+SET'SUB'REC:
+        SUB'SPACE = SPACE
+        SUB'HDR'LOC'NO = LIN'HDR'LOC'NO
+        SUB'DOC'TYPE = LIN'DOC'TYPE
+        SUB'HDR'NO = LIN'HDR'NO
+        SUB'LIN'NO = LIN'NO
+        \SETSUB
+RETURN
+
+E'SORD'NO:
+        \TABEDTC PROC1 WRH'SORD'NO
+RETURN
+
+!!ADD'ATQ:              !!in CCCARD.CPY
+
+MAP1 TAX'PERC,F
+
+TOTAL'HDR:
+        COPY "TTLHDR[SA]",ZTOTAL="Y",APID="OE"   !ZTOTAL:
+RETURN
+
+SUBTRACT'HDR:
+        COPY "TTLHDR[SA]",SIGN="-",SKIP'TTLSTX="Y",APID="OE"
+RETURN
+
+FILL'HHS'FROM'OCH:
+        HHS'SPACE = SPACE
+        HHS'LOC'NO = WRH'LOC'NO
+        HHS'DOC'TYPE = 1
+!!      HHS'NO = 0
+!!      HHS'SHIPMENT = 0
+        HHS'QUOTE'YN = "N"
+        HHS'GL'CNO = UB'CNO
+        HHS'NAM'NO = CUS'NO
+!!      HHS'SHIP'TO = 0
+        HHS'DROP'YN = "N"
+        HHS'BO'YN = "Y"
+        HHS'DEL'ALT'YN = "N"
+!!      HHS'SHP'NO = 0
+!!      HHS'TRH'NO = 0
+!!      HHS'VIA'NO = 0
+        HHS'FOB'NO = CUS'FOB'NO
+!!      HHS'PO = ""
+        HHS'SOURCE = "CD"
+        HHS'HOLD'YN = "N"
+        HHS'PRI'NO1 = CUS'PRI'NO1
+        HHS'PRI'NO2 = CUS'PRI'NO2
+!!      HHS'LIN'COUNT = 0
+!!      HHS'LIN'TOTAL = 0
+!!      HHS'LIN'DISC = 0
+!!      HHS'SHP'TOTAL = 0
+!!      HHS'SHP'DISC = 0
+!!      HHS'SHP'ODISC = 0
+!!      HHS'SHP'RETRO = 0
+!!      HHS'SHP'VTTL(7) = 0
+!!      HHS'OLD'CASH = 0
+!!      HHS'OLD'DR = 0
+!!      HHS'OLD'CR = 0
+!!      HHS'LIN'BO = 0
+!!      HHS'ORDER'VER = 0
+!!      HHS'PICK'VER = 0
+        HHS'ORDER'DTT = DATE
+        HHS'PROM'DTT = DATE
+        HHS'SHIP'DTT = DATE
+        HHS'PSTID = "CD1OCH"
+        \CNV'DTT DATE HHS'LSTDT
+        HHS'CRDT = DATE
+        HHS'LSTID = HHS'PSTID
+        HHS'CRID = HHS'PSTID
+!!      HHS'ACTION = ""
+!!      HHS'PQU'STAT = ""
+!!      HHS'STX1ABLE = 0
+!!      HHS'STX1FINAL = 0
+!!      HHS'STX2TOTAL = 0
+!!      HHS'STX2FINAL = 0
+!!      HHS'WEIGHT = 0
+        IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+            HHS'NAM'TYP'NO = 0
+            HHS'PROC = 6
+        ELSE
+            HHS'NAM'TYP'NO = CUS'TYP'NO
+            HHS'PROC = 1
+        ENDIF
+        HHS'SHP'DONE = "N"
+        IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+            HHS'STX'NO = 0
+        ELSE
+            HHS'STX'NO = CUS'STX'NO
+        ENDIF
+!!      HHS'UDOC'TYPE = 0
+!!      HHS'INTERNAL = 0
+!!      HHS'CCR'NO = 0
+!!      HHS'PRGNAM = ""
+!!      HHS'SAV'OCASH = 0
+        HHS'BATCH'YN = "N"
+        IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+            HHS'CMG'NO = 0
+        ELSE
+            HHS'CMG'NO = CUS'CMG'NO
+        ENDIF
+!!      HHS'LIN'COM = 0
+!!      HHS'BOX'COUNT = 0
+!!      HHS'YEAR = 0
+!!      HHS'PERIOD = 0
+!!      HHS'HDR'GONE = 0
+        HHS'INV'YN = "N"
+        HHS'MAN'DTT = DATE
+!!      HHS'MSGNO = 0
+        HHS'MAN'YN = "N"
+        IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+            HHS'SHP'ZIP = ""
+        ELSE
+            \USELST HHS'NAM'NO
+            HHS'SHP'ZIP = LST'ZIP
+        ENDIF
+!!      HHS'MSGNO2 = 0
+!!      HHS'MARGIN = 0
+!!      HHS'MARGINF = 0
+        IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+            HHS'COMPLETE = ""
+        ELSE
+            HHS'COMPLETE = "N"
+        ENDIF
+!!      HHS'FILLIT = ""
+        HHS'RCN = 0
+RETURN
+
+FILL'HHS'FROM'O:
+        HHS'KLOC'NO = OCH'O'LOC'NO
+        HHS'KDOC'TYPE = OCH'O'DOC'TYPE
+        HHS'KNO = OCH'O'NO
+        HHS'KSHIPMENT = OCH'O'SHIPMENT
+        USE HHS INTO HHS'REC KEY HHS'KEY
+        IF HHS'CTL # 0 THEN
+                ENTRY = "Cannot find order from OCH: "+STR(OCH'NO)+" HDR:"
+                \KERROR HHS MODE="K" CNO="N" APID="OE"
+                CALL DO'ERR
+        ENDIF
+RETURN
+
+FLIPPER:
+        DO
+                TAD'RCN = 0
+                REL TAD
+                CASE
+                IF RCN(1) # 0 AND RCN(2) # 0 THEN
+                        ENTRY = "To change press C)redit or N)ew Order, any key to continue."
+                ELSE
+                IF RCN(1) # 0 THEN
+                        ENTRY = "To change press 'C' for Credit, any key to continue."
+                ELSE
+                IF RCN(2) # 0 THEN
+                        ENTRY = "To change press 'N' for New Order, any key to continue."
+                ELSE
+                        IF OCD'FLAG # 0 EXIT            !!KLUDGE
+                        ENTRY = "Any key to continue."
+                ENDCASE
+                \L24CHR NOMSG="Y" CLR="Y"
+                ENTRY = UCS(ENTRY)
+                IF INX2 = FN'C THEN ENTRY = "C"
+                IF INX2 = FN'N THEN ENTRY = "N"
+                CALL TST'FUNC
+                IF TST'FUNC # 0 OR INX1 = I'ESC THEN ENTRY = ""
+                CASE
+                IF ENTRY = "C" THEN
+                        XX = 1
+                        CALL FLIP'OE1HDR
+                ELSE
+                IF ENTRY = "N" THEN
+                        XX = 2
+                        CALL FLIP'OE1HDR
+                ELSE
+                        XX = 0
+                ENDCASE
+        LOOP UNTIL XX = 0
+RETURN
+
+COPYF "OCHFIL[CD]",=ZZZO
+
+RDLOCK'OCH:
+        RDLOCK OCH WRH'OCH'RCN INTO OCH'REC
+        ZZZO'REC = OCH'REC
+RETURN
+
+UPDATE'OCH:
+        IF ZZZO'REC # OCH'REC THEN
+                UPDATE OCH FROM OCH'REC
+                ZZZO'REC = OCH'REC
+        ENDIF
+RETURN
+
+\COPYF HDR PO POHDR MODE="PRI"
+COPYF "HHSKEY[PO]",=POHHS
+
+USE'POHDR:
+!!NOTE - since we are doing this from post po it should be from current
+!!       I left the other code in in case we ever need it.
+        IF CMN'SAV'RCN(1) = 0 AND CMN'SAV'RCN(2) # 0 THEN !!HHS'CTL,HHS'RCN
+                USE POHHS CMN'SAV'RCN(2) INTO POHDR'REC
+                POHDR'CTL = POHHS'CTL
+        ELSE
+                USE POHDR CMN'SAV'RCN(3) INTO POHDR'REC
+        ENDIF
+RETURN
+
+FILL'HHS'FROM'POHDR:
+        CALL FILL'HHS'FROM'OCH          !!Mostly the same
+        HHS'LOC'NO = CMN'SAV'RCN(4)     !!except these fields
+        HHS'SOURCE = "PO"
+        HHS'PSTID = ""
+        HHS'LSTID = UB'UID
+        HHS'CRID = CMN'FRM'PRGNAM
+        IF CMN'LEVEL # 0 THEN
+            HHS'PROC = CMN'LEVEL
+        ENDIF
+        IF HHS'PROC # 6 THEN
+            HHS'TRH'NO = CUS'TRH'NO
+            HHS'VIA'NO = CUS'VIA'NO
+        ENDIF
+        \KERROR HDR APID="PO" CNO="N" MODE="D" ALTPRE="POHDR"
+        \STRIP ENTRY 3      !!Leading and trailing spaces stripped off
+        HHS'PO = ENTRY
+RETURN
+
+COPY'POLIN:
+        LHS'SPACE = SPACE
+        LHS'DOC'TYPE = HDR'DOC'TYPE
+        LHS'HDR'LOC'NO = HDR'LOC'NO
+        LHS'HDR'NO = HDR'NO
+        LHS'USR'OQTY = 0
+        LHS'SUB'COUNT = 0
+        \COPYF SHS PO POSHS MODE="KEY"
+        \COPYF SUB PO POSUB MODE="PRI"
+
+        IF CMN'SAV'RCN(1) = 0 THEN
+!!NOTE - since we are doing this from post po it should be from current
+!!       I left the other code in in case we ever need it.
+                POSHS'KDOC'TYPE = POLIN'DOC'TYPE
+                POSHS'KHDR'NO = POLIN'HDR'NO
+                POSHS'KSHIPMENT = POLIN'SHIPMENT
+                POSHS'KLIN'NO = POLIN'NO
+                POSHS'KNO = 0
+                USE POSHS INTO POSUB'REC KEY POSHS'KEY
+                DO
+                    GETNXT POSHS INTO POSUB'REC
+                    IF POSHS'KDOC'TYPE # POSUB'DOC'TYPE OR &
+                            POSHS'KHDR'NO # POSUB'HDR'NO OR &
+                            POSHS'KSHIPMENT # POSUB'SHIPMENT OR &
+                            POSHS'KLIN'NO # POSUB'LIN'NO THEN POSHS'CTL=1
+                        IF POSHS'CTL # 0 EXIT
+                        ENTRY = "1: PO="+POSUB'DOC'TYPE+"-"+POSUB'HDR'NO+"-"+POSUB'SHIPMENT+"-"+POSUB'LIN'NO
+                        XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+                        CALL COPY'POSUB
+                LOOP
+        ELSE
+                POSUB'KDOC'TYPE = POLIN'DOC'TYPE
+                POSUB'KHDR'NO = POLIN'HDR'NO
+                POSUB'KLIN'NO = POLIN'NO
+                POSUB'KNO = 0
+                USE POSUB INTO POSUB'REC KEY POSUB'KEY
+                DO
+                    GETNXT POSUB INTO POSUB'REC
+                    IF POSUB'KDOC'TYPE # POSUB'DOC'TYPE OR &
+                            POSUB'KHDR'NO # POSUB'HDR'NO OR &
+                            POSUB'KLIN'NO # POSUB'LIN'NO THEN POSUB'CTL=1
+                        IF POSUB'CTL # 0 EXIT
+                        ENTRY = "2: PO="+POSUB'DOC'TYPE+"-"+POSUB'HDR'NO+"-"+POSUB'SHIPMENT+"-"+POSUB'LIN'NO
+                        XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+                        CALL COPY'POSUB
+                LOOP
+        ENDIF
+
+        IF EXISTING'LIN # 0 THEN
+            LIN'REC = LHS'REC
+            LIN'NO = EXISTING'LIN
+            WRITE LIN FROM LIN'REC
+            GOTO ALL'DONE
+        ENDIF
+!!      LHS'WIDTH = 0
+!!      LHS'HEIGHT = 0
+!!      LHS'RPROC = 0
+        WRH'SORD'NO = 0
+        LHS'KIT'BUILD = "N"
+        LIN'TRK'NO = POLIN'TRK'NO
+        CALL FIND'PRH
+        LHS'QFRACTION = PRH'QFRACTION
+!!      LHS'LFRACTION = 0
+!!      LHS'XFRACTION = 0
+!!      LHS'HFRACTION = 0
+        IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+            LHS'LOC'NO = CMN'SAV'RCN(5)
+        ELSE
+            LHS'LOC'NO = HDR'LOC'NO
+        ENDIF
+        LHS'PFRACTION = PRH'PFRACTION
+        LHS'SHIPMENT = HDR'SHIPMENT
+        IF MAKORD = 0 OR CMN'ORDER'NO = 0 THEN
+            LHS'NO = POLIN'NO
+        ELSE
+            MAP1 NEXT'LIN'NO,B,2
+            IF NEXT'LIN'NO = 0 THEN
+                \SETKEY LIN MODE="KEY" ALTPRE="LHS"
+                LIN'KNO = -1
+                RDKEY LIN
+                GETPRV LIN
+                LIN'KEY = LIN'KEY2
+                IF LIN'KHDR'LOC'NO # LHS'HDR'LOC'NO OR LIN'KDOC'TYPE # LHS'DOC'TYPE OR &
+                                LIN'KHDR'NO # LHS'HDR'NO OR LIN'CTL # 0 THEN
+                    NEXT'LIN'NO = 0
+                ELSE
+                    NEXT'LIN'NO = LIN'KNO
+                ENDIF
+            ENDIF
+            NEXT'LIN'NO = NEXT'LIN'NO + 1
+            LHS'NO = NEXT'LIN'NO
+        ENDIF
+        LHS'SHIP'DTT = 0
+        LHS'TRK'NO = POLIN'TRK'NO
+        LHS'UOM'NO = 1
+!       LHS'UOM'FACTOR(1) = 1
+!       LHS'TPRICE(1) = POLIN'EST'AMT
+!       LHS'TCPRICE(1) = POLIN'EST'AMT
+!       LHS'UOM'FACTOR(2) = 1
+!       LHS'TPRICE(2) = POLIN'EST'AMT
+!       LHS'TCPRICE(2) = POLIN'EST'AMT
+!       LHS'UOM'FACTOR(3) = 1
+!       LHS'TPRICE(3) = POLIN'EST'AMT
+!       LHS'TCPRICE(3) = POLIN'EST'AMT
+!       LHS'NET = LHS'COM'QTY*POLIN'EST'AMT     !!Tacky ...
+!       LHS'PRICE = POLIN'EST'AMT
+!       LHS'CALC'PRICE = LHS'PRICE
+!       LHS'CAP'HPRICE = LHS'PRICE
+!!      LHS'CALC'DISC = 0
+!!      LHS'DISC = 0
+        LHS'PROM'DTT = DATE
+        LHS'PRI'NO1 = HDR'PRI'NO1
+        LHS'PRI'NO2 = HDR'PRI'NO2
+!!      LHS'PACK'FLAG = 0
+!!      LHS'OVERIDE = 0
+        LHS'HOLD'YN = "N"
+        LHS'BATCH'YN = "N"
+!!      LHS'SHPPED'QTY = 0
+        LHS'NET = OCD'NET
+!!      LHS'REQ'DTT = 0
+        LHS'CMG'NO = HDR'CMG'NO
+!!      LHS'EXT'TRK'NO = 0
+!!      LHS'PRV'LOC'NO,B,2              !Previous Location Number
+!!      LHS'PRV'TYPE,B,1                !Previous Order Type
+!!      LHS'PRV'HDR'NO,B,3              !Previous Order Header Number
+!!      LHS'MSGNO,B,3                   !Message Chain
+!!      LHS'KTD'TRK'NO = 0
+        LHS'SLIP'PRICE = OCD'SLIP'PRICE
+        CALL COPY'LHS
+    ALL'DONE:
+        CALL TOTAL'HDR
+RETURN
+
+MAP1 EXISTING'LIN,B,4
+MAP1 EXISTING'TRK'NO,B,3
+
+COPY'POSUB:
+    IF MAKORD = 0 OR CMN'LEVEL # 6 GOTO COPY'POSUB2
+    IF EXISTING'TRK'NO = POLIN'TRK'NO GOTO COPY'POSUB2  !!KLUDGE
+    EXISTING'LIN = 0
+    EXISTING'TRK'NO = 0
+    LIN'KHDR'LOC'NO = HDR'LOC'NO
+    LIN'KDOC'TYPE = HDR'DOC'TYPE
+    LIN'KHDR'NO = HDR'NO
+    LIN'KNO = 0
+    USE LIN INTO LIN'REC KEY LIN'KEY
+    DO
+        GETNXT LIN
+        \CHKKEY LIN
+        IF LIN'CTL # 0 EXIT
+        IF LIN'TRK'NO = POLIN'TRK'NO EXIT
+    LOOP
+    IF LIN'CTL = 0 THEN
+        RDLOCK LIN INTO LIN'REC
+        IF LIN'CTL # 0 THEN
+            ENTRY = "Weird lost line!"
+            \KERROR LIN MODE="D" CNO="N" APID="OE"
+            CALL DO'ERRL
+            GOTO ABORT
+        ENDIF
+        CALL SUBTRACT'HDR
+        EXISTING'LIN = LIN'NO
+        EXISTING'TRK'NO = POLIN'TRK'NO
+        LHS'REC = LIN'REC
+    ENDIF
+    CALL COPY'POSUB2
+RETURN
+
+COPY'POSUB2:
+        LIN'UOM'NO = POLIN'UOM'NO
+        CALL FIND'UOM
+        IF MAKORD # 0 AND CMN'LEVEL = 6 THEN
+            LHS'USR'OQTY = LHS'USR'OQTY + (POSUB'USR'RQTY * (UOM'NUNITS/UOM'DUNITS))
+            LHS'SUB'COUNT = LHS'SUB'COUNT + 1
+            LHS'TCOM'QTY(POSUB'ATT'NO1) = LHS'TCOM'QTY(POSUB'ATT'NO1) + (POSUB'USR'RQTY * (UOM'NUNITS/UOM'DUNITS))
+            LHS'TORDER'QTY(POSUB'ATT'NO1) = LHS'TCOM'QTY(POSUB'ATT'NO1)
+            LHS'USR'CQTY = LHS'USR'OQTY
+            LHS'ORDER'QTY = LHS'USR'OQTY
+            LHS'COM'QTY = LHS'USR'OQTY
+            ENTRY = "Size 1="+POSUB'ATT'NO1+" LHS COM="+LHS'TCOM'QTY(POSUB'ATT'NO1)+" TO="+LHS'TORDER'QTY(POSUB'ATT'NO1)
+            XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+        ELSE
+            LHS'USR'OQTY = LHS'USR'OQTY + (POSUB'ORDER'QTY * (UOM'NUNITS/UOM'DUNITS))
+            LHS'SUB'COUNT = LHS'SUB'COUNT + 1
+            LHS'TCOM'QTY(POSUB'ATT'NO1) = (POSUB'ORDER'QTY * (UOM'NUNITS/UOM'DUNITS))
+            LHS'TORDER'QTY(POSUB'ATT'NO1) = (POSUB'ORDER'QTY * (UOM'NUNITS/UOM'DUNITS))
+            LHS'USR'CQTY = LHS'USR'OQTY
+            LHS'ORDER'QTY = LHS'USR'OQTY
+            LHS'COM'QTY = LHS'USR'OQTY
+            ENTRY = "Size 2 ="+POSUB'ATT'NO1+" LHS COM="+LHS'COM'QTY+" TO="+LHS'TORDER'QTY(POSUB'ATT'NO1)
+            XCALL VICSIT,26,ENTRY,"/logs/oe2cre.DAILY"
+        ENDIF
+RETURN
+
+CHECK'IF'CANCELED:                    !!(bdl)
+        ADD'TO'CANCEL = "N"           !!(bdl) This code checks for the order in the CANFIL under OE
+        CAN'KLOC'NO = WRH'LOC'NO
+        CAN'KDOC'TYPE = WRH'DOC'TYPE
+        CAN'KHHS'NO = WRH'HDR'NO
+        CAN'KSHIPMENT = WRH'EDTT
+        USE CAN INTO CAN'REC KEY CAN'KEY
+        IF CAN'CTL = 0 THEN
+            DTT = CAN'DATE
+            \STRDTT DTT="DTT" DDATE="CHECK'DATE"
+            ENTRY = "Order: "+WRH'LOC'NO+"-"+WRH'DOC'TYPE+"-"+WRH'HDR'NO+" already canceled by: "+CAN'UB'UID+" On: "+CHECK'DATE
+            CALL DO'ERR
+        ELSE
+            ADD'TO'CANCEL = "Y"
+        ENDIF
+RETURN
+
+ADD'CAN'RECORD:                                !!(bdl)
+    CAN'LOC'NO = WRH'LOC'NO                    !!(bdl) This code adds the order to the CANFIL as the last thing
+    CAN'DOC'TYPE = WRH'DOC'TYPE                !!(bdl) before it exits the cancel replace function.
+    CAN'HHS'NO = WRH'HDR'NO
+    CAN'SHIPMENT = WRH'EDTT
+    CAN'UB'UID = UB'UID
+    CAN'DATE = DATE
+    CAN'KLOC'NO = WRH'LOC'NO
+    CAN'KDOC'TYPE = WRH'DOC'TYPE
+    CAN'KHHS'NO = WRH'HDR'NO
+    CAN'KSHIPMENT = WRH'EDTT
+    CAN'NAM'NO = HHS'NAM'NO
+    CAN'TYPE = "C"
+    CAN'QUOTE'YN = HHS'QUOTE'YN
+    \SETKEY CAN MODE="KEY" APID="OE"
+    ADDL CAN FROM CAN'REC KEY CAN'KEY
+    IF CAN'CTL = 0 THEN
+        \SETKEY CAN MODE="KY2" APID="OE"
+        \ADDKEY CAN MODE="KY2" APID="OE"
+        REL CAN
+    ELSE
+        \SETKEY CAN MODE="KEY" APID="OE"
+        RDLOCK CAN INTO CAN'REC KEY CAN'KEY
+        IF CAN'CTL # 0 THEN
+            ENTRY = "WEIRD: could not add CAN!"
+            CALL DO'ERR
+        ENDIF
+        IF CAN'UB'UID = "" THEN
+            \SETKEY CAN MODE="KY2" APID="OE"
+            \UPDKEY CAN MODE="KY2" APID="OE"
+            WRITE CAN FROM CAN'REC
+        ELSE
+            REL CAN
+        ENDIF
+    ENDIF
+    ADD'TO'CANCEL = "N"                        !!(bdl) Already added... don't want to add again by mistake
+
+RETURN
+
+\COPYF ORD OE ORD2
+
+CHANGE'ORD'RECORD:
+    \CNV'DTT HHS'PSTDT YDAYS
+    \CNV'DTT DATE TODAY
+    IF YDAYS = TODAY THEN
+        ORD'SPACE = SPACE
+        ORD2'KLOC'NO = WRH'LOC'NO
+        ORD2'KDOC'TYPE = WRH'DOC'TYPE
+        ORD2'KNO = WRH'HDR'NO
+        ORD2'KSHIPMENT = WRH'EDTT
+        ORD2'KTIH'NO = 0
+        USE ORD2 INTO ORD'REC KEY ORD2'KEY
+        DO
+            GETNXT ORD2 INTO ORD'REC
+            \CHKKEY ORD ALTKEY="ORD2"
+            IF ORD2'CTL # 0 EXIT
+            RDLOCK ORD ORD2'RCN INTO ORD'REC
+            IF ORD'CTL = 0 THEN
+                ORD'CANCEL'FLG = "Y"
+                WRITE ORD FROM ORD'REC
+            ENDIF
+        LOOP
+    ENDIF
+RETURN
+
+LOOKUP'AND'ADD'TAD:
+    TAD2'KBS = "S"            !!Shipping TAD
+    TAD2'KHDR'LOC'NO = HHS'LOC'NO
+    TAD2'KDOC'TYPE = HHS'DOC'TYPE
+    TAD2'KHDR'NO = HHS'NO
+    USE TAD2 INTO TAD2'REC KEY TAD2'KEY
+    IF TAD2'CTL = 0 THEN
+        TAD'BS = "S"
+        TAD'HDR'LOC'NO = HDR'LOC'NO
+        TAD'DOC'TYPE = HDR'DOC'TYPE
+        TAD'HDR'NO = HDR'NO
+        TAD'COMPANY = TAD2'COMPANY
+        TAD'ADDR1 = TAD2'ADDR1
+        TAD'ADDR2 = TAD2'ADDR2
+        TAD'CITY = TAD2'CITY
+        TAD'ST = TAD2'ST
+        TAD'ZIP = TAD2'ZIP
+        TAD'COUNTRY = TAD2'COUNTRY
+        TAD'RES'YN = TAD2'RES'YN
+        TAD'BOTH'YN = TAD2'BOTH'YN
+        TAD'CRDT = TAD2'CRDT
+        TAD'NAME = TAD2'NAME
+        TAD'PHONE = TAD2'PHONE
+        \SETKEY TAD MODE="KEY" APID="OE"
+        ADDL TAD FROM TAD'REC KEY TAD'KEY
+        IF TAD'CTL = 0 THEN
+            \SETKEY TAD MODE="KY2" APID="OE"
+            \ADDKEY TAD MODE="KY2" APID="OE"
+        ENDIF
+    ELSE
+        TAD2'KBS = "B"            !!Billing TAD
+        USE TAD2 INTO TAD2'REC KEY TAD2'KEY
+        IF TAD2'CTL = 0 THEN
+            TAD'BS = "B"
+            TAD'HDR'LOC'NO = HDR'LOC'NO
+            TAD'DOC'TYPE = HDR'DOC'TYPE
+            TAD'HDR'NO = HDR'NO
+            TAD'COMPANY = TAD2'COMPANY
+            TAD'ADDR1 = TAD2'ADDR1
+            TAD'ADDR2 = TAD2'ADDR2
+            TAD'CITY = TAD2'CITY
+            TAD'ST = TAD2'ST
+            TAD'ZIP = TAD2'ZIP
+            TAD'COUNTRY = TAD2'COUNTRY
+            TAD'RES'YN = TAD2'RES'YN
+            TAD'BOTH'YN = TAD2'BOTH'YN
+            TAD'CRDT = TAD2'CRDT
+            TAD'NAME = TAD2'NAME
+            TAD'PHONE = TAD2'PHONE
+            \SETKEY TAD MODE="KEY" APID="OE"
+            ADDL TAD FROM TAD'REC KEY TAD'KEY
+            IF TAD'CTL = 0 THEN
+                \SETKEY TAD MODE="KY2" APID="OE"
+                \ADDKEY TAD MODE="KY2" APID="OE"
+            ENDIF
+        ENDIF
+    ENDIF
+RETURN
+
+!![WC] CCANET maps
+\ANAUTHMAPS
+
+CREATE'ATQ:
+    ATQ'SPACE = SPACE
+
+    !![WC] ANET changes
+    CALL GET'CC'PROVIDER            !![WC] Found in CCANET.CPY
+    IF PPI'ACTIVE = "AN" THEN
+        ATQ'PPI = "YES"
+    ENDIF
+    !![WC]
+
+    ATQ'CARDNO = ATQ8'CARDNO
+    ATQ'EXP = ATQ8'EXP
+    ATQ'VSTATUS = "P"
+    ATQ'ELECTRONIC = ATQ8'ELECTRONIC !![58]
+    ATQ'STATUS = "U"
+    IF ATQ'ELECTRONIC = "N" THEN
+        ATQ'APPROVAL = ATQ8'APPROVAL
+    ENDIF
+    \UCNVATQ
+    IF SIGN = -1 THEN
+        ATQ'OSPECIAL = ATQ8'SPECIAL
+        ATQ'AMT = -ATQ8'AMT             !![58]
+        ATQ8'OSPECIAL = ATQ'SPECIAL
+        WRITE ATQT8 FROM ATQ8'REC
+    ELSE
+        ATQ'AMT = ATQ8'AMT              !![58]
+        REL ATQT8
+    ENDIF
+\COPYF CTP AR MODE="PRI"
+MAP1 CTPPTR,X,30
+    CTP'KNO = TRH'CTP'NO
+    \VUSE CTP
+    IF CTP'CTL # 0 THEN
+        ENTRY = "Invalid CTP from TRH!"
+        CALL DO'ERRL
+        ENTRY = "DANGER: check with VICS!"
+        CALL DO'ERRL
+    ENDIF
+    IF ATQ'AMT >= 0 THEN    !![58] set codes
+        ATQ'TRX'CODES = CTP'DEB'SET
+    ELSE
+        ATQ'TRX'CODES = CTP'CRE'SET
+    ENDIF
+    CALL ADD'ATQ
+    REL ATQT
+RETURN
+
+DELETE'WL:
+    \COPYF VFD WL
+    VFDA2'KVFH'LOC'NO = HHS'LOC'NO
+    VFDA2'KDOC'TYPE = HHS'DOC'TYPE
+    VFDA2'KHDR'NO = HHS'NO
+    VFDA2'KSHIPMENT = HHS'SHIPMENT
+    VFDA2'KLS = ""
+    USE VFDA2 INTO VFD'REC KEY VFDA2'KEY
+    DO
+        GETNXT VFDA2 INTO VFD'REC
+        \CHKKEY VFDA ALTKEY="VFDA2" APID="WL"
+        IF VFDA2'CTL # 0 EXIT
+        RDLOCK VFD VFDA2'RCN INTO VFD'REC
+        IF VFD'CTL = 0 THEN
+            \SETKEY VFD MODE="ALL" APID="WL"
+            \DELKEY VFD MODE="ALL" APID="WL"
+            DELETE VFD
+        ELSE
+            ENTRY = "VFD not found error:"
+            \KERROR VFD CNO="N" MODE="D" APID="WL"
+            GOTO DO'ERR
+        ENDIF
+    LOOP
+    WLQ'KLOC'NO = HDR'LOC'NO
+    WLQ'KDOC'TYPE = HDR'DOC'TYPE
+    WLQ'KHDR'NO = HDR'NO
+    WLQ'KSHIPMENT = HDR'SHIPMENT + 1  !!?????
+    RDLOCK WLQ INTO WLQ'REC KEY WLQ'KEY
+    IF WLQ'CTL = 0 THEN
+        \SETKEY WLQ MODE="KY2" APID="WL"
+        \DELKEY WLQ MODE="ALL" APID="WL"
+        DELETE WLQ
+    ENDIF
+RETURN
+
+COPY "FEDEX",WANT'DPS="Y",WANT'TRKNO="Y",WANT'VALID="Y",ERR'CALL="DO'ERR",ABORT'CALL="ABORT"
+
+SNDMON: !!Dummy for Endicia on bagger (which this program does not run on)
+RETURN
+
+\COPYF MBX OE
+MAP1 MY'TIME,B,3
+
+ADD'MBX'MSG:
+    \STRDTT DTT="DATE" DDATE="M'DATE"
+    \SET'TIME MY'TIME
+    \TIME NUM'TIME="MY'TIME" DSP="Y" ALP'TIME="PRINT'TIME"
+
+    MBX'SPACE = SPACE
+    MBX'HDR'LOC'NO = RHHS'LOC'NO
+    MBX'DOC'TYPE = RHHS'DOC'TYPE
+    MBX'HDR'NO = RHHS'NO
+    MBX'SHIPMENT = 99
+    MBX'BOX'NO = 1
+    \SETKEY MBX MODE="KEY" APID="OE"
+    RDLOCK MBX INTO MBX'REC KEY MBX'KEY
+    IF MBX'CTL # 0 THEN
+        MBX'HDR'LOC'NO = RHHS'LOC'NO
+        MBX'DOC'TYPE = RHHS'DOC'TYPE
+        MBX'HDR'NO = RHHS'NO
+        MBX'SHIPMENT = 99
+        MBX'BOX'NO = 1
+        \SETKEY MBX MODE="KEY" APID="OE"
+        ADD MBX FROM MBX'REC KEY MBX'KEY
+        IF MBX'CTL = 0 THEN
+            RDLOCK MBX INTO MBX'REC KEY MBX'KEY
+        ENDIF
+    ENDIF
+    IF MBX'CTL = 0 THEN    !!Found MBX
+        MSG'DID = "OEMSG"
+        IF MBX'MSGNO = 0 THEN
+            MSG'SPACE = SPACE
+            MSG'DATA = "CANCEL/REPLACE on "+M'DATE + " " + PRINT'TIME + " by "+UB'UID
+            ADD MSG
+            MBX'MSGNO = MSG'RCN
+            UPDATE MBX
+
+            MSG'SPACE = SPACE
+            MSG'DATA = SAVE'MESSAGE
+            ENTRY = MSG'DATA
+            \LOOPMSG PRE="MBX" APPEND="MBX'MSGNO" DATA="ENTRY" APID="OE"
+            UPDATE MBX
+        ELSE
+            MSG'SPACE = SPACE
+            MSG'DATA = "CANCEL/REPLACE on "+M'DATE + " " + PRINT'TIME + " by "+UB'UID
+            \LOOPMSG PRE="MBX" APPEND="MBX'MSGNO" DATA="ENTRY" APID="OE"
+            UPDATE MBX
+
+            MSG'SPACE = SPACE
+            MSG'DATA = SAVE'MESSAGE
+            ENTRY = MSG'DATA
+            \LOOPMSG PRE="MBX" APPEND="MBX'MSGNO" DATA="ENTRY" APID="OE"
+            UPDATE MBX
+        ENDIF
+        REL MBX
+    ENDIF
+RETURN
